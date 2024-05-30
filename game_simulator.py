@@ -1,4 +1,3 @@
-## In the get_game_information file, I think we should filter to include only where the ball was put in play or a walk/hbp or a strikeout
 ## Then make sure to remove duplicates
 ## Then, we create a new df that includes venue_name, balls, strikes, outs, bases occupied, launch angle, exit velo
 ## Here, we could merge run expectancy, launch angle and exit velo at the specific venue

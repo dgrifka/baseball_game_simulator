@@ -56,7 +56,7 @@ def fetch_games():
     ## Return the venues as well, since we use this information in the model
     venues_list = filtered_games_df['venue.name'].unique()
 
-    return games_list, venues_list
+    return filtered_games_df, games_list, venues_list
 
 
 ## Now, we want to get each game's info
@@ -134,9 +134,13 @@ def get_game_info(game_id):
     ## Filter for only balls put in play or if the play is a strikeout/walk
     total_pbp_filtered = total_pbp.copy()
     other_plays = ['walk', 'hit_by_pitch', 'strikeout']
-    total_pbp_filtered = total_pbp_filtered[(total_pbp_filtered['details.isInPlay'] == True) | (total_pbp_filtered['gameDate'].isin([other_plays]))]
+    total_pbp_filtered = total_pbp_filtered[(total_pbp_filtered['details.isInPlay'] == True) | (total_pbp_filtered['eventType'].isin(other_plays))]
 
     ## Then, filter to the last record of this occurrence, since each playId includes other irrelevant information, such as stolen bases, etc.
-    total_pbp_filtered = total_pbp_filtered.drop_duplicates(subset="playId", keep="last")
+    total_pbp_filtered = total_pbp_filtered.drop_duplicates(subset="ab_num", keep="last")
+
+    ## Filter to only columns needed
+    cols_needed = ["ab_num", "eventType", "description", "isOut", "hitData.launchSpeed", "hitData.launchAngle"]
+    total_pbp_filtered = total_pbp_filtered[cols_needed]
 
     return total_pbp_filtered
