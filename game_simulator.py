@@ -1,13 +1,3 @@
-## Then make sure to remove duplicates
-## Then, we create a new df that includes venue_name, balls, strikes, outs, bases occupied, launch angle, exit velo
-## Here, we could merge run expectancy, launch angle and exit velo at the specific venue
-## A walk/hbp automatically moves everyone up 1 base
-## A strikeout adds 1 out
-## In main, we use the model to predict the outcome of the of the launch angle and exit velo at the specific venue
-## Then, we roll the dice to see what the outcome is
-## Then, we adjust the bases, scores, outs
-## Repeat 10,000 times and compare winners
-
 import pandas as pd
 import pickle
 

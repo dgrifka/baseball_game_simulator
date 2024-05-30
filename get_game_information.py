@@ -56,6 +56,8 @@ def fetch_games():
     ## Return the venues as well, since we use this information in the model
     venues_list = filtered_games_df['venue.name'].unique()
 
+    filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.name", "teams.away.score", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]].head()
+
     return filtered_games_df, games_list, venues_list
 
 
@@ -139,8 +141,13 @@ def get_game_info(game_id):
     ## Then, filter to the last record of this occurrence, since each playId includes other irrelevant information, such as stolen bases, etc.
     total_pbp_filtered = total_pbp_filtered.drop_duplicates(subset="ab_num", keep="last")
 
+    # Replace event types that are not 'single', 'double', 'triple', or 'home_run' with 'out'
+    total_pbp_filtered['eventType'] = total_pbp_filtered['eventType'].apply(lambda x: x if x in ['single', 'double', 'triple', 'home_run', 'walk', 'hit_by_pitch'] else 'out')
+    total_pbp_filtered['eventType'] = total_pbp_filtered['eventType'].str.replace("hit_by_pitch", "walk")
+
     ## Filter to only columns needed
-    cols_needed = ["ab_num", "eventType", "description", "isOut", "hitData.launchSpeed", "hitData.launchAngle"]
+    cols_needed = ["gamePk", "playId", "ab_num", "eventType", "description", "outs",
+                   "isOut", "isTopInning", "inning", "hitData.launchSpeed", "hitData.launchAngle"]
     total_pbp_filtered = total_pbp_filtered[cols_needed]
 
     return total_pbp_filtered
