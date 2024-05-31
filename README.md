@@ -10,7 +10,7 @@ In the future, I'd like to create simulations that rely on Bayesian inference (s
 The data was gathered from the MLB Stats API.
 
 ##
-Assumptions
+Assumptions:
 
 The number of strikeouts and walks (incl. hbp) remain the same.
 
