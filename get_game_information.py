@@ -5,7 +5,7 @@ from pandas import json_normalize
 import pytz
 import datetime
 
-from constants import base_url, endpoint, schedule_ver, game_ver
+from constants import base_url, league, season, endpoint, team_ver, schedule_ver, game_ver
 
 def response_code(base_url, ver, endpoint):
     """
@@ -24,6 +24,19 @@ def response_code(base_url, ver, endpoint):
     response = requests.get(url)
     data = response.json()
     return data
+
+def team_info():
+    endpoint = 'teams'
+    team_info = response_code(base_url, team_ver, endpoint)
+    flattened_teams = json_normalize(team_info['teams'])
+
+    teams_df = flattened_teams.copy()
+    teams_df = teams_df[teams_df['sport.id'] == float(league)].reset_index(drop=True)
+    teams_df = teams_df[teams_df['season'] == season].reset_index(drop=True)
+
+    teams_df = teams_df.rename(columns = {"id": "team.id"})
+
+    return teams_df
 
 
 def fetch_games():
@@ -56,7 +69,7 @@ def fetch_games():
     ## Return the venues as well, since we use this information in the model
     venues_list = filtered_games_df['venue.name'].unique()
 
-    filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.name", "teams.away.score", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]].head()
+    filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]].head()
 
     return filtered_games_df, games_list, venues_list
 

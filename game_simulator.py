@@ -1,67 +1,134 @@
-import pandas as pd
+import random
 import pickle
+import pandas as pd
+import numpy as np
 
-# Load the game data from the pandas DataFrame
-game_data = pd.read_csv('game_data.csv')
-
-# Load the logistic regression model from the pickle file
+# Load the saved model and fitted preprocessor
 with open('logistic_regression_model.pkl', 'rb') as file:
-    model = pickle.load(file)
+    loaded_model = pickle.load(file)
 
-# Initialize variables for runs and outs
-away_runs = 0
-home_runs = 0
-outs = 0
+with open('preprocessor.pkl', 'rb') as file:
+    preprocessor = pickle.load(file)
 
-# Function to simulate a half-inning
-def simulate_half_inning(team):
-    global outs
+
+def outcomes(game_data, home_or_away):
+    home_or_away_team = game_data.copy()
+    if home_or_away == 'home':
+        home_or_away_team = home_or_away_team[home_or_away_team['isTopInning'] == False]
+    else:
+        home_or_away_team = home_or_away_team[home_or_away_team['isTopInning'] == True]
+
+    ## Calculate number of automatic outs (i.e. strikeouts)
+    ## We're going to assume these outs stay the same in the simulations
+    automatic_outs = home_or_away_team.copy()
+    automatic_outs = automatic_outs[(automatic_outs['eventType'] == 'out') & (automatic_outs['hitData.launchSpeed'].isnull())]
+    strikeouts = len(automatic_outs)
+    ## Calculate the number of walks
+    walks = home_or_away_team.copy()
+    walks = walks[walks['eventType'] == 'walk']
+    walk_len = len(walks)
+
+    ## Now let's create a df with balls put in play
+    put_in_play = home_or_away_team.copy()
+    put_in_play = put_in_play[~put_in_play['hitData.launchSpeed'].isnull()].reset_index(drop=True)
+    put_in_play = put_in_play[['hitData.launchSpeed', 'hitData.launchAngle', 'venue.name']]
+
+    ## Now, we'll create a list of outcomes to sample from
+    # Convert the DataFrame to a list of lists
+    pip_list = put_in_play[['hitData.launchSpeed', 'hitData.launchAngle', 'venue.name']].values.tolist()
+
+    # Create a list of "strikeout" and "walk" strings
+    strikeout_list = ["strikeout"] * strikeouts
+    walk_list = ["walk"] * walk_len
+
+    # Combine the two lists
+    outcomes = pip_list + strikeout_list + walk_list
+
+    return outcomes
+
+
+def simulate_game(outcomes_df):
     outs = 0
-    while outs < 3:
-        # Get the next batter's data from the game_data DataFrame
-        batter_data = game_data.loc[game_data['team'] == team].iloc[0]
+    runs = 0
+    bases = [False, False, False]  # First, Second, Third base
+    
+    outcomes_copy = outcomes_df.copy()  # Create a copy of the outcomes list
+    
+    while outcomes_copy:  # Continue until all outcomes are used
+        if outs == 3:
+            outs = 0
+            bases = [False, False, False]  # Clear the bases after 3 outs
         
-        # Extract the relevant features for the logistic regression model
-        launch_speed = batter_data['hitData.launchSpeed']
-        launch_angle = batter_data['hitData.launchAngle']
-        venue_name = batter_data['venue.name']
-        
-        # Prepare the input features for the model
-        input_features = [[launch_speed, launch_angle, venue_name]]
-        
-        # Use the logistic regression model to predict the outcome
-        outcome = model.predict(input_features)
-        
-        # Update runs and outs based on the outcome
-        if outcome == 'hit':
-            if team == 'away':
-                global away_runs
-                away_runs += 1
-            else:
-                global home_runs
-                home_runs += 1
-        else:
+        # Sample an outcome from the list
+        outcome = random.choice(outcomes_copy)
+        outcomes_copy.remove(outcome)  # Remove the sampled outcome from the copy
+
+        if outcome == "out":
             outs += 1
-        
-        # Remove the current batter from the game_data DataFrame
-        game_data.drop(game_data.index[0], inplace=True)
+        elif outcome == "walk":
+            advance_runner(bases)
+        elif isinstance(outcome, list) and len(outcome) == 3:
+            # Extract the launch speed, launch angle, and stadium from the outcome
+            launch_speed, launch_angle, stadium = outcome
 
-# Simulate the game
-for inning in range(1, 10):
-    print(f"Inning {inning}")
-    
-    # Top half of the inning (away team)
-    print("Top of the inning")
-    simulate_half_inning('away')
-    
-    # Bottom half of the inning (home team)
-    print("Bottom of the inning")
-    simulate_half_inning('home')
-    
-    print(f"Score: Away {away_runs} - Home {home_runs}")
-    print()
+            # Create a DataFrame with the new example
+            new_example = pd.DataFrame({
+                'hitData_launchSpeed': [launch_speed],
+                'hitData_launchAngle': [launch_angle],
+                'venue_name': [stadium]
+            })
 
-# Final score
-print("Final Score:")
-print(f"Away: {away_runs}")
-print(f"Home: {home_runs}")
+            # Preprocess the new example using the loaded preprocessor
+            new_example_preprocessed = preprocessor.transform(new_example)
+
+            # Get predicted probabilities
+            probabilities = loaded_model.predict_proba(new_example_preprocessed)[0]
+
+            # Generate a random value between 0 and 1
+            random_value = random.random()
+
+            # Determine the outcome based on the probabilities
+            if random_value < probabilities[0]:
+                outs += 1
+            elif random_value < probabilities[0] + probabilities[1]:
+                runs += advance_runner(bases)
+                bases[0] = True
+            elif random_value < probabilities[0] + probabilities[1] + probabilities[2]:
+                runs += advance_runner(bases, 2)
+                bases[1] = True
+            elif random_value < probabilities[0] + probabilities[1] + probabilities[2] + probabilities[3]:
+                runs += advance_runner(bases, 3)
+                bases[2] = True
+            else:
+                runs += advance_runner(bases, 4)
+                bases = [False, False, False]
+    
+    return runs
+
+def advance_runner(bases, count=1):
+    runs = 0
+    for _ in range(count):
+        if bases[2]:
+            runs += 1
+        bases[2] = bases[1]
+        bases[1] = bases[0]
+        bases[0] = True
+    return runs
+
+
+def simulator(num_simulations, home_outcomes, away_outcomes):
+    # Simulate the game for home_outcomes and away_outcomes
+    home_runs_scored = np.array([simulate_game(home_outcomes) for _ in range(num_simulations)])
+    away_runs_scored = np.array([simulate_game(away_outcomes) for _ in range(num_simulations)])
+
+    # Compare the scores and calculate win/tie/loss percentages
+    home_wins = np.sum(home_runs_scored > away_runs_scored)
+    away_wins = np.sum(home_runs_scored < away_runs_scored)
+    ties = np.sum(home_runs_scored == away_runs_scored)
+
+    home_win_percentage = home_wins / num_simulations * 100
+    away_win_percentage = away_wins / num_simulations * 100
+    tie_percentage = ties / num_simulations * 100
+
+    return home_runs_scored, away_runs_scored, home_win_percentage, away_win_percentage, tie_percentage
+

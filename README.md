@@ -1,9 +1,15 @@
 # baseball_simulator
-MLB Deserve-to-Win Simulator -- STILL IN PRODUCTION
+MLB Deserve-to-Win Simulator
 
-First, we're utilizing launch angle and exit velocity, since I wanted to reward teams that hit the ball hard. I'd like to add a feature that resamples the existing outcomes, instead of LA/EV, but selfishly I just wanted to learn how to importing a model into a simulation via pickle.
-We're essentially determining a team's "luck" factor by how their hits were dispersed in a game vs many simulations.
+I wanted to analyze how game outcomes can change, depending on when a hit occurred. For example, I wanted to determine if a team hit well, but struggled to string together hits. I essentially wanted to determine a team's "luck" factor by how their hits were dispersed in a game vs many simulations. For example, leaving 15 batters on base to end the game can be incredibly frustrating for fans. So, this can let them know that they should have won!
 
+Additionally, I wanted to utilize a model that uses launch angle, exit velocity, and ballpark to determine , since I wanted to reward teams that hit the ball hard. In the future, I'd like to add a new sim that only resamples the existing outcomes, instead of using LA/EV, but selfishly I also wanted to my modeling skills to the test. I've included the methodology behind my model as an ipynb. Please, feel free to rip it up and improve it!
+
+In the future, I'd like to create simulations that rely on Bayesian inference (such as run distributions for the priors) to help reduce outliers.
+
+The data was gathered from the MLB Stats API.
+
+##
 Assumptions
 
 The number of strikeouts and walks (incl. hbp) remain the same.
@@ -19,12 +25,3 @@ This model uses launch angle and exit velocity to predict outcomes, so a great d
 If the away team went up to bat in the 9th inning, while the home team did not, then the away team could be favored more than the home team in the simulation.
 
 Fielding errors are not accounted for, so a team can outperform or underperform in the simulation depending on errors.
-
-## Then, we create a new df that includes venue_name, balls, strikes, outs, bases occupied, launch angle, exit velo
-## Here, we could merge run expectancy, launch angle and exit velo at the specific venue
-## A walk automatically moves everyone up 1 base
-## A strikeout adds 1 out
-## In main, we use the model to predict the outcome of the of the launch angle and exit velo at the specific venue
-## Then, we roll the dice to see what the outcome is
-## Then, we adjust the bases, scores, outs
-## Repeat 10,000 times and compare winners
