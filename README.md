@@ -9,6 +9,7 @@ In the future, I'd like to create simulations that rely on Bayesian inference (s
 
 The data was gathered from the MLB Stats API.
 
+The main.py will run the simulations and create visualizations about the distributions.
 ##
 Assumptions:
 
