@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt
 from constants import team_colors
 
-def wp_barplot(num_simulations, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team):
+import os
+
+def wp_barplot(num_simulations, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score):
 
     # Create a bar plot for win percentages
     labels = [f'{home_team}', f'{away_team}', 'Tie']
@@ -16,7 +18,13 @@ def wp_barplot(num_simulations, home_win_percentage, away_win_percentage, tie_pe
     plt.xticks(fontsize=12)
     plt.yticks(fontsize=12)
     plt.gca().set_yticklabels([f'{x:.0f}%' for x in plt.gca().get_yticks()])
-    plt.show()
+
+    # Save the plot to the "images" folder in the repository
+    images_dir = "images"
+    if not os.path.exists(images_dir):
+        os.makedirs(images_dir)
+    plt.savefig(os.path.join(images_dir, f'{home_team}_{away_team}_wp_{str({away_score})}-{str(home_score)}.png'))
+    plt.close()
 
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team):
     # Graph the distributions of runs scored
@@ -29,4 +37,9 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.xticks(fontsize=12)
     plt.yticks(fontsize=12)
     plt.legend(fontsize=12)
-    plt.show()
+    # Save the plot to the "images" folder in the repository
+    images_dir = "images"
+    if not os.path.exists(images_dir):
+        os.makedirs(images_dir)
+    plt.savefig(os.path.join(images_dir, f'{home_team}_{away_team}_rd.png'))
+    plt.close()
