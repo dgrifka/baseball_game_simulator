@@ -1,5 +1,5 @@
 # baseball_simulator
-MLB Deserve-to-Win Simulator
+MLB Deserve-to-Win Simulator (inspired by @MoneyPuckdotcom)
 
 I wanted to analyze how game outcomes can change, depending on when a hit occurred. For example, I wanted to determine if a team hit well, but struggled to string together hits. I essentially wanted to determine a team's "luck" factor by how their hits were dispersed in a game vs many simulations. For example, leaving 15 batters on base to end the game can be incredibly frustrating for fans. So, this can let them know that they should have won!
 
