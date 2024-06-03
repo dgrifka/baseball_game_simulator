@@ -69,7 +69,7 @@ def fetch_games():
     ## Return the venues as well, since we use this information in the model
     venues_list = filtered_games_df['venue.name'].unique()
 
-    filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]].head()
+    filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]]
 
     return filtered_games_df, games_list, venues_list
 
