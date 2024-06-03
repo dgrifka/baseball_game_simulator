@@ -14,7 +14,7 @@ game_ver = 'v1.1'
 ## Colors and Logo
 team_colors = {
     "D-backs": ("#000000", "Process Black"),
-    "Braves": ("#6D2C91", "108"),
+    "Braves": ("#CE114", "108"),
     "Orioles": ("#DF4601", "109"),
     "Red Sox": ("#BD3039", "116"),
     "White Sox": ("#C0C0C0", "122"),
