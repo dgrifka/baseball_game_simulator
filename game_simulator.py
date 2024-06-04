@@ -10,7 +10,6 @@ with open('logistic_regression_model.pkl', 'rb') as file:
 with open('preprocessor.pkl', 'rb') as file:
     preprocessor = pickle.load(file)
 
-
 def outcomes(game_data, home_or_away):
     home_or_away_team = game_data.copy()
     if home_or_away == 'home':
@@ -115,7 +114,6 @@ def advance_runner(bases, count=1):
         bases[0] = True
     return runs
 
-
 def simulator(num_simulations, home_outcomes, away_outcomes):
     # Simulate the game for home_outcomes and away_outcomes
     home_runs_scored = np.array([simulate_game(home_outcomes) for _ in range(num_simulations)])
@@ -131,4 +129,3 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     tie_percentage = ties / num_simulations * 100
 
     return home_runs_scored, away_runs_scored, home_win_percentage, away_win_percentage, tie_percentage
-
