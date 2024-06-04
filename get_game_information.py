@@ -60,7 +60,7 @@ def fetch_games():
     utc_timezone = pytz.UTC
 
     current_date_time = datetime.datetime.now(utc_timezone)
-    one_day_ago = current_date_time - datetime.timedelta(days=2)
+    one_day_ago = current_date_time - datetime.timedelta(days=1)
 
     filtered_games_df = finished_games[(finished_games['gameDate'] >= one_day_ago) & (finished_games['gameDate'] <= current_date_time)]
 
