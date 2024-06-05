@@ -39,7 +39,7 @@ def team_info():
     return teams_df
 
 
-def fetch_games():
+def fetch_games(days_ago):
 
     schedule = response_code(base_url, schedule_ver, endpoint)
 
@@ -60,7 +60,7 @@ def fetch_games():
     utc_timezone = pytz.UTC
 
     current_date_time = datetime.datetime.now(utc_timezone)
-    one_day_ago = current_date_time - datetime.timedelta(days=1)
+    one_day_ago = current_date_time - datetime.timedelta(days=days_ago)
 
     filtered_games_df = finished_games[(finished_games['gameDate'] >= one_day_ago) & (finished_games['gameDate'] <= current_date_time)]
 
