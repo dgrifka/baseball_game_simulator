@@ -40,6 +40,7 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 ##
 Outputs:
 
-![wp](https://github.com/dgrifka/baseball_game_simulator/assets/65031380/4178b2b6-918a-4abd-860b-26741f381c8c)
+![White Sox_Cubs_6-7--43-46_rd](https://github.com/dgrifka/baseball_game_simulator/assets/65031380/18099a3e-174b-440a-b73d-c2ebeb1bcc9e)
 
-![rs](https://github.com/dgrifka/baseball_game_simulator/assets/65031380/48ea9da2-2597-4c7c-88ca-c5c02b0808cf)
+![White Sox_Cubs_6-7--43-46_tb](https://github.com/dgrifka/baseball_game_simulator/assets/65031380/f9c47682-b43f-4932-aba3-f73fb5c58f39)
+
