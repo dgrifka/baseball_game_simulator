@@ -70,6 +70,11 @@ def fetch_games(days_ago):
     venues_list = filtered_games_df['venue.name'].unique()
 
     filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]]
+    
+    number_of_games = len(games_list)
+    print(f"Number of games: {number_of_games}")
+    print(filtered_games_df[["gamePk", "teams.away.team.name", "teams.home.team.name"]]
+        .apply(lambda row: f"{row['gamePk']}: {row['teams.away.team.name']} at {row['teams.home.team.name']}", axis=1))
 
     return filtered_games_df, games_list, venues_list
 
@@ -110,7 +115,6 @@ def get_game_info(game_id):
     try:
         # Attempt to extract the 'allPlays' section
         all_plays = game['liveData']['plays']['allPlays']
-        # ... rest of your code to process 'all_plays'
 
     except KeyError:
         # This block executes if 'liveData' or any nested key is missing
