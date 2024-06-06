@@ -60,30 +60,30 @@ def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_
     plt.close()
 
 
-def wp_barplot(num_simulations, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score):
+# def wp_barplot(num_simulations, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score):
 
-    # Create a bar plot for win percentages
-    labels = [f'{home_team}', f'{away_team}', 'Tie']
-    percentages = [home_win_percentage, away_win_percentage, tie_percentage]
-    colors = [team_colors[home_team][0], team_colors[away_team][0], '#808080']  # Use hex codes for bar colors
-    away_win_percentage_str = f"{away_win_percentage:.0f}"
-    home_win_percentage_str = f"{home_win_percentage:.0f}"
-    tie_percentage_str = f"{tie_percentage:.0f}"
+#     # Create a bar plot for win percentages
+#     labels = [f'{home_team}', f'{away_team}', 'Tie']
+#     percentages = [home_win_percentage, away_win_percentage, tie_percentage]
+#     colors = [team_colors[home_team][0], team_colors[away_team][0], '#808080']  # Use hex codes for bar colors
+#     away_win_percentage_str = f"{away_win_percentage:.0f}"
+#     home_win_percentage_str = f"{home_win_percentage:.0f}"
+#     tie_percentage_str = f"{tie_percentage:.0f}"
 
-    plt.figure(figsize=(8, 6))
-    plt.bar(labels, percentages, color=colors)
-    plt.xlabel('Team', fontsize=14)
-    plt.ylabel('Deserve-to-Win', fontsize=14)
-    plt.title(f'Deserve-to-Win ({num_simulations} Simulations)\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.gca().set_yticklabels([f'{x:.0f}%' for x in plt.gca().get_yticks()])
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
+#     plt.figure(figsize=(8, 6))
+#     plt.bar(labels, percentages, color=colors)
+#     plt.xlabel('Team', fontsize=14)
+#     plt.ylabel('Deserve-to-Win', fontsize=14)
+#     plt.title(f'Deserve-to-Win ({num_simulations} Simulations)\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
+#     plt.xticks(fontsize=12)
+#     plt.yticks(fontsize=12)
+#     plt.gca().set_yticklabels([f'{x:.0f}%' for x in plt.gca().get_yticks()])
+#     plt.gca().spines['top'].set_visible(False)
+#     plt.gca().spines['right'].set_visible(False)
 
-    # Save the plot to the "images" folder in the repository
-    images_dir = "images"
-    if not os.path.exists(images_dir):
-        os.makedirs(images_dir)
-    plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_wp.png'), bbox_inches='tight')
-    plt.close()
+#     # Save the plot to the "images" folder in the repository
+#     images_dir = "images"
+#     if not os.path.exists(images_dir):
+#         os.makedirs(images_dir)
+#     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_wp.png'), bbox_inches='tight')
+#     plt.close()

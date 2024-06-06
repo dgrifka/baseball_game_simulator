@@ -5,7 +5,7 @@ from pandas import json_normalize
 import pytz
 import datetime
 
-from constants import base_url, league, season, endpoint, team_ver, schedule_ver, game_ver
+from constants import base_url, league, season, endpoint, team_ver, schedule_ver, game_ver, venue_names
 
 def response_code(base_url, ver, endpoint):
     """
@@ -69,6 +69,10 @@ def fetch_games(days_ago):
     ## Return the venues as well, since we use this information in the model
     venues_list = filtered_games_df['venue.name'].unique()
 
+    # Filter the DataFrame based on venue_names
+    filtered_games_df = filtered_games_df[filtered_games_df['venue.name'].isin(venue_names)].reset_index(drop=True)
+
+    ## Trim the columns down to save memory
     filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]]
     
     ## Print game information for troubleshooting
