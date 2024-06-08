@@ -21,7 +21,7 @@ def response_code(base_url, ver, endpoint):
     """
     url = f'{base_url}{ver}/{endpoint}'
     print(url)
-    response = requests.get(url, verify=False)
+    response = requests.get(url)
     data = response.json()
     return data
 
