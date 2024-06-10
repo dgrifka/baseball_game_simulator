@@ -19,7 +19,7 @@ def launch_angle_range(exit_velocity):
         max_launch_angle = 30 + (exit_velocity - 98) * (2 if exit_velocity <= 116 else 3)
         return min_launch_angle, max_launch_angle
     
-def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images):
+def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
     tie_percentage_str = f"{tie_percentage:.0f}"
