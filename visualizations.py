@@ -19,7 +19,7 @@ def launch_angle_range(exit_velocity):
         max_launch_angle = 30 + (exit_velocity - 98) * (2 if exit_velocity <= 116 else 3)
         return min_launch_angle, max_launch_angle
     
-def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage):
+def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
     tie_percentage_str = f"{tie_percentage:.0f}"
@@ -79,7 +79,6 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.gca().spines['right'].set_visible(False)
 
     # Save the plot to the "images" folder in the repository
-    images_dir = "images"
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_bb.png'), bbox_inches='tight')
@@ -88,7 +87,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
 
 
-def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage):
+def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
     tie_percentage_str = f"{tie_percentage:.0f}"
@@ -109,14 +108,13 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.gca().spines['right'].set_visible(False)
 
     # Save the plot to the "images" folder in the repository
-    images_dir = "images"
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
 
 
-def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score):
+def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
     # Create a bar plot for estimated total bases
     labels = [f'{away_team}', f'{home_team}']
@@ -138,7 +136,6 @@ def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_
     plt.gca().spines['right'].set_visible(False)
 
     # Save the plot to the "images" folder in the repository
-    images_dir = "images"
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_tb.png'), bbox_inches='tight')
