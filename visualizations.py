@@ -1,14 +1,25 @@
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from matplotlib.patches import Rectangle
+
+import numpy as np
+
 from constants import team_colors
 
 import os
 
 
+def launch_angle_range(exit_velocity):
+    if exit_velocity < 98:
+        return None
+    elif exit_velocity == 98:
+        return 26, 30
+    else:
+        min_launch_angle = 26 - (exit_velocity - 98) * (2 if exit_velocity <= 116 else 3)
+        max_launch_angle = 30 + (exit_velocity - 98) * (2 if exit_velocity <= 116 else 3)
+        return min_launch_angle, max_launch_angle
+    
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage):
-    # Create a bar plot for estimated total bases
-    labels = [f'{away_team}', f'{home_team}']
-    total_bases = [away_estimated_total_bases, home_estimated_total_bases]
-    colors = [team_colors[away_team][0], team_colors[home_team][0]]  # Use hex codes for bar colors
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
     tie_percentage_str = f"{tie_percentage:.0f}"
@@ -23,23 +34,47 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
     plt.figure(figsize=(10, 6))
 
-    plt.scatter(home_ev, home_la, alpha=0.5, label=f'{home_team}', color=team_colors[home_team][0])
-    plt.scatter(away_ev, away_la, alpha=0.5, label=f'{away_team}', color=team_colors[away_team][0])
+    plt.scatter(home_ev, home_la, s=135, alpha=0.5, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
+    plt.scatter(away_ev, away_la, s=135, alpha=0.5, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
+    plt.axhline(y=0, color='black', alpha = 0.8, linewidth=0.8)
 
-    plt.axhline(y=0, color='black', linewidth=0.8)  # Add a black line at y = 0
+    plt.text(0.05, 0.95, 'Walks/HBP', transform=plt.gca().transAxes, fontsize=16, verticalalignment='top')
+    plt.text(0.05, 0.945, '___________', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
+    plt.text(0.05, 0.90, f'{away_team}: {away_walks}', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
+    plt.text(0.05, 0.85, f'{home_team}: {home_walks}', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
 
-    plt.text(0.05, 0.95, f'{home_team} Walks: {home_walks}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
-    plt.text(0.05, 0.90, f'{away_team} Walks: {away_walks}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+    x = np.linspace(98, 122, 100)  # Exit velocity range
+    y1 = np.zeros_like(x)
+    y2 = np.zeros_like(x)
 
-    plt.xlabel('Exit Velocity', fontsize=16)
-    plt.ylabel('Launch Angle', fontsize=16)
-    plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\nActual Score: {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
+    for i, ev in enumerate(x):
+        angle_range = launch_angle_range(ev)
+        if angle_range:
+            y1[i], y2[i] = angle_range
+
+    # Shade the area between the launch angle ranges
+    plt.fill_between(x, y1, y2, where=(y1 > 0) & (y2 > 0), color='green', alpha=0.2)
+
+    # Add a label for the Barrel Zone
+    barrel_zone_label = 'Barrel Zone'
+    barrel_zone_position = (111, 30)  # Adjust the position as needed
+    plt.text(barrel_zone_position[0], barrel_zone_position[1], barrel_zone_label, fontsize=12, color='green', fontweight='bold', rotation=39, ha='right', va='bottom')
+
+    # plt.text(0.05, 0.75, 'Estimated Total Bases', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+    # plt.text(0.05, 0.745, '_____________________', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+    # plt.text(0.05, 0.70, f'{away_team}: {away_estimated_total_bases}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+    # plt.text(0.05, 0.65, f'{home_team}: {home_estimated_total_bases}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+
+    plt.xlabel('Exit Velocity (mph)', fontsize=18)
+    plt.ylabel('Launch Angle', fontsize=18)
+    plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
 
     plt.legend(loc='upper right')  # Add a legend in the upper right corner
 
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.gca().set_yticklabels([f'{x:.1f}' for x in plt.gca().get_yticks()])
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
+    # Format y-tick labels as degrees
+    plt.gca().yaxis.set_major_formatter(ticker.FormatStrFormatter('%d°'))
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
 
