@@ -82,6 +82,20 @@ def simulate_game(outcomes_df):
     
     outcomes_copy = outcomes_df.copy()  # Create a copy of the outcomes list
     
+    # Calculate probabilities for each outcome before the loop
+    probabilities_dict = {}
+    for outcome in outcomes_copy:
+        if isinstance(outcome, list) and len(outcome) == 3:
+            launch_speed, launch_angle, stadium = outcome
+            new_example = pd.DataFrame({
+                'hitData_launchSpeed': [launch_speed],
+                'hitData_launchAngle': [launch_angle],
+                'venue_name': [stadium]
+            })
+            new_example_preprocessed = preprocessor.transform(new_example)
+            probabilities = loaded_model.predict_proba(new_example_preprocessed)[0]
+            probabilities_dict[tuple(outcome)] = probabilities
+    
     while outcomes_copy:  # Continue until all outcomes are used
         if outs == 3:
             outs = 0
@@ -96,21 +110,8 @@ def simulate_game(outcomes_df):
         elif outcome == "walk":
             advance_runner(bases)
         elif isinstance(outcome, list) and len(outcome) == 3:
-            # Extract the launch speed, launch angle, and stadium from the outcome
-            launch_speed, launch_angle, stadium = outcome
-
-            # Create a DataFrame with the new example
-            new_example = pd.DataFrame({
-                'hitData_launchSpeed': [launch_speed],
-                'hitData_launchAngle': [launch_angle],
-                'venue_name': [stadium]
-            })
-
-            # Preprocess the new example using the loaded preprocessor
-            new_example_preprocessed = preprocessor.transform(new_example)
-
-            # Get predicted probabilities
-            probabilities = loaded_model.predict_proba(new_example_preprocessed)[0]
+            # Get the pre-calculated probabilities for the outcome
+            probabilities = probabilities_dict[tuple(outcome)]
 
             # Generate a random value between 0 and 1
             random_value = random.random()
@@ -144,9 +145,13 @@ def advance_runner(bases, count=1):
     return runs
 
 def simulator(num_simulations, home_outcomes, away_outcomes):
-    # Simulate the game for home_outcomes and away_outcomes
-    home_runs_scored = np.array([simulate_game(home_outcomes) for _ in range(num_simulations)])
-    away_runs_scored = np.array([simulate_game(away_outcomes) for _ in range(num_simulations)])
+    # Simulate the game for home_outcomes and away_outcomes using NumPy
+    home_runs_scored = np.zeros(num_simulations, dtype=int)
+    away_runs_scored = np.zeros(num_simulations, dtype=int)
+
+    for i in range(num_simulations):
+        home_runs_scored[i] = simulate_game(home_outcomes)
+        away_runs_scored[i] = simulate_game(away_outcomes)
 
     # Compare the scores and calculate win/tie/loss percentages
     home_wins = np.sum(home_runs_scored > away_runs_scored)
