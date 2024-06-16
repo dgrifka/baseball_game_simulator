@@ -34,14 +34,14 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
     plt.figure(figsize=(10, 6))
 
-    plt.scatter(home_ev, home_la, s=135, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
-    plt.scatter(away_ev, away_la, s=135, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
+    plt.scatter(home_ev, home_la, s=150, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
+    plt.scatter(away_ev, away_la, s=150, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
     plt.axhline(y=0, color='black', alpha = 0.8, linewidth=0.8)
 
     plt.text(0.05, 0.95, 'Walks/HBP', transform=plt.gca().transAxes, fontsize=16, verticalalignment='top')
     plt.text(0.05, 0.947, '___________', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
-    plt.text(0.05, 0.90, f'{away_team}: {away_walks}', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
-    plt.text(0.05, 0.85, f'{home_team}: {home_walks}', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
+    plt.text(0.05, 0.90, f'{away_team}: {away_walks}', transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
+    plt.text(0.05, 0.85, f'{home_team}: {home_walks}', transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
 
     x = np.linspace(98, 123, 100)  # Exit velocity range
     y1 = np.zeros_like(x)
