@@ -25,14 +25,14 @@ venue_names = ['Oriole Park at Camden Yards', 'Great American Ball Park',
 
 ## Colors and Logo
 team_colors = {
-    "D-backs": ("#000000", "Process Black"),
+    "D-backs": ("#A71930", "Process Black"),
     "Braves": ("#CE1141", "108"),
     "Orioles": ("#DF4601", "109"),
     "Red Sox": ("#BD3039", "116"),
     "White Sox": ("#27251F", "122"),
     "Cubs": ("#0E3386", "123"),
     "Reds": ("#C6011F", "124"),
-    "Guardians": ("#E31937", "1235"),
+    "Guardians": ("#00385D", "1235"),
     "Rockies": ("#333366", "155"),
     "Tigers": ("#0C2C56", "1655"),
     "Astros": ("#EB6E1F", "172"),
@@ -40,7 +40,7 @@ team_colors = {
     "Angels": ("#BA0021", "1815"),
     "Dodgers": ("#005A9C", "185"),
     "Marlins": ("#00A3E0", "186"),
-    "Brewers": ("#0A2351", "187"),
+    "Brewers": ("#FFC52f", "187"),
     "Twins": ("#002B5C", "199"),
     "Yankees": ("#003087", "200"),
     "Mets": ("#002D72", "201"),
@@ -52,7 +52,7 @@ team_colors = {
     "Mariners": ("#0C2C56", "288"),
     "Cardinals": ("#C41E3A", "289"),
     "Rays": ("#092C5C", "292"),
-    "Rangers": ("#003278", "293"),
+    "Rangers": ("#C0111F", "293"),
     "Blue Jays": ("#134A8E", "294"),
     "Nationals": ("#AB0003", "295")
 }
