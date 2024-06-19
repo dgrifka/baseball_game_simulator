@@ -29,7 +29,7 @@ team_colors = {
     "Braves": ("#CE1141", "108"),
     "Orioles": ("#DF4601", "109"),
     "Red Sox": ("#BD3039", "116"),
-    "White Sox": ("#C0C0C0", "122"),
+    "White Sox": ("#27251F", "122"),
     "Cubs": ("#0E3386", "123"),
     "Reds": ("#C6011F", "124"),
     "Guardians": ("#E31937", "1235"),
