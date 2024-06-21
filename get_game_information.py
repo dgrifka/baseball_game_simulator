@@ -39,7 +39,7 @@ def team_info():
     return teams_df
 
 
-def fetch_games(days_ago):
+def fetch_games(days_ago, all_columns = False):
 
     schedule = response_code(base_url, schedule_ver, endpoint)
 
@@ -73,7 +73,8 @@ def fetch_games(days_ago):
     filtered_games_df = filtered_games_df[filtered_games_df['venue.name'].isin(venue_names)].reset_index(drop=True)
 
     ## Trim the columns down to save memory
-    filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]]
+    if all_columns == False:
+        filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]]
     
     ## Print game information for troubleshooting
     print(list(games_list))
