@@ -47,18 +47,19 @@ def outcomes(game_data, home_or_away):
 
 ## For the estimated total bases graph
 def calculate_total_bases(outcomes):
-    total_bases = 0
-    all_probabilities = []
-
+    result_list = []
     for outcome in outcomes:
         if outcome == "strikeout":
             bases = 0
-            probabilities = [1, 0, 0, 0, 0]  # Assuming 5 classes: out, single, double, triple, home run
+            event_type = "strikeout"
+            probabilities = [1, 0, 0, 0, 0]
         elif outcome == "walk":
             bases = 1
-            probabilities = [0, 1, 0, 0, 0]  # Treating walk as a single
+            event_type = "walk"
+            probabilities = [0, 1, 0, 0, 0]
         else:
             launch_speed, launch_angle, stadium = outcome
+            event_type = "in_play"
             # Create a DataFrame with the new example
             new_example = pd.DataFrame({
                 'hitData_launchSpeed': [launch_speed],
@@ -76,12 +77,32 @@ def calculate_total_bases(outcomes):
                 probabilities[3] * 3 +  # Triple
                 probabilities[4] * 4    # Home Run
             )
+            print(probabilities)
         
-        total_bases += bases
-        all_probabilities.append(probabilities)
+        result_list.append({
+            'launch_speed': launch_speed if event_type == "in_play" else None,
+            'launch_angle': launch_angle if event_type == "in_play" else None,
+            'stadium': stadium if event_type == "in_play" else None,
+            'event_type': event_type,
+            'estimated_bases': bases,
+            'out_prob': probabilities[0],
+            'single_prob': probabilities[1],
+            'double_prob': probabilities[2],
+            'triple_prob': probabilities[3],
+            'hr_prob': probabilities[4]
+        })
+    
+    return pd.DataFrame(result_list)
 
-    return total_bases, all_probabilities
-
+def create_detailed_outcomes_df(game_data, home_or_away):
+    # Get outcomes
+    outcomes_list = outcomes(game_data, home_or_away)
+    
+    # Calculate total bases and get detailed DataFrame
+    detailed_df = calculate_total_bases(outcomes_list)
+    
+    return detailed_df
+    
 def simulate_game(outcomes_df):
     outs = 0
     runs = 0
