@@ -92,6 +92,8 @@ def create_detailed_outcomes_df(game_data, home_or_away):
     
     # Calculate total bases and get detailed DataFrame
     detailed_df = calculate_total_bases(outcomes_list)
+
+    detailed_df = detailed_df.dropna().reset_index(drop=True)
     
     return detailed_df
     
