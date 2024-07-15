@@ -16,47 +16,39 @@ def outcomes(game_data, home_or_away):
         home_or_away_team = home_or_away_team[home_or_away_team['isTopInning'] == False]
     else:
         home_or_away_team = home_or_away_team[home_or_away_team['isTopInning'] == True]
+    
+    outcomes = []
 
-    ## Calculate number of automatic outs (i.e. strikeouts)
-    ## We're going to assume these outs stay the same in the simulations
-    automatic_outs = home_or_away_team.copy()
-    automatic_outs = automatic_outs[(automatic_outs['eventType'] == 'out') & (automatic_outs['hitData.launchSpeed'].isnull())]
-    strikeouts = len(automatic_outs)
-    ## Calculate the number of walks
-    walks = home_or_away_team.copy()
-    walks = walks[walks['eventType'] == 'walk']
-    walk_len = len(walks)
+    # Handle automatic outs (strikeouts)
+    automatic_outs = home_or_away_team[(home_or_away_team['eventType'] == 'out') & (home_or_away_team['hitData.launchSpeed'].isnull())]
+    for _, row in automatic_outs.iterrows():
+        outcomes.append(("strikeout", row['eventType']))
 
-    ## Now let's create a df with balls put in play
-    put_in_play = home_or_away_team.copy()
-    put_in_play = put_in_play[~put_in_play['hitData.launchSpeed'].isnull()].reset_index(drop=True)
-    put_in_play = put_in_play[['hitData.launchSpeed', 'hitData.launchAngle', 'venue.name']]
+    # Handle walks
+    walks = home_or_away_team[home_or_away_team['eventType'] == 'walk']
+    for _, row in walks.iterrows():
+        outcomes.append(("walk", row['eventType']))
 
-    ## Now, we'll create a list of outcomes to sample from
-    # Convert the DataFrame to a list of lists
-    pip_list = put_in_play[['hitData.launchSpeed', 'hitData.launchAngle', 'venue.name']].values.tolist()
-
-    # Create a list of "strikeout" and "walk" strings
-    strikeout_list = ["strikeout"] * strikeouts
-    walk_list = ["walk"] * walk_len
-
-    # Combine the two lists
-    outcomes = pip_list + strikeout_list + walk_list
+    # Handle balls put in play
+    put_in_play = home_or_away_team[~home_or_away_team['hitData.launchSpeed'].isnull()].reset_index(drop=True)
+    for _, row in put_in_play.iterrows():
+        outcomes.append(([row['hitData.launchSpeed'], row['hitData.launchAngle'], row['venue.name']], row['eventType']))
 
     return outcomes
 
-## For the estimated total bases graph
 def calculate_total_bases(outcomes):
     result_list = []
-    for outcome in outcomes:
+    for outcome, original_event_type in outcomes:
         if outcome == "strikeout":
             bases = 0
             event_type = "strikeout"
             probabilities = [1, 0, 0, 0, 0]
+            launch_speed, launch_angle, stadium = None, None, None
         elif outcome == "walk":
             bases = 1
             event_type = "walk"
             probabilities = [0, 1, 0, 0, 0]
+            launch_speed, launch_angle, stadium = None, None, None
         else:
             launch_speed, launch_angle, stadium = outcome
             event_type = "in_play"
@@ -77,13 +69,13 @@ def calculate_total_bases(outcomes):
                 probabilities[3] * 3 +  # Triple
                 probabilities[4] * 4    # Home Run
             )
-            print(probabilities)
         
         result_list.append({
-            'launch_speed': launch_speed if event_type == "in_play" else None,
-            'launch_angle': launch_angle if event_type == "in_play" else None,
-            'stadium': stadium if event_type == "in_play" else None,
+            'launch_speed': launch_speed,
+            'launch_angle': launch_angle,
+            'stadium': stadium,
             'event_type': event_type,
+            'original_event_type': original_event_type,
             'estimated_bases': bases,
             'out_prob': probabilities[0],
             'single_prob': probabilities[1],
