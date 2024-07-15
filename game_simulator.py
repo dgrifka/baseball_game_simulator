@@ -22,17 +22,17 @@ def outcomes(game_data, home_or_away):
     # Handle automatic outs (strikeouts)
     automatic_outs = home_or_away_team[(home_or_away_team['eventType'] == 'out') & (home_or_away_team['hitData.launchSpeed'].isnull())]
     for _, row in automatic_outs.iterrows():
-        outcomes.append(("strikeout", row['eventType'], row['fullName']))
+        outcomes.append(("strikeout", row['eventType'], row['batter.fullName']))
 
     # Handle walks
     walks = home_or_away_team[home_or_away_team['eventType'] == 'walk']
     for _, row in walks.iterrows():
-        outcomes.append(("walk", row['eventType'], row['fullName']))
+        outcomes.append(("walk", row['eventType'], row['batter.fullName']))
 
     # Handle balls put in play
     put_in_play = home_or_away_team[~home_or_away_team['hitData.launchSpeed'].isnull()].reset_index(drop=True)
     for _, row in put_in_play.iterrows():
-        outcomes.append(([row['hitData.launchSpeed'], row['hitData.launchAngle'], row['venue.name']], row['eventType'], row['fullName']))
+        outcomes.append(([row['hitData.launchSpeed'], row['hitData.launchAngle'], row['venue.name']], row['eventType'], row['batter.fullName']))
 
     return outcomes
 
