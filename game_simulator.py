@@ -73,7 +73,7 @@ def calculate_total_bases(outcomes):
                 probabilities[4] * 4    # Home Run
             )
         total_bases += bases
-    return total_bases
+    return total_bases, probabilities
 
 def simulate_game(outcomes_df):
     outs = 0
