@@ -74,7 +74,7 @@ def fetch_games(days_ago, all_columns = False):
 
     ## Trim the columns down to save memory
     if all_columns == False:
-        filtered_games_df = filtered_games_df[["gamePk", "fullName", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]]
+        filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]]
     
     ## Print game information for troubleshooting
     print(list(games_list))
