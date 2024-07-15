@@ -3,6 +3,8 @@ import pickle
 import pandas as pd
 import numpy as np
 
+from constants import team_colors
+
 # Load the saved model and fitted preprocessor
 with open('logistic_regression_model.pkl', 'rb') as file:
     loaded_model = pickle.load(file)
@@ -94,8 +96,52 @@ def create_detailed_outcomes_df(game_data, home_or_away):
     # Calculate total bases and get detailed DataFrame
     detailed_df = calculate_total_bases(outcomes_list)
     detailed_df = detailed_df.dropna().reset_index(drop=True)
-    
+
     return detailed_df
+
+def outcome_rankings(home_detailed_df, away_detailed_df, luck_type):
+    # Create total dataframe
+    total_team_outcomes = pd.concat([home_detailed_df, away_detailed_df])
+
+    # Filter based on luck_type
+    if luck_type == "unlucky":
+        total_team_outcomes = total_team_outcomes[total_team_outcomes['original_event_type'] == 'out']
+        total_team_outcomes = total_team_outcomes.sort_values(by='estimated_bases', ascending=False).reset_index(drop=True)
+    elif luck_type == "lucky":
+        total_team_outcomes = total_team_outcomes[total_team_outcomes['original_event_type'] != 'out']
+        total_team_outcomes = total_team_outcomes.sort_values(by='estimated_bases', ascending=True).reset_index(drop=True)
+
+    # Convert launch_angle to int and round estimated_bases
+    total_team_outcomes['launch_angle'] = total_team_outcomes['launch_angle'].astype(int)
+    total_team_outcomes['estimated_bases'] = total_team_outcomes['estimated_bases'].round(2)
+
+    # Clean up probability columns
+    prob_columns = [col for col in total_team_outcomes.columns if '_prob' in col]
+    for col in prob_columns:
+        total_team_outcomes[col] = (total_team_outcomes[col] * 100).round(0).astype(int).astype(str) + '%'
+
+    # Select top 10 rows and relevant columns
+    total_team_outcomes = total_team_outcomes.head(10)
+    selected_columns = ['team', 'player', 'launch_speed', 'launch_angle', "original_event_type", 'estimated_bases', "out_prob", "single_prob", "double_prob", "triple_prob", "hr_prob"]
+    total_team_outcomes = total_team_outcomes[selected_columns]
+
+    # Capitalize original_event_type values
+    total_team_outcomes['original_event_type'] = total_team_outcomes['original_event_type'].str.title()
+
+    # Rename columns
+    total_team_outcomes.columns = total_team_outcomes.columns.str.replace('_', ' ').str.title()
+    total_team_outcomes = total_team_outcomes.rename(columns={'Original Event Type': 'Result', 'Full Name': 'Player'})
+
+    # Extract the team names from the lucky_outcomes DataFrame
+    # Assuming 'Team' column exists in lucky_outcomes DataFrame
+    team_names = total_team_outcomes['Team']
+    
+    # Create a dictionary mapping team names to their corresponding colors
+    color_mapping = {team: colors[0] for team, colors in team_colors.items()}
+    
+    # Add the 'team_color' column to the lucky_outcomes DataFrame
+    total_team_outcomes['team_color'] = total_team_outcomes['Team'].map(color_mapping)
+    return total_team_outcomes
     
 def simulate_game(outcomes_df):
     outs = 0
