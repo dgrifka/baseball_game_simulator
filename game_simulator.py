@@ -48,11 +48,15 @@ def outcomes(game_data, home_or_away):
 ## For the estimated total bases graph
 def calculate_total_bases(outcomes):
     total_bases = 0
+    all_probabilities = []
+
     for outcome in outcomes:
         if outcome == "strikeout":
             bases = 0
+            probabilities = [1, 0, 0, 0, 0]  # Assuming 5 classes: out, single, double, triple, home run
         elif outcome == "walk":
             bases = 1
+            probabilities = [0, 1, 0, 0, 0]  # Treating walk as a single
         else:
             launch_speed, launch_angle, stadium = outcome
             # Create a DataFrame with the new example
@@ -72,8 +76,11 @@ def calculate_total_bases(outcomes):
                 probabilities[3] * 3 +  # Triple
                 probabilities[4] * 4    # Home Run
             )
+        
         total_bases += bases
-    return total_bases, probabilities
+        all_probabilities.append(probabilities)
+
+    return total_bases, all_probabilities
 
 def simulate_game(outcomes_df):
     outs = 0
