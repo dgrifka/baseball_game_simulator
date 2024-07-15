@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
+import seaborn as sns
 
 import numpy as np
 
@@ -118,6 +119,83 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
 
+
+def create_estimated_bases_graph(df, title, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
+    # Create a figure with two subplots (one for table, one for graph)
+    fig, (ax_table, ax_graph) = plt.subplots(2, 1, figsize=(14, 16), gridspec_kw={'height_ratios': [1, 2]})
+
+    away_win_percentage_str = f"{away_win_percentage:.0f}"
+    home_win_percentage_str = f"{home_win_percentage:.0f}"
+    tie_percentage_str = f"{tie_percentage:.0f}"
+
+    # Create the table
+    table_data = df.drop(columns=['team_color']).copy()
+    table_data['Estimated Bases'] = table_data['Estimated Bases'].round(2)  # Round to 2 decimal places
+    
+    # Rename columns to include line breaks
+    column_names = [
+        'Team', 'Player', 'Launch\nSpeed', 'Launch\nAngle', 'Result', 'Estimated\nBases',
+        'Out\nProb', 'Single\nProb', 'Double\nProb', 'Triple\nProb', 'Hr\nProb'
+    ]
+    
+    # Set column widths
+    col_widths = [0.1, 0.15, 0.09, 0.09, 0.09, 0.09, 0.08, 0.08, 0.08, 0.08, 0.08]
+    
+    table = ax_table.table(cellText=table_data.values, colLabels=column_names, cellLoc='center', loc='center', colWidths=col_widths)
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)  # Increased font size
+    table.scale(1, 1.5)  # Adjust table size
+    
+    ax_table.axis('off')  # Hide axis for the table subplot
+
+    # Create the horizontal bar plot
+    bars = ax_graph.barh(range(len(df)), df['Estimated Bases'], color=df['team_color'], alpha=1, edgecolor='black', linewidth=1)
+
+    # Customize the plot
+    ax_graph.set_xlabel('Estimated Bases', fontsize=19)
+    fig.suptitle(f'{title}', fontsize=22, y=0.91)  # Move title up slightly
+    
+    # Create labels for y-axis
+    y_labels = [f"{player}\n({result})" for player, result in zip(df['Player'], df['Result'])]
+    
+    # Set y-axis ticks and labels
+    ax_graph.set_yticks(range(len(df)))
+    ax_graph.set_yticklabels(y_labels, fontsize=13)
+
+    # Add value labels at the end of each bar
+    for i, v in enumerate(df['Estimated Bases']):
+        ax_graph.text(v, i, f' {v:.2f}', va='center', fontsize=18)
+
+    # Invert y-axis to show highest value at the top
+    ax_graph.invert_yaxis()
+
+    # Remove x-axis tick marks and labels
+    ax_graph.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+
+    # Remove top and right spines
+    ax_graph.spines['top'].set_visible(False)
+    ax_graph.spines['right'].set_visible(False)
+
+    # Add a legend
+    teams = df['Team'].unique()
+    handles = [plt.Rectangle((0,0),1,1, facecolor=team_colors[team][0], alpha=1, edgecolor='black', linewidth=1) for team in teams]
+    ax_graph.legend(handles, teams, fontsize=18)
+
+    # Adjust layout
+    plt.tight_layout()
+    
+    # Adjust the spacing between subplots and title
+    plt.subplots_adjust(top=0.95, hspace=-0.075)
+
+    if title == "Lucky Hits (Using Estimated Bases)":
+      title_save = "lh"
+    elif title == "Unlucky Outs (Using Estimated Bases)":
+      title_save = "uo"
+    # Save the figure
+    if not os.path.exists(images_dir):
+        os.makedirs(images_dir)
+    plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_{title_save}.png'), bbox_inches='tight')
+    plt.close()
 
 def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
