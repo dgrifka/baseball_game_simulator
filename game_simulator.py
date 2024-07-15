@@ -22,23 +22,23 @@ def outcomes(game_data, home_or_away):
     # Handle automatic outs (strikeouts)
     automatic_outs = home_or_away_team[(home_or_away_team['eventType'] == 'out') & (home_or_away_team['hitData.launchSpeed'].isnull())]
     for _, row in automatic_outs.iterrows():
-        outcomes.append(("strikeout", row['eventType']))
+        outcomes.append(("strikeout", row['eventType'], row['fullName']))
 
     # Handle walks
     walks = home_or_away_team[home_or_away_team['eventType'] == 'walk']
     for _, row in walks.iterrows():
-        outcomes.append(("walk", row['eventType']))
+        outcomes.append(("walk", row['eventType'], row['fullName']))
 
     # Handle balls put in play
     put_in_play = home_or_away_team[~home_or_away_team['hitData.launchSpeed'].isnull()].reset_index(drop=True)
     for _, row in put_in_play.iterrows():
-        outcomes.append(([row['hitData.launchSpeed'], row['hitData.launchAngle'], row['venue.name']], row['eventType']))
+        outcomes.append(([row['hitData.launchSpeed'], row['hitData.launchAngle'], row['venue.name']], row['eventType'], row['fullName']))
 
     return outcomes
 
 def calculate_total_bases(outcomes):
     result_list = []
-    for outcome, original_event_type in outcomes:
+    for outcome, original_event_type, full_name in outcomes:
         if outcome == "strikeout":
             bases = 0
             event_type = "strikeout"
@@ -71,6 +71,7 @@ def calculate_total_bases(outcomes):
             )
         
         result_list.append({
+            'player': full_name,
             'launch_speed': launch_speed,
             'launch_angle': launch_angle,
             'stadium': stadium,
@@ -92,7 +93,6 @@ def create_detailed_outcomes_df(game_data, home_or_away):
     
     # Calculate total bases and get detailed DataFrame
     detailed_df = calculate_total_bases(outcomes_list)
-
     detailed_df = detailed_df.dropna().reset_index(drop=True)
     
     return detailed_df
