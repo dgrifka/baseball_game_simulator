@@ -121,7 +121,7 @@ def outcome_rankings(home_detailed_df, away_detailed_df, luck_type):
         total_team_outcomes[col] = (total_team_outcomes[col] * 100).round(0).astype(int).astype(str) + '%'
 
     # Select top 10 rows and relevant columns
-    total_team_outcomes = total_team_outcomes.head(10)
+    total_team_outcomes = total_team_outcomes.head(7)
     selected_columns = ['team', 'player', 'launch_speed', 'launch_angle', "original_event_type", 'estimated_bases', "out_prob", "single_prob", "double_prob", "triple_prob", "hr_prob"]
     total_team_outcomes = total_team_outcomes[selected_columns]
 
