@@ -172,6 +172,6 @@ def get_game_info(game_id):
     ## Filter to only columns needed
     # cols_needed = ["gamePk", "playId", "ab_num", "eventType", "description", "outs",
                    # "isOut", "isTopInning", "inning", "hitData.launchSpeed", "hitData.launchAngle"]
-    total_pbp_filtered = total_pbp_filtered[cols_needed]
+    # total_pbp_filtered = total_pbp_filtered[cols_needed]
 
     return total_pbp_filtered
