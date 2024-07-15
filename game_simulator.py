@@ -213,6 +213,10 @@ def advance_runner(bases, count=1):
     return runs
 
 def simulator(num_simulations, home_outcomes, away_outcomes):
+    ## Clean up the tuples
+    home_outcomes = [outcome[0] if isinstance(outcome[0], tuple) else outcome[0] for outcome in home_outcomes]
+    away_outcomes = [outcome[0] if isinstance(outcome[0], tuple) else outcome[0] for outcome in away_outcomes]
+    
     # Simulate the game for home_outcomes and away_outcomes using NumPy
     home_runs_scored = np.zeros(num_simulations, dtype=int)
     away_runs_scored = np.zeros(num_simulations, dtype=int)
