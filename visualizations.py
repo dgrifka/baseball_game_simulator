@@ -126,7 +126,6 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
 
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
-    tie_percentage_str = f"{tie_percentage:.0f}"
 
     # Create the table
     table_data = df.drop(columns=['team_color']).copy()
