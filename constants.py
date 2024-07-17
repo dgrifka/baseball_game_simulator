@@ -55,6 +55,6 @@ team_colors = {
     "Rangers": ("#C0111F", "293"),
     "Blue Jays": ("#134A8E", "294"),
     "Nationals": ("#AB0003", "295"),
-    "National League All-Stars": ("#87CEEB", "blue"),
-    "American League All-Stars": ("#FF7F50", "coral")
+    "NL": ("#87CEEB", "blue"),
+    "AL": ("#FF7F50", "coral")
 }
