@@ -6,7 +6,7 @@ import numpy as np
 from constants import team_colors
 
 # Load the saved model and fitted preprocessor
-with open('logistic_regression_model.pkl', 'rb') as file:
+with open('random_forest_model.pkl', 'rb') as file:
     loaded_model = pickle.load(file)
 
 with open('preprocessor.pkl', 'rb') as file:
