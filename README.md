@@ -36,6 +36,12 @@ If the away team went up to bat in the 9th inning, while the home team did not, 
 Fielding errors are not accounted for, so a team can outperform or underperform in the simulation depending on errors.
 
 ##
+Model Testing:
+
+![download](https://github.com/user-attachments/assets/29443ee2-81e6-4e5f-86cc-7e71f5607f5e)
+
+
+##
 Outputs:
 
 ![img1](https://github.com/user-attachments/assets/8bcbe33c-66ff-40da-a8cd-216b3af7f988)
