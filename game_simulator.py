@@ -2,6 +2,7 @@ import random
 import pickle
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 
 from constants import team_colors
 
@@ -213,12 +214,12 @@ def advance_runner(bases, count=1):
     return runs
 
 def simulator(num_simulations, home_outcomes, away_outcomes):
-    
     # Simulate the game for home_outcomes and away_outcomes using NumPy
     home_runs_scored = np.zeros(num_simulations, dtype=int)
     away_runs_scored = np.zeros(num_simulations, dtype=int)
-
-    for i in range(num_simulations):
+    
+    # Create a tqdm progress bar
+    for i in tqdm(range(num_simulations), desc="Simulating games", unit="sim"):
         home_runs_scored[i] = simulate_game(home_outcomes)
         away_runs_scored[i] = simulate_game(away_outcomes)
 
