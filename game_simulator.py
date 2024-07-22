@@ -7,7 +7,7 @@ from tqdm import tqdm
 from constants import team_colors
 
 # Load the saved model and fitted preprocessor
-with open('light_gbm_model.pkl', 'rb') as file:
+with open('decision_tree_model.pkl', 'rb') as file:
     loaded_model = pickle.load(file)
 
 with open('preprocessor.pkl', 'rb') as file:
