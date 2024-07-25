@@ -39,6 +39,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
     # Load and plot the contour data
     contour_data = pd.read_csv('contour_data.csv')
+    print(contour_data)
     x = contour_data['x'].values
     y = contour_data['y'].values
     z = contour_data['z'].values
