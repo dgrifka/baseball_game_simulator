@@ -53,11 +53,19 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     
     # Interpolate the data
     Z = griddata((x, y), z, (X, Y), method='linear', fill_value=0)
-    # Create a custom colormap from white to dark gray
-    cmap = colors.LinearSegmentedColormap.from_list("", ["white", "darkgray"])
+    # Create a custom colormap
+    cmap = colors.LinearSegmentedColormap.from_list("", ["white", "lightgray", "darkgray", "black"])
     
-    contour = plt.contourf(X, Y, Z, levels=20, cmap=cmap, alpha=1)  # Adjust alpha as needed
-    plt.colorbar(contour, label='Average Total Bases')
+    # Set specific levels
+    levels = [0, 1, 2, 3, 4]
+    
+    # Plot filled contours
+    contour = plt.contourf(X, Y, Z, levels=levels, cmap=cmap, alpha=0.7, extend='both')
+    
+    # Add contour lines (optional)
+    line_contour = plt.contour(X, Y, Z, levels=levels, colors='black', linewidths=0.5, alpha=0.5)
+    # Add colorbar with specific ticks
+    cbar = plt.colorbar(contour, label='Average Total Bases', ticks=levels)
     
     plt.scatter(home_ev, home_la, s=150, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
     plt.scatter(away_ev, away_la, s=150, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
