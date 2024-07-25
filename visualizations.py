@@ -63,7 +63,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     Z = np.clip(Z, 0.5, 4)
     
     # Plot filled contours
-    contour = plt.contourf(X, Y, Z, levels=levels, cmap=cmap, alpha=0.7, extend='both')
+    contour = plt.contourf(X, Y, Z, levels=levels, cmap=cmap, alpha=0.2, extend='both')
     
     # Add contour lines (optional)
     line_contour = plt.contour(X, Y, Z, levels=levels, colors='black', linewidths=0.5, alpha=0.5)
