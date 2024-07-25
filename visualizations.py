@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 import seaborn as sns
+from scipy.interpolate import griddata
 
 import pandas as pd
 import numpy as np
