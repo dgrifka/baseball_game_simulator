@@ -3,7 +3,7 @@ import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 import seaborn as sns
 from scipy.interpolate import griddata
-
+import matplotlib.colors as colors
 import pandas as pd
 import numpy as np
 
@@ -53,8 +53,10 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     
     # Interpolate the data
     Z = griddata((x, y), z, (X, Y), method='linear', fill_value=0)
+    # Create a custom colormap from white to dark gray
+    cmap = colors.LinearSegmentedColormap.from_list("", ["white", "darkgray"])
     
-    plt.contourf(X, Y, Z, levels=20, cmap='YlOrRd', alpha=0.5)
+    plt.contourf(X, Y, Z, levels=20, cmap=cmap, alpha=0.7)  # Adjust alpha as needed
 
     plt.scatter(home_ev, home_la, s=150, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
     plt.scatter(away_ev, away_la, s=150, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
@@ -64,28 +66,6 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.text(0.05, 0.947, '___________', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
     plt.text(0.05, 0.90, f'{away_team}: {away_walks}', transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
     plt.text(0.05, 0.85, f'{home_team}: {home_walks}', transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
-
-    x = np.linspace(98, 123, 100)  # Exit velocity range
-    y1 = np.zeros_like(x)
-    y2 = np.zeros_like(x)
-
-    for i, ev in enumerate(x):
-        angle_range = launch_angle_range(ev)
-        if angle_range:
-            y1[i], y2[i] = angle_range
-
-    # Shade the area between the launch angle ranges
-    plt.fill_between(x, y1, y2, where=(y1 > 0) & (y2 > 0), color='green', alpha=0.15)
-
-    # Calculate the position of the label relative to the right middle of the green fill between
-    label_ev = 114  # Specify the exit velocity at which to position the label
-    label_la = (launch_angle_range(label_ev)[0] + launch_angle_range(label_ev)[1]) / 2  # Calculate the middle launch angle
-
-    barrel_zone_label = 'Barrel Zone'
-    barrel_zone_position = (label_ev, label_la)  # Position the label at the specified exit velocity and middle launch angle
-
-    plt.text(barrel_zone_position[0], barrel_zone_position[1], barrel_zone_label, fontsize=11, alpha=0.8, color='green',
-            fontweight='bold', ha='right', va='center', rotation=270)
 
     # plt.text(0.05, 0.75, 'Estimated Total Bases', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
     # plt.text(0.05, 0.745, '_____________________', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
