@@ -3,6 +3,7 @@ import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 import seaborn as sns
 
+import pandas as pd
 import numpy as np
 
 from constants import team_colors
@@ -34,6 +35,23 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     away_walks = away_outcomes.count('walk')
 
     plt.figure(figsize=(10, 6))
+
+    # Load and plot the contour data
+    contour_data = pd.read_csv('contour_data.csv')
+    x = contour_data['x'].values
+    y = contour_data['y'].values
+    z = contour_data['z'].values
+
+    # Create a grid for interpolation
+    xi = np.linspace(x.min(), x.max(), 100)
+    yi = np.linspace(y.min(), y.max(), 100)
+    X, Y = np.meshgrid(xi, yi)
+
+    # Interpolate the data
+    Z = griddata((x, y), z, (X, Y), method='cubic')
+
+    # Plot the contour
+    plt.contourf(X, Y, Z, levels=np.linspace(0, 4, 20), cmap='YlOrRd', alpha=0.5)
 
     plt.scatter(home_ev, home_la, s=150, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
     plt.scatter(away_ev, away_la, s=150, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
