@@ -56,7 +56,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Create a custom colormap from white to dark gray
     cmap = colors.LinearSegmentedColormap.from_list("", ["white", "darkgray"])
     
-    plt.contourf(X, Y, Z, levels=20, cmap=cmap, alpha=0.7)  # Adjust alpha as needed
+    plt.contourf(X, Y, Z, levels=20, cmap=cmap, alpha=1)  # Adjust alpha as needed
 
     plt.scatter(home_ev, home_la, s=150, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
     plt.scatter(away_ev, away_la, s=150, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
