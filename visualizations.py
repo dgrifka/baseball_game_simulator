@@ -54,7 +54,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Interpolate the data
     Z = griddata((x, y), z, (X, Y), method='linear', fill_value=0)
     # Create a custom colormap
-    cmap = colors.LinearSegmentedColormap.from_list("", ["white", "lightgray", "gray", "darkgray", "#4A4A4A"])
+    cmap = colors.LinearSegmentedColormap.from_list("", ["white", "lightgray", "gray", "darkgray", "black"])
     
     # Set specific levels from 0.5 to 4
     levels = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]
