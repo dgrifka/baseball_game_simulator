@@ -118,8 +118,8 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.figure(figsize=(10, 6))
     max_runs = max(max(home_runs_scored), max(away_runs_scored))
     bins = range(0, max_runs + 2)  # Start from 0 and include the maximum runs scored
-    plt.hist(home_runs_scored, bins=bins, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], edgecolor='black', linewidth=1)
-    plt.hist(away_runs_scored, bins=bins, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], edgecolor='black', linewidth=1)
+    plt.hist(home_runs_scored, bins=bins, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], edgecolor='black', linewidth=1, hatch='/')
+    plt.hist(away_runs_scored, bins=bins, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], edgecolor='black', linewidth=1, hatch='\\')
     plt.xlabel('Runs Scored', fontsize=14)
     plt.ylabel('Frequency', fontsize=14)
     plt.title(f'Distribution of Runs Scored ({num_simulations} Simulations)\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
