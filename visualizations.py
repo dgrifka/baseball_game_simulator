@@ -55,13 +55,11 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     Z = griddata((x, y), z, (X, Y), method='linear', fill_value=0)
     
     # Create a custom colormap with evenly spaced colors
-    colors_list = ["white", "lightgray", "gray", "darkgray", "#4A4A4A"]
-    # Set specific levels from 0.5 to 4
+    colors_list = ["white", "#E6E6E6", "#CCCCCC", "#B3B3B3", "#999999", "#808080", "#666666", "#4A4A4A"]
     levels = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]
     n_bins = len(levels) - 1  # number of color bins
     cmap = colors.LinearSegmentedColormap.from_list("custom", colors_list, N=n_bins)
 
-    
     # Clip the data to the desired range
     Z = np.clip(Z, 0.5, 4)
     
