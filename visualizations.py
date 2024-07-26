@@ -206,9 +206,9 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
     ax_graph.spines['top'].set_visible(False)
     ax_graph.spines['right'].set_visible(False)
 
-    # Add a legend
+    # Add a legend with hatching
     teams = df['Team'].unique()
-    handles = [plt.Rectangle((0,0),1,1, facecolor=team_colors[team][0], alpha=1, edgecolor='black', linewidth=1) for team in teams]
+    handles = [plt.Rectangle((0,0),1,1, facecolor=team_colors[team][0], alpha=0.8, edgecolor='black', linewidth=1, hatch=team_hatches[team]) for team in teams]
     ax_graph.legend(handles, teams, fontsize=18)
 
     # Adjust layout
