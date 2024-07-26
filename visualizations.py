@@ -2,7 +2,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 import seaborn as sns
-
+from scipy.interpolate import griddata
+import matplotlib.colors as colors
+import pandas as pd
 import numpy as np
 
 from constants import team_colors
@@ -35,36 +37,50 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
     plt.figure(figsize=(10, 6))
 
-    plt.scatter(home_ev, home_la, s=150, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
-    plt.scatter(away_ev, away_la, s=150, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
+    # Load and plot the contour data
+    contour_data = pd.read_csv('contour_data.csv')
+    contour_data = contour_data.dropna()
+    
+    # Extract x, y, z values
+    x = contour_data['x'].values
+    y = contour_data['y'].values
+    z = contour_data['z'].values
+    
+    # Create a grid for interpolation
+    xi = np.linspace(x.min(), x.max(), 100)
+    yi = np.linspace(y.min(), y.max(), 100)
+    X, Y = np.meshgrid(xi, yi)
+    
+    # Interpolate the data
+    Z = griddata((x, y), z, (X, Y), method='linear', fill_value=0)
+    
+    # Create a custom colormap with evenly spaced colors
+    colors_list = ["white", "#E6E6E6", "#CCCCCC", "#B3B3B3", "#999999", "#808080", "#666666", "#4A4A4A"]
+    levels = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]
+    n_bins = len(levels) - 1  # number of color bins
+    cmap = colors.LinearSegmentedColormap.from_list("custom", colors_list, N=n_bins)
+
+    # Clip the data to the desired range
+    Z = np.clip(Z, 0.5, 4)
+    
+    # Plot filled contours
+    contour = plt.contourf(X, Y, Z, levels=levels, cmap=cmap, alpha=0.7, extend='both')
+
+    # Add contour lines (optional)
+    line_contour = plt.contour(X, Y, Z, levels=levels, colors='black', linewidths=0.25, alpha=0.1)
+    
+    # Add colorbar with specific ticks
+    cbar = plt.colorbar(contour, label='Average Total Bases', ticks=levels)
+    cbar.set_ticklabels([f'{level:.1f}' for level in levels])  # Format tick labels to one decimal place
+    
+    plt.scatter(home_ev, home_la, s=175, alpha=0.65, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
+    plt.scatter(away_ev, away_la, s=175, alpha=0.65, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
     plt.axhline(y=0, color='black', alpha = 0.8, linewidth=0.8)
 
     plt.text(0.05, 0.95, 'Walks/HBP', transform=plt.gca().transAxes, fontsize=16, verticalalignment='top')
     plt.text(0.05, 0.947, '___________', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
     plt.text(0.05, 0.90, f'{away_team}: {away_walks}', transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
     plt.text(0.05, 0.85, f'{home_team}: {home_walks}', transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
-
-    x = np.linspace(98, 123, 100)  # Exit velocity range
-    y1 = np.zeros_like(x)
-    y2 = np.zeros_like(x)
-
-    for i, ev in enumerate(x):
-        angle_range = launch_angle_range(ev)
-        if angle_range:
-            y1[i], y2[i] = angle_range
-
-    # Shade the area between the launch angle ranges
-    plt.fill_between(x, y1, y2, where=(y1 > 0) & (y2 > 0), color='green', alpha=0.15)
-
-    # Calculate the position of the label relative to the right middle of the green fill between
-    label_ev = 114  # Specify the exit velocity at which to position the label
-    label_la = (launch_angle_range(label_ev)[0] + launch_angle_range(label_ev)[1]) / 2  # Calculate the middle launch angle
-
-    barrel_zone_label = 'Barrel Zone'
-    barrel_zone_position = (label_ev, label_la)  # Position the label at the specified exit velocity and middle launch angle
-
-    plt.text(barrel_zone_position[0], barrel_zone_position[1], barrel_zone_label, fontsize=11, alpha=0.8, color='green',
-            fontweight='bold', ha='right', va='center', rotation=270)
 
     # plt.text(0.05, 0.75, 'Estimated Total Bases', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
     # plt.text(0.05, 0.745, '_____________________', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
@@ -102,8 +118,14 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.figure(figsize=(10, 6))
     max_runs = max(max(home_runs_scored), max(away_runs_scored))
     bins = range(0, max_runs + 2)  # Start from 0 and include the maximum runs scored
-    plt.hist(home_runs_scored, bins=bins, alpha=0.6, label=f'{home_team}', color=team_colors[home_team][0], edgecolor='black', linewidth=1)
-    plt.hist(away_runs_scored, bins=bins, alpha=0.6, label=f'{away_team}', color=team_colors[away_team][0], edgecolor='black', linewidth=1)
+    # Home team histogram with hatching
+    plt.hist(home_runs_scored, bins=bins, alpha=0.6, label=f'{home_team}', 
+             color=team_colors[home_team][0], edgecolor='black', linewidth=1, hatch='/')
+    
+    # Away team histogram with different hatching
+    plt.hist(away_runs_scored, bins=bins, alpha=0.6, label=f'{away_team}', 
+             color=team_colors[away_team][0], edgecolor='black', linewidth=1, hatch='\\')
+
     plt.xlabel('Runs Scored', fontsize=14)
     plt.ylabel('Frequency', fontsize=14)
     plt.title(f'Distribution of Runs Scored ({num_simulations} Simulations)\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
@@ -147,8 +169,17 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
     
     ax_table.axis('off')  # Hide axis for the table subplot
 
+    # Create a dictionary to map teams to hatch patterns
+    hatch_patterns = ['/', '\\', 'x', '+', '.', 'o', '*', '-']
+    team_hatches = {team: hatch_patterns[i % len(hatch_patterns)] for i, team in enumerate(df['Team'].unique())}
+    
     # Create the horizontal bar plot
-    bars = ax_graph.barh(range(len(df)), df['Estimated Bases'], color=df['team_color'], alpha=1, edgecolor='black', linewidth=1)
+    bars = ax_graph.barh(range(len(df)), df['Estimated Bases'], color=df['team_color'], alpha=0.7, edgecolor='black', linewidth=1)
+    
+    # Apply hatching to each bar based on team
+    for bar, team in zip(bars, df['Team']):
+        bar.set_hatch(team_hatches[team])
+        bar.set_edgecolor('black')  # Ensure the hatch is visible
 
     # Customize the plot
     ax_graph.set_xlabel('Estimated Bases', fontsize=19)
@@ -175,9 +206,9 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
     ax_graph.spines['top'].set_visible(False)
     ax_graph.spines['right'].set_visible(False)
 
-    # Add a legend
+    # Add a legend with hatching
     teams = df['Team'].unique()
-    handles = [plt.Rectangle((0,0),1,1, facecolor=team_colors[team][0], alpha=1, edgecolor='black', linewidth=1) for team in teams]
+    handles = [plt.Rectangle((0,0),1,1, facecolor=team_colors[team][0], alpha=0.8, edgecolor='black', linewidth=1, hatch=team_hatches[team]) for team in teams]
     ax_graph.legend(handles, teams, fontsize=18)
 
     # Adjust layout
