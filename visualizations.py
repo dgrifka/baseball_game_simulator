@@ -119,12 +119,12 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     max_runs = max(max(home_runs_scored), max(away_runs_scored))
     bins = range(0, max_runs + 2)  # Start from 0 and include the maximum runs scored
     # Home team histogram with hatching
-    plt.hist(home_runs_scored, bins=bins, alpha=0.4, label=f'{home_team}', 
-             color=team_colors[home_team][0], edgecolor='black', linewidth=1, hatch='////')
+    plt.hist(home_runs_scored, bins=bins, alpha=0.6, label=f'{home_team}', 
+             color=team_colors[home_team][0], edgecolor='black', linewidth=1, hatch='/')
     
     # Away team histogram with different hatching
-    plt.hist(away_runs_scored, bins=bins, alpha=0.4, label=f'{away_team}', 
-             color=team_colors[away_team][0], edgecolor='black', linewidth=1, hatch='\\\\\\\\')
+    plt.hist(away_runs_scored, bins=bins, alpha=0.6, label=f'{away_team}', 
+             color=team_colors[away_team][0], edgecolor='black', linewidth=1, hatch='\\')
 
     plt.xlabel('Runs Scored', fontsize=14)
     plt.ylabel('Frequency', fontsize=14)
@@ -169,8 +169,16 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
     
     ax_table.axis('off')  # Hide axis for the table subplot
 
-    # Create the horizontal bar plot
-    bars = ax_graph.barh(range(len(df)), df['Estimated Bases'], color=df['team_color'], alpha=1, edgecolor='black', linewidth=1)
+    # Create a list of hatch patterns
+    hatch_patterns = ['/', '\\', 'x', '+', '.', 'o', '*', '-']
+    
+    # Create the horizontal bar plot with hatching
+    bars = ax_graph.barh(range(len(df)), df['Estimated Bases'], color=df['team_color'], alpha=0.8, edgecolor='black', linewidth=1)
+    
+    # Apply hatching to each bar
+    for bar, hatch in zip(bars, hatch_patterns * (len(df) // len(hatch_patterns) + 1)):
+        bar.set_hatch(hatch)
+        bar.set_edgecolor('black')  # Ensure the hatch is visible
 
     # Customize the plot
     ax_graph.set_xlabel('Estimated Bases', fontsize=19)
