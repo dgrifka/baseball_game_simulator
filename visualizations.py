@@ -169,15 +169,16 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
     
     ax_table.axis('off')  # Hide axis for the table subplot
 
-    # Create a list of hatch patterns
+    # Create a dictionary to map teams to hatch patterns
     hatch_patterns = ['/', '\\', 'x', '+', '.', 'o', '*', '-']
+    team_hatches = {team: hatch_patterns[i % len(hatch_patterns)] for i, team in enumerate(df['Team'].unique())}
     
-    # Create the horizontal bar plot with hatching
-    bars = ax_graph.barh(range(len(df)), df['Estimated Bases'], color=df['team_color'], alpha=0.8, edgecolor='black', linewidth=1)
+    # Create the horizontal bar plot
+    bars = ax_graph.barh(range(len(df)), df['Estimated Bases'], color=df['team_color'], alpha=0.7, edgecolor='black', linewidth=1)
     
-    # Apply hatching to each bar
-    for bar, hatch in zip(bars, hatch_patterns * (len(df) // len(hatch_patterns) + 1)):
-        bar.set_hatch(hatch)
+    # Apply hatching to each bar based on team
+    for bar, team in zip(bars, df['Team']):
+        bar.set_hatch(team_hatches[team])
         bar.set_edgecolor('black')  # Ensure the hatch is visible
 
     # Customize the plot
