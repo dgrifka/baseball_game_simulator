@@ -44,7 +44,7 @@ Model Testing:
 ##
 Outputs:
 
-![img1](https://github.com/user-attachments/assets/8bcbe33c-66ff-40da-a8cd-216b3af7f988)
+[![img1](https://github.com/user-attachments/assets/8bcbe33c-66ff-40da-a8cd-216b3af7f988)](https://x.com/mlb_simulator)
 ![img2](https://github.com/user-attachments/assets/79f93289-a542-433f-923a-670255bd55ce)
 ![img3](https://github.com/user-attachments/assets/bc8291fd-1610-4e43-aab1-d8e01c363065)
 ![img4](https://github.com/user-attachments/assets/bcc016b9-4045-4d16-9a4b-293f45d13f61)
