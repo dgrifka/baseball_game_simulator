@@ -110,6 +110,9 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
 
 
+import numpy as np
+from scipy import stats
+
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
@@ -119,9 +122,9 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     home_mode = stats.mode(home_runs_scored)
     away_mode = stats.mode(away_runs_scored)
     
-    # Convert to string, handling multiple modes
-    home_mode_str = str(home_mode.mode[0])
-    away_mode_str = str(away_mode.mode[0])
+    # Convert to string, handling different return types
+    home_mode_str = str(home_mode.mode) if hasattr(home_mode, 'mode') else str(home_mode[0])
+    away_mode_str = str(away_mode.mode) if hasattr(away_mode, 'mode') else str(away_mode[0])
     
     # Graph the distributions of runs scored
     plt.figure(figsize=(10, 6))
@@ -159,7 +162,6 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
-
 def create_estimated_bases_graph(df, title, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure with two subplots (one for table, one for graph)
     fig, (ax_table, ax_graph) = plt.subplots(2, 1, figsize=(14, 16), gridspec_kw={'height_ratios': [1, 2]})
