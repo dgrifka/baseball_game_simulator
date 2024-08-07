@@ -108,6 +108,9 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.close()
 
 
+import numpy as np
+from scipy import stats
+
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
@@ -117,12 +120,14 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     home_mode = stats.mode(home_runs_scored)
     away_mode = stats.mode(away_runs_scored)
     
-    # Convert to string, handling multiple modes
+    # Convert to string, handling multiple modes and single values
     def mode_to_str(mode_result):
         if hasattr(mode_result, 'mode'):
             return ', '.join(map(str, mode_result.mode))
+        elif isinstance(mode_result, np.ndarray):
+            return ', '.join(map(str, mode_result))
         else:
-            return ', '.join(map(str, mode_result[0]))
+            return str(mode_result)
 
     home_mode_str = mode_to_str(home_mode)
     away_mode_str = mode_to_str(away_mode)
