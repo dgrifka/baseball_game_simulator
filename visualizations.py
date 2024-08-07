@@ -108,11 +108,6 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.close()
 
 
-
-
-import numpy as np
-from scipy import stats
-
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
@@ -153,7 +148,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.gca().spines['right'].set_visible(False)
     
     # Add mode information
-    plt.text(0.98, 0.98, f'{away_team} mode: {away_mode_str}\n{home_team} mode: {home_mode_str}', 
+    plt.text(0.87, 0.98, f'Most Likely Outcomes:\n{away_team}: {away_mode_str}\n{home_team}: {home_mode_str}', 
              transform=plt.gca().transAxes, ha='right', va='top', fontsize=10, 
              bbox=dict(facecolor='white', edgecolor='none', alpha=0.7))
     
@@ -162,6 +157,8 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
+
+
 def create_estimated_bases_graph(df, title, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure with two subplots (one for table, one for graph)
     fig, (ax_table, ax_graph) = plt.subplots(2, 1, figsize=(14, 16), gridspec_kw={'height_ratios': [1, 2]})
