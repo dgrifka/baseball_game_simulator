@@ -6,6 +6,7 @@ from scipy.interpolate import griddata
 import matplotlib.colors as colors
 import pandas as pd
 import numpy as np
+from scipy import stats
 
 from constants import team_colors
 
@@ -113,11 +114,20 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
     tie_percentage_str = f"{tie_percentage:.0f}"
-
+    
+    # Calculate modes
+    home_mode = stats.mode(home_runs_scored).mode
+    away_mode = stats.mode(away_runs_scored).mode
+    
+    # Convert to string, handling multiple modes
+    home_mode_str = ', '.join(map(str, home_mode)) if len(home_mode) > 1 else str(home_mode[0])
+    away_mode_str = ', '.join(map(str, away_mode)) if len(away_mode) > 1 else str(away_mode[0])
+    
     # Graph the distributions of runs scored
     plt.figure(figsize=(10, 6))
     max_runs = max(max(home_runs_scored), max(away_runs_scored))
     bins = range(0, max_runs + 2)  # Start from 0 and include the maximum runs scored
+    
     # Home team histogram with hatching
     plt.hist(home_runs_scored, bins=bins, alpha=0.6, label=f'{home_team}', 
              color=team_colors[home_team][0], edgecolor='black', linewidth=1, hatch='/')
@@ -125,22 +135,30 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     # Away team histogram with different hatching
     plt.hist(away_runs_scored, bins=bins, alpha=0.6, label=f'{away_team}', 
              color=team_colors[away_team][0], edgecolor='black', linewidth=1, hatch='\\')
-
+    
     plt.xlabel('Runs Scored', fontsize=14)
     plt.ylabel('Frequency', fontsize=14)
     plt.title(f'Distribution of Runs Scored ({num_simulations} Simulations)\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
-    plt.xticks(fontsize=12)
+    
+    # Set integer x-axis ticks
+    x_ticks = range(0, max_runs + 2)
+    plt.xticks(x_ticks, fontsize=12)
+    
     plt.yticks(fontsize=12)
     plt.legend(fontsize=12)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
-
+    
+    # Add mode information
+    plt.text(0.98, 0.98, f'{away_team} mode: {away_mode_str}\n{home_team} mode: {home_mode_str}', 
+             transform=plt.gca().transAxes, ha='right', va='top', fontsize=10, 
+             bbox=dict(facecolor='white', edgecolor='none', alpha=0.7))
+    
     # Save the plot to the "images" folder in the repository
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
-
 
 def create_estimated_bases_graph(df, title, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure with two subplots (one for table, one for graph)
