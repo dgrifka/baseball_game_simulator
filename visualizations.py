@@ -117,9 +117,15 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     home_mode = stats.mode(home_runs_scored)
     away_mode = stats.mode(away_runs_scored)
     
-    # Convert to string, handling different return types
-    home_mode_str = str(home_mode.mode) if hasattr(home_mode, 'mode') else str(home_mode[0])
-    away_mode_str = str(away_mode.mode) if hasattr(away_mode, 'mode') else str(away_mode[0])
+    # Convert to string, handling multiple modes
+    def mode_to_str(mode_result):
+        if hasattr(mode_result, 'mode'):
+            return ', '.join(map(str, mode_result.mode))
+        else:
+            return ', '.join(map(str, mode_result[0]))
+
+    home_mode_str = mode_to_str(home_mode)
+    away_mode_str = mode_to_str(away_mode)
     
     # Graph the distributions of runs scored
     plt.figure(figsize=(10, 6))
@@ -136,7 +142,14 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
     plt.xlabel('Runs Scored', fontsize=14)
     plt.ylabel('Frequency', fontsize=14)
-    plt.title(f'Distribution of Runs Scored ({num_simulations} Simulations)\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
+    
+    # Multi-line title with Most Likely Outcomes
+    title = (f'Distribution of Runs Scored ({num_simulations} Simulations)\n'
+             f'Actual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\n'
+             f'Deserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%\n'
+             f'Most Likely Outcomes: {away_team} {away_mode_str}, {home_team} {home_mode_str}')
+    
+    plt.title(title, fontsize=16, loc='left', pad=20)  # Increased pad for more space
     
     # Set integer x-axis ticks
     x_ticks = range(0, max_runs + 2)
@@ -146,11 +159,6 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.legend(fontsize=12)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
-    
-    # Add mode information
-    plt.text(0.98, 0.85, f'Most Likely Outcomes:\n{away_team}: {away_mode_str}\n{home_team}: {home_mode_str}', 
-             transform=plt.gca().transAxes, ha='right', va='top', fontsize=10, 
-             bbox=dict(facecolor='white', edgecolor='none', alpha=0.7))
     
     # Save the plot to the "images" folder in the repository
     if not os.path.exists(images_dir):
