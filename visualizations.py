@@ -158,7 +158,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.title(title, fontsize=16, loc='left', pad=20)  # Increased pad for more space
 
     ## Add watermark
-    plt.text(0.5, 0.01, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=8, color='darkgray', ha='center', va='bottom')
+    plt.text(0.5, -0.01, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=8, color='darkgray', ha='center', va='bottom')
     
     # Set integer x-axis ticks
     x_ticks = range(0, max_runs + 2)
@@ -202,6 +202,9 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
     
     ax_table.axis('off')  # Hide axis for the table subplot
 
+    ## Add watermark
+    ax_table.text(0.5, 0.01, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=8, color='darkgray', ha='center', va='bottom')
+    
     # Create a dictionary to map teams to hatch patterns
     hatch_patterns = ['/', '\\', 'x', '+', '.', 'o', '*', '-']
     team_hatches = {team: hatch_patterns[i % len(hatch_patterns)] for i, team in enumerate(df['Team'].unique())}
@@ -243,9 +246,6 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
     teams = df['Team'].unique()
     handles = [plt.Rectangle((0,0),1,1, facecolor=team_colors[team][0], alpha=0.8, edgecolor='black', linewidth=1, hatch=team_hatches[team]) for team in teams]
     ax_graph.legend(handles, teams, fontsize=18)
-
-    ## Add watermark
-    ax.text(0.5, 0.01, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=8, color='darkgray', ha='center', va='bottom')
 
     # Adjust layout
     plt.tight_layout()
