@@ -108,9 +108,6 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.close()
 
 
-import numpy as np
-from scipy import stats
-
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
@@ -152,9 +149,9 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
     # Multi-line title with Most Likely Outcomes
     title = (f'Distribution of Runs Scored ({num_simulations} Simulations)\n'
-             f'Actual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\n'
-             f'Deserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%\n'
-             f'Most Likely Outcomes: {away_team} {away_mode_str}, {home_team} {home_mode_str}')
+             f'Actual Score: {away_team} {str(away_score)} - {home_team} {str(home_score)}\n'
+             f'Deserve-to-Win: {away_team} {str(away_win_percentage_str)}% - {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%\n'
+             f'Most Likely Outcome: {away_team} {away_mode_str} - {home_team} {home_mode_str}')
     
     plt.title(title, fontsize=16, loc='left', pad=20)  # Increased pad for more space
     
@@ -172,6 +169,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
+    
 def create_estimated_bases_graph(df, title, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure with two subplots (one for table, one for graph)
     fig, (ax_table, ax_graph) = plt.subplots(2, 1, figsize=(14, 16), gridspec_kw={'height_ratios': [1, 2]})
