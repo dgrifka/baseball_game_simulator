@@ -6,6 +6,7 @@ from scipy.interpolate import griddata
 import matplotlib.colors as colors
 import pandas as pd
 import numpy as np
+from scipy import stats
 
 from constants import team_colors
 
@@ -82,6 +83,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.text(0.05, 0.90, f'{away_team}: {away_walks}', transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
     plt.text(0.05, 0.85, f'{home_team}: {home_walks}', transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
 
+    ## Add watermark
+    plt.text(0.5, 0.01, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='center', va='bottom')
     # plt.text(0.05, 0.75, 'Estimated Total Bases', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
     # plt.text(0.05, 0.745, '_____________________', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
     # plt.text(0.05, 0.70, f'{away_team}: {away_estimated_total_bases}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
@@ -107,17 +110,34 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.close()
 
 
-
-
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
     tie_percentage_str = f"{tie_percentage:.0f}"
+    
+    # Calculate modes
+    home_mode = stats.mode(home_runs_scored, keepdims=True)
+    away_mode = stats.mode(away_runs_scored, keepdims=True)
+    
+    # Convert to string, handling multiple modes and single values
+    def mode_to_str(mode_result):
+        if hasattr(mode_result, 'mode'):
+            mode_values = mode_result.mode.flatten()
+        elif isinstance(mode_result, np.ndarray):
+            mode_values = mode_result.flatten()
+        else:
+            mode_values = [mode_result]
+        
+        return ','.join(map(str, mode_values))
 
+    home_mode_str = mode_to_str(home_mode)
+    away_mode_str = mode_to_str(away_mode)
+    
     # Graph the distributions of runs scored
     plt.figure(figsize=(10, 6))
     max_runs = max(max(home_runs_scored), max(away_runs_scored))
     bins = range(0, max_runs + 2)  # Start from 0 and include the maximum runs scored
+    
     # Home team histogram with hatching
     plt.hist(home_runs_scored, bins=bins, alpha=0.6, label=f'{home_team}', 
              color=team_colors[home_team][0], edgecolor='black', linewidth=1, hatch='/')
@@ -125,23 +145,36 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     # Away team histogram with different hatching
     plt.hist(away_runs_scored, bins=bins, alpha=0.6, label=f'{away_team}', 
              color=team_colors[away_team][0], edgecolor='black', linewidth=1, hatch='\\')
-
+    
     plt.xlabel('Runs Scored', fontsize=14)
     plt.ylabel('Frequency', fontsize=14)
-    plt.title(f'Distribution of Runs Scored ({num_simulations} Simulations)\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
-    plt.xticks(fontsize=12)
+    
+    # Multi-line title with Most Likely Outcomes
+    title = (f'Distribution of Runs Scored ({num_simulations} Simulations)\n'
+             f'Actual Score: {away_team} {str(away_score)} - {home_team} {str(home_score)}\n'
+             f'Deserve-to-Win: {away_team} {str(away_win_percentage_str)}% - {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%\n'
+             f'Most Likely Outcome: {away_team} {away_mode_str} - {home_team} {home_mode_str}')
+    
+    plt.title(title, fontsize=16, loc='left', pad=20)  # Increased pad for more space
+
+    ## Add watermark
+    plt.text(0.5, 1.02, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='center', va='bottom')
+    
+    # Set integer x-axis ticks
+    x_ticks = range(0, max_runs + 2)
+    plt.xticks(x_ticks, fontsize=12)
+    
     plt.yticks(fontsize=12)
     plt.legend(fontsize=12)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
-
+    
     # Save the plot to the "images" folder in the repository
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
-
-
+    
 def create_estimated_bases_graph(df, title, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure with two subplots (one for table, one for graph)
     fig, (ax_table, ax_graph) = plt.subplots(2, 1, figsize=(14, 16), gridspec_kw={'height_ratios': [1, 2]})
@@ -168,7 +201,7 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
     table.scale(1, 1.5)  # Adjust table size
     
     ax_table.axis('off')  # Hide axis for the table subplot
-
+    
     # Create a dictionary to map teams to hatch patterns
     hatch_patterns = ['/', '\\', 'x', '+', '.', 'o', '*', '-']
     team_hatches = {team: hatch_patterns[i % len(hatch_patterns)] for i, team in enumerate(df['Team'].unique())}
@@ -211,6 +244,9 @@ def create_estimated_bases_graph(df, title, away_team, home_team, away_score, ho
     handles = [plt.Rectangle((0,0),1,1, facecolor=team_colors[team][0], alpha=0.8, edgecolor='black', linewidth=1, hatch=team_hatches[team]) for team in teams]
     ax_graph.legend(handles, teams, fontsize=18)
 
+    ## Add watermark
+    ax_graph.text(0.5, 0.01, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=10, color='darkgray', ha='center', va='bottom')
+    
     # Adjust layout
     plt.tight_layout()
     
@@ -248,6 +284,9 @@ def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
 
+    ## Add watermark
+    plt.text(0.5, 0.01, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=8, color='darkgray', ha='center', va='bottom')
+    
     # Save the plot to the "images" folder in the repository
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
