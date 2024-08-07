@@ -116,12 +116,12 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     tie_percentage_str = f"{tie_percentage:.0f}"
     
     # Calculate modes
-    home_mode = stats.mode(home_runs_scored).mode
-    away_mode = stats.mode(away_runs_scored).mode
+    home_mode = stats.mode(home_runs_scored)
+    away_mode = stats.mode(away_runs_scored)
     
     # Convert to string, handling multiple modes
-    home_mode_str = ', '.join(map(str, home_mode)) if len(home_mode) > 1 else str(home_mode[0])
-    away_mode_str = ', '.join(map(str, away_mode)) if len(away_mode) > 1 else str(away_mode[0])
+    home_mode_str = str(home_mode.mode[0])
+    away_mode_str = str(away_mode.mode[0])
     
     # Graph the distributions of runs scored
     plt.figure(figsize=(10, 6))
