@@ -148,7 +148,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.gca().spines['right'].set_visible(False)
     
     # Add mode information
-    plt.text(0.87, 0.98, f'Most Likely Outcomes:\n{away_team}: {away_mode_str}\n{home_team}: {home_mode_str}', 
+    plt.text(0.98, 0.85, f'Most Likely Outcomes:\n{away_team}: {away_mode_str}\n{home_team}: {home_mode_str}', 
              transform=plt.gca().transAxes, ha='right', va='top', fontsize=10, 
              bbox=dict(facecolor='white', edgecolor='none', alpha=0.7))
     
