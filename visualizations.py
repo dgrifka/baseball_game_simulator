@@ -84,7 +84,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.text(0.05, 0.85, f'{home_team}: {home_walks}', transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
 
     ## Add watermark
-    plt.text(0.05, -.15, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='center', va='bottom')
+    plt.text(-.05, -.09, '@mlb_simulator', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='center', va='bottom')
     # plt.text(0.05, 0.75, 'Estimated Total Bases', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
     # plt.text(0.05, 0.745, '_____________________', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
     # plt.text(0.05, 0.70, f'{away_team}: {away_estimated_total_bases}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
