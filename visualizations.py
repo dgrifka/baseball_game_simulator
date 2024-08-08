@@ -159,8 +159,8 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.title(title, fontsize=16, loc='left', pad=20)  # Increased pad for more space
 
     ## Add watermark
-    plt.text(-.1, -.09, 'Data: MLB', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='left', va='bottom')
-    plt.text(-.1, -.11, 'By: @mlb_simulator', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='left', va='bottom')
+    plt.text(-.05, -.09, 'Data: MLB', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='left', va='bottom')
+    plt.text(-.05, -.11, 'By: @mlb_simulator', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='left', va='bottom')
     
     # Set integer x-axis ticks
     x_ticks = range(0, max_runs + 2)
