@@ -173,44 +173,61 @@ def simulate_game(outcomes_df):
         # Sample an outcome from the list
         outcome = random.choice(outcomes_copy)
         outcomes_copy.remove(outcome)  # Remove the sampled outcome from the copy
-
-        if outcome == "out":
+        
+        if outcome == "strikeout":
             outs += 1
         elif outcome == "walk":
-            advance_runner(bases)
+            runs += advance_runner(bases, is_walk=True)
         elif isinstance(outcome, list) and len(outcome) == 3:
             # Get the pre-calculated probabilities for the outcome
             probabilities = probabilities_dict[tuple(outcome)]
-
             # Generate a random value between 0 and 1
             random_value = random.random()
-
             # Determine the outcome based on the probabilities
             if random_value < probabilities[0]:
                 outs += 1
             elif random_value < probabilities[0] + probabilities[1]:
-                runs += advance_runner(bases)
-                bases[0] = True
+                runs += advance_runner(bases, 1)
             elif random_value < probabilities[0] + probabilities[1] + probabilities[2]:
                 runs += advance_runner(bases, 2)
-                bases[1] = True
             elif random_value < probabilities[0] + probabilities[1] + probabilities[2] + probabilities[3]:
                 runs += advance_runner(bases, 3)
-                bases[2] = True
             else:
                 runs += advance_runner(bases, 4)
-                bases = [False, False, False]
     
     return runs
 
-def advance_runner(bases, count=1):
+def advance_runner(bases, count=1, is_walk=False):
     runs = 0
-    for _ in range(count):
-        if bases[2]:
+    if is_walk:
+        # Handle walk scenario
+        if bases[2] and bases[1] and bases[0]:
+            # Bases loaded, force in a run
             runs += 1
-        bases[2] = bases[1]
-        bases[1] = bases[0]
-        bases[0] = True
+            bases[2] = bases[1]
+            bases[1] = bases[0]
+            bases[0] = True
+        elif bases[1] and bases[0]:
+            # Runners on first and second, advance to second and third
+            bases[2] = bases[1]
+            bases[1] = bases[0]
+            bases[0] = True
+        elif bases[0]:
+            # Runner on first, advance to second
+            bases[1] = bases[0]
+            bases[0] = True
+        else:
+            # No runners on, just put batter on first
+            bases[0] = True
+    else:
+        # Handle non-walk scenarios (hits)
+        for _ in range(count):
+            if bases[2]:
+                runs += 1
+            bases[2] = bases[1]
+            bases[1] = bases[0]
+            bases[0] = True
+    
     return runs
 
 def simulator(num_simulations, home_outcomes, away_outcomes):
