@@ -181,13 +181,14 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(14, 12))
+    fig, ax = plt.subplots(figsize=(14, 14))
     
     # Hide axis
     ax.axis('off')
     
-    # Replace first space with newline in Player names
+    # Replace first space with newline in Player names and "_" with " " in Result
     df['Player'] = df['Player'].str.replace(' ', '\n', n=1)
+    df['Result'] = df['Result'].str.replace('_', ' ')
     
     # Create color mapping for teams
     team_colors = dict(zip(df['Team'], df['team_color']))
@@ -260,14 +261,14 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_facecolor('red')
             cell.set_alpha(0.3)
     
-    # Add watermark
-    fig.text(0.375, 0.02, 'Data: MLB', fontsize=12, color='darkgray', ha='left', va='bottom')
-    fig.text(0.625, 0.02, 'By: @mlb_simulator', fontsize=12, color='darkgray', ha='left', va='bottom')
+    # Add watermark at the top middle
+    fig.text(0.5, 0.98, 'Data: MLB    By: @mlb_simulator', fontsize=12, color='darkgray', ha='center', va='top')
     
     # Set titles
-    plt.title('Top 15 Estimated Bases', fontsize=24, fontweight='bold', pad=20)
-    plt.suptitle(f'{away_team} {away_score} - {home_team} {home_score}\nDeserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
-                 fontsize=20, fontweight='bold', y=0.95)
+    plt.suptitle('Top 15 Estimated Bases', fontsize=24, fontweight='bold', y=0.95)
+    plt.title(f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
+              f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
+              fontsize=20, y=1.05)
     
     # Adjust layout and save
     plt.tight_layout()
@@ -278,7 +279,6 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'), 
                 bbox_inches='tight', dpi=300)
     plt.close()
-
 
 def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
