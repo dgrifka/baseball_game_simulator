@@ -205,12 +205,15 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
                      loc='center',
                      cellLoc='center')
     
-    # Set uniform cell width
-    table.auto_set_column_width(col=list(range(len(df.columns))))
-    cell_width = 1.0 / len(df.columns)
-    for (row, col), cell in table.get_celld().items():
-        cell.set_width(cell_width)
-    
+    # Create the table with equal column widths
+    n_cols = len(df.columns)
+    col_width = 1.0 / n_cols
+    table = ax.table(cellText=df.values,
+                     colLabels=df.columns,
+                     loc='center',
+                     cellLoc='center',
+                     colWidths=[col_width] * n_cols)  # Set uniform column widths
+
     # Set font size and style for column labels and cells
     for (row, col), cell in table.get_celld().items():
         if row == 0:
