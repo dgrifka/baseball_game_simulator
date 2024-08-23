@@ -181,7 +181,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a new figure and axis, ensuring it's clear of any previous content
-    fig, ax = plt.subplots(figsize=(16, 16))  # Reduced figure height
+    fig, ax = plt.subplots(figsize=(16, 10))  # Reduced figure height
     
     # Clear the axis completely
     ax.clear()
