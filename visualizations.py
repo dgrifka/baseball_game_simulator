@@ -181,7 +181,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a new figure and axis, ensuring it's clear of any previous content
-    fig, ax = plt.subplots(figsize=(16, 18))  # Increased figure height to accommodate title and watermark
+    fig, ax = plt.subplots(figsize=(16, 16))  # Reduced figure height
     
     # Clear the axis completely
     ax.clear()
@@ -268,17 +268,17 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         ax.patches[0].remove()
     
     # Add watermark above the table
-    fig.text(0.5, 0.9, 'Data: MLB    By: @mlb_simulator', fontsize=20, color='darkgray', ha='center', va='center')
+    fig.text(0.5, 0.97, 'Data: MLB    By: @mlb_simulator', fontsize=20, color='darkgray', ha='center', va='center')
     
     # Set combined title above the watermark, aligned to the left
     plt.title(f'Top 15 Estimated Bases\n'
               f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
               f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
-              fontsize=30, loc='left', y=1.0)
+              fontsize=30, loc='left', y=1.05)
     
     # Adjust layout and save
     plt.tight_layout()
-    plt.subplots_adjust(top=0.93, bottom=0.05)
+    plt.subplots_adjust(top=0.95, bottom=0.05)
     
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
