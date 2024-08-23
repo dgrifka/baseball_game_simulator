@@ -228,7 +228,7 @@ def create_estimated_bases_tables(top_10_df, bottom_10_df, away_team, home_team,
     fig.text(0.625, 0.01, 'By: @mlb_simulator', fontsize=12, color='darkgray', ha='left', va='bottom')
     
     # Set main title
-    fig.suptitle(f'{title}\n{away_team} {away_score} - {home_team} {home_score}\n(Win%: {away_win_percentage:.0f}% - {home_win_percentage:.0f}%)', 
+    fig.suptitle(f'{away_team} {away_score} - {home_team} {home_score}\n(Win%: {away_win_percentage:.0f}% - {home_win_percentage:.0f}%)', 
                  fontsize=20, fontweight='bold', y=0.98)
     
     # Adjust layout and save
