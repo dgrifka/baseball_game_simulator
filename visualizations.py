@@ -178,69 +178,76 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
     
-def create_estimated_bases_tables(top_10_df, bottom_10_df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
-    # Combine dataframes
-    combined_df = pd.concat([top_10_df, bottom_10_df])
-    
+def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure and axis
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 20))
+    fig, ax = plt.subplots(figsize=(12, 10))
     
-    # Hide axes
-    ax1.axis('off')
-    ax2.axis('off')
+    # Hide axis
+    ax.axis('off')
     
-    # Function to create and format table
-    def create_table(ax, df, title):
-        table = ax.table(cellText=df.values,
-                         colLabels=df.columns,
-                         loc='center',
-                         cellLoc='center')
-        
-        # Set font size and style for column labels and cells
-        for (row, col), cell in table.get_celld().items():
-            if row == 0:
-                cell.set_text_props(weight='bold', fontsize=12)
-            else:
-                cell.set_text_props(fontsize=10)
-            cell.set_height(0.06)
-        
-        # Function to apply color gradient
-        def color_scale(values, cmap_name='RdYlGn'):
-            cmap = plt.cm.get_cmap(cmap_name)
-            norm = plt.Normalize(vmin=values.min(), vmax=values.max())
-            colors = cmap(norm(values))
-            colors = (colors * 0.7) + 0.3  # Make colors less intense
-            return colors
-        
-        # Apply conditional formatting to Estimated Bases column
-        col_index = df.columns.get_loc('Estimated Bases')
-        column_values = df['Estimated Bases'].values
-        colors = color_scale(column_values)
-        for row in range(1, len(df) + 1):
-            table[(row, col_index)].set_facecolor(colors[row - 1])
+    # Replace "_" with " " in the Result column
+    df['Result'] = df['Result'].str.replace('_', ' ')
     
-    # Create tables
-    create_table(ax1, top_10_df, 'Top 10 Estimated Bases')
-    create_table(ax2, bottom_10_df, 'Bottom 10 Estimated Bases')
+    # Create color mapping for teams
+    team_colors = dict(zip(df['Team'], df['team_color']))
+    
+    # Drop the team_color column
+    df = df.drop('team_color', axis=1)
+    
+    # Create the table
+    table = ax.table(cellText=df.values,
+                     colLabels=df.columns,
+                     loc='center',
+                     cellLoc='center')
+    
+    # Set font size and style for column labels and cells
+    for (row, col), cell in table.get_celld().items():
+        if row == 0:
+            cell.set_text_props(weight='bold', fontsize=14)
+        else:
+            cell.set_text_props(fontsize=12)
+        cell.set_height(0.07)
+    
+    # Function to apply color gradient
+    def color_scale(values, cmap_name='RdYlGn'):
+        cmap = plt.cm.get_cmap(cmap_name)
+        norm = plt.Normalize(vmin=values.min(), vmax=values.max())
+        colors = cmap(norm(values))
+        colors = (colors * 0.7) + 0.3  # Make colors less intense
+        return colors
+    
+    # Apply conditional formatting to Estimated Bases column
+    col_index = df.columns.get_loc('Estimated Bases')
+    column_values = df['Estimated Bases'].values
+    colors = color_scale(column_values)
+    for row in range(1, len(df) + 1):
+        table[(row, col_index)].set_facecolor(colors[row - 1])
+    
+    # Color the Team column
+    team_col_index = df.columns.get_loc('Team')
+    for row in range(1, len(df) + 1):
+        team = df.iloc[row-1]['Team']
+        table[(row, team_col_index)].set_facecolor(team_colors[team])
     
     # Add watermark
-    fig.text(0.375, 0.01, 'Data: MLB', fontsize=12, color='darkgray', ha='left', va='bottom')
-    fig.text(0.625, 0.01, 'By: @mlb_simulator', fontsize=12, color='darkgray', ha='left', va='bottom')
+    fig.text(0.375, 0.02, 'Data: MLB', fontsize=12, color='darkgray', ha='left', va='bottom')
+    fig.text(0.625, 0.02, 'By: @mlb_simulator', fontsize=12, color='darkgray', ha='left', va='bottom')
     
-    # Set main title
-    fig.suptitle(f'{away_team} {away_score} - {home_team} {home_score}\nDeserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%)', 
-                 fontsize=20, fontweight='bold', y=0.98)
+    # Set titles
+    plt.title('Top 15 Estimated Bases', fontsize=24, fontweight='bold', pad=20)
+    plt.suptitle(f'{away_team} {away_score} - {home_team} {home_score}\nDeserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
+                 fontsize=20, fontweight='bold', y=0.95)
     
     # Adjust layout and save
     plt.tight_layout()
-    plt.subplots_adjust(top=0.9, hspace=0.3)
+    plt.subplots_adjust(top=0.85)
     
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'), 
                 bbox_inches='tight', dpi=300)
     plt.close()
-
+    
 def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
     # Create a bar plot for estimated total bases
