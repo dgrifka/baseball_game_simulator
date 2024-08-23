@@ -215,25 +215,11 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         r, g, b = to_rgb(color)
         return (r * 0.299 + g * 0.587 + b * 0.114) < 0.5
 
-    # Function to apply color gradient for Estimated Bases
+    # Function to apply continuous color gradient for Estimated Bases
     def color_scale(values):
-        min_val, max_val = min(values), max(values)
-        norm = plt.Normalize(min_val, max_val)
-        colors = []
-        for value in values:
-            if value >= (max_val - min_val) * 0.75 + min_val:
-                color = 'red'
-            elif value >= (max_val - min_val) * 0.5 + min_val:
-                color = 'orange'
-            elif value >= (max_val - min_val) * 0.25 + min_val:
-                color = 'yellow'
-            else:
-                color = 'white'
-            rgb = to_rgb(color)
-            hsv = colorsys.rgb_to_hsv(*rgb)
-            rgb = colorsys.hsv_to_rgb(hsv[0], hsv[1] * 0.5, hsv[2])  # Reduce intensity
-            colors.append(rgb)
-        return colors
+        cmap = plt.cm.get_cmap('RdYlGn_r')
+        norm = plt.Normalize(min(values), max(values))
+        return [cmap(norm(value)) for value in values]
     
     # Apply formatting to Team column
     team_col_index = df.columns.get_loc('Team')
@@ -261,14 +247,14 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_facecolor('red')
             cell.set_alpha(0.3)
     
-    # Add watermark at the top middle
-    fig.text(0.5, 0.98, 'Data: MLB    By: @mlb_simulator', fontsize=12, color='darkgray', ha='center', va='top')
+    # Add watermark in the middle of the plot
+    fig.text(0.5, 0.89, 'Data: MLB    By: @mlb_simulator', fontsize=12, color='darkgray', ha='center', va='center')
     
-    # Set titles
-    plt.suptitle('Top 15 Estimated Bases', fontsize=24, fontweight='bold', y=0.95)
-    plt.title(f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
+    # Set combined title
+    plt.title(f'Top 15 Estimated Bases\n'
+              f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
               f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
-              fontsize=20, y=1.05)
+              fontsize=20, loc='left', y=1.05)
     
     # Adjust layout and save
     plt.tight_layout()
@@ -279,6 +265,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'), 
                 bbox_inches='tight', dpi=300)
     plt.close()
+
 
 def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
