@@ -217,7 +217,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
 
     # Function to apply continuous color gradient for Estimated Bases
     def color_scale(values):
-        cmap = plt.cm.get_cmap('RdYlGn_r')
+        cmap = plt.cm.get_cmap('YlOrRd')
         norm = plt.Normalize(min(values), max(values))
         return [cmap(norm(value)) for value in values]
     
