@@ -181,7 +181,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(14, 14))
+    fig, ax = plt.subplots(figsize=(16, 18))  # Increased figure size
     
     # Hide axis
     ax.axis('off')
@@ -208,7 +208,10 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_text_props(weight='bold', fontsize=22)
         else:
             cell.set_text_props(fontsize=20)
-        cell.set_height(0.07)
+        cell.set_height(0.09)  # Increased cell height
+    
+    # Adjust column widths
+    table.auto_set_column_width(col=list(range(len(df.columns))))
     
     # Function to determine if color is dark
     def is_dark(color):
@@ -216,7 +219,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         return (r * 0.299 + g * 0.587 + b * 0.114) < 0.5
 
     # Function to apply continuous color gradient for Estimated Bases
-    def color_scale(values, alpha=0.55):
+    def color_scale(values, alpha=0.50):
         cmap = plt.cm.get_cmap('YlOrRd')
         norm = plt.Normalize(min(values), max(values))
         colors = [cmap(norm(value)) for value in values]
@@ -249,17 +252,17 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_alpha(0.25)
     
     # Add watermark in the middle of the plot
-    fig.text(0.5, 0.89, 'Data: MLB    By: @mlb_simulator', fontsize=12, color='darkgray', ha='center', va='center')
+    fig.text(0.5, 0.87, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
     
     # Set combined title
     plt.title(f'Top 15 Estimated Bases\n'
               f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
               f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
-              fontsize=20, loc='left', y=1.05)
+              fontsize=24, loc='left', y=1.08)
     
     # Adjust layout and save
     plt.tight_layout()
-    plt.subplots_adjust(top=0.85)
+    plt.subplots_adjust(top=0.82, bottom=0.05)  # Adjusted top and bottom margins
     
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
