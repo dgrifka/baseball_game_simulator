@@ -181,7 +181,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(16, 18))  # Increased figure size
+    fig, ax = plt.subplots(figsize=(16, 20))  # Increased height to accommodate title above table
     
     # Hide axis
     ax.axis('off')
@@ -196,11 +196,20 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Drop the team_color column
     df = df.drop('team_color', axis=1)
     
+    # Replace spaces with newlines in column names
+    df.columns = df.columns.str.replace(' ', '\n')
+    
     # Create the table
     table = ax.table(cellText=df.values,
                      colLabels=df.columns,
                      loc='center',
                      cellLoc='center')
+    
+    # Set uniform cell width
+    table.auto_set_column_width(col=list(range(len(df.columns))))
+    cell_width = 1.0 / len(df.columns)
+    for (row, col), cell in table.get_celld().items():
+        cell.set_width(cell_width)
     
     # Set font size and style for column labels and cells
     for (row, col), cell in table.get_celld().items():
@@ -209,9 +218,6 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         else:
             cell.set_text_props(fontsize=20)
         cell.set_height(0.09)  # Increased cell height
-    
-    # Adjust column widths
-    table.auto_set_column_width(col=list(range(len(df.columns))))
     
     # Function to determine if color is dark
     def is_dark(color):
@@ -235,8 +241,8 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.get_text().set_color('white')
     
     # Apply formatting to Estimated Bases column
-    col_index = df.columns.get_loc('Estimated Bases')
-    column_values = df['Estimated Bases'].values
+    col_index = df.columns.get_loc('Estimated\nBases')
+    column_values = df['Estimated\nBases'].values
     colors = color_scale(column_values)
     for row in range(1, len(df) + 1):
         cell = table[(row, col_index)]
@@ -251,25 +257,24 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_facecolor('red')
             cell.set_alpha(0.25)
     
-    # Add watermark in the middle of the plot
-    fig.text(0.5, 0.87, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
+    # Add watermark above the table
+    fig.text(0.5, 0.95, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
     
-    # Set combined title
+    # Set combined title above the table, aligned to the left
     plt.title(f'Top 15 Estimated Bases\n'
               f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
               f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
-              fontsize=24, loc='left', y=1.08)
+              fontsize=24, loc='left', y=1.02)
     
     # Adjust layout and save
     plt.tight_layout()
-    plt.subplots_adjust(top=0.82, bottom=0.05)  # Adjusted top and bottom margins
+    plt.subplots_adjust(top=0.90, bottom=0.05)  # Adjusted top margin to accommodate title and watermark
     
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'), 
                 bbox_inches='tight', dpi=300)
     plt.close()
-
 
 def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
