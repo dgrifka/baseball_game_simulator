@@ -4,6 +4,7 @@ from matplotlib.patches import Rectangle
 import seaborn as sns
 from scipy.interpolate import griddata
 from matplotlib.colors import LinearSegmentedColormap, to_rgb
+import colorsys
 import matplotlib.colors as colors
 import pandas as pd
 import numpy as np
