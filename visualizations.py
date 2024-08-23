@@ -268,7 +268,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         ax.patches[0].remove()
     
     # Add watermark above the table
-    fig.text(0.5, 1.085, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
+    fig.text(0.5, 1.0925, 'Data: MLB    By: @mlb_simulator', fontsize=13, color='darkgray', ha='center', va='center')
     
     # Set combined title above the watermark, aligned to the left
     plt.title(f'Top 15 Estimated Bases\n'
