@@ -181,7 +181,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a new figure and axis, ensuring it's clear of any previous content
-    fig, ax = plt.subplots(figsize=(16, 20))
+    fig, ax = plt.subplots(figsize=(16, 22))  # Increased figure height to accommodate title and watermark
     
     # Clear the axis completely
     ax.clear()
@@ -214,9 +214,9 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Set font size and style for column labels and cells
     for (row, col), cell in table.get_celld().items():
         if row == 0:
-            cell.set_text_props(weight='bold', fontsize=30)  # Increased font size for headers
+            cell.set_text_props(weight='bold', fontsize=32)  # Increased font size for headers
         else:
-            cell.set_text_props(fontsize=26)  # Increased font size for cell content
+            cell.set_text_props(fontsize=28)  # Increased font size for cell content
         cell.set_height(0.07)  # Reduced cell height
     
     # Function to determine if color is dark
@@ -268,17 +268,17 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         ax.patches[0].remove()
     
     # Add watermark above the table
-    fig.text(0.5, 0.95, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
+    fig.text(0.5, 0.94, 'Data: MLB    By: @mlb_simulator', fontsize=16, color='darkgray', ha='center', va='center')
     
-    # Set combined title above the table, aligned to the left
+    # Set combined title above the watermark, aligned to the left
     plt.title(f'Top 15 Estimated Bases\n'
               f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
               f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
-              fontsize=24, loc='left', y=1.02)
+              fontsize=26, loc='left', y=1.05)
     
     # Adjust layout and save
     plt.tight_layout()
-    plt.subplots_adjust(top=0.90, bottom=0.05)
+    plt.subplots_adjust(top=0.93, bottom=0.05)
     
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
