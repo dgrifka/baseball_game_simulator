@@ -260,8 +260,12 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Remove any existing texts or other elements
     for text in ax.texts:
         text.remove()
-    ax.collections.clear()
-    ax.patches.clear()
+    
+    # Clear collections and patches
+    while ax.collections:
+        ax.collections[0].remove()
+    while ax.patches:
+        ax.patches[0].remove()
     
     # Add watermark above the table
     fig.text(0.5, 0.95, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
