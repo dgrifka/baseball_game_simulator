@@ -180,8 +180,11 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.close()
     
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
-    # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(16, 20))  # Increased height to accommodate title above table
+    # Create a new figure and axis, ensuring it's clear of any previous content
+    fig, ax = plt.subplots(figsize=(16, 20))
+    
+    # Clear the axis completely
+    ax.clear()
     
     # Hide axis
     ax.axis('off')
@@ -260,6 +263,10 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_facecolor('red')
             cell.set_alpha(0.25)
     
+    # After creating and formatting the table, make sure no other elements are drawn
+    ax.texts = []  # Clear any text objects that might have been added
+    ax.artists = []  # Clear any artist objects
+    
     # Add watermark above the table
     fig.text(0.5, 0.95, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
     
@@ -271,7 +278,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     
     # Adjust layout and save
     plt.tight_layout()
-    plt.subplots_adjust(top=0.90, bottom=0.05)  # Adjusted top margin to accommodate title and watermark
+    plt.subplots_adjust(top=0.90, bottom=0.05)
     
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
