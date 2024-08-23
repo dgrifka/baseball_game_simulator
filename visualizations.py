@@ -190,7 +190,7 @@ def create_estimated_bases_tables(top_10_df, bottom_10_df, away_team, home_team,
     ax2.axis('off')
     
     # Function to create and format table
-    def create_table(ax, df):
+    def create_table(ax, df, title):
         table = ax.table(cellText=df.values,
                          colLabels=df.columns,
                          loc='center',
