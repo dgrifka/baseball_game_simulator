@@ -202,12 +202,6 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Replace spaces with newlines in column names
     df.columns = df.columns.str.replace(' ', '\n')
     
-    # Create the table
-    table = ax.table(cellText=df.values,
-                     colLabels=df.columns,
-                     loc='center',
-                     cellLoc='center')
-    
     # Create the table with equal column widths
     n_cols = len(df.columns)
     col_width = 1.0 / n_cols
@@ -263,9 +257,11 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_facecolor('red')
             cell.set_alpha(0.25)
     
-    # After creating and formatting the table, make sure no other elements are drawn
+    # Remove any existing texts or other elements
     for text in ax.texts:
         text.remove()
+    ax.collections.clear()
+    ax.patches.clear()
     
     # Add watermark above the table
     fig.text(0.5, 0.95, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
