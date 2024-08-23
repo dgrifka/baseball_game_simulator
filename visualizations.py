@@ -205,9 +205,9 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Set font size and style for column labels and cells
     for (row, col), cell in table.get_celld().items():
         if row == 0:
-            cell.set_text_props(weight='bold', fontsize=16)
+            cell.set_text_props(weight='bold', fontsize=22)
         else:
-            cell.set_text_props(fontsize=14)
+            cell.set_text_props(fontsize=20)
         cell.set_height(0.07)
     
     # Function to determine if color is dark
@@ -216,7 +216,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         return (r * 0.299 + g * 0.587 + b * 0.114) < 0.5
 
     # Function to apply continuous color gradient for Estimated Bases
-    def color_scale(values, alpha=0.6):
+    def color_scale(values, alpha=0.55):
         cmap = plt.cm.get_cmap('YlOrRd')
         norm = plt.Normalize(min(values), max(values))
         colors = [cmap(norm(value)) for value in values]
@@ -246,7 +246,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         cell = table[(row, result_col_index)]
         if result == 'Out':
             cell.set_facecolor('red')
-            cell.set_alpha(0.3)
+            cell.set_alpha(0.25)
     
     # Add watermark in the middle of the plot
     fig.text(0.5, 0.89, 'Data: MLB    By: @mlb_simulator', fontsize=12, color='darkgray', ha='center', va='center')
