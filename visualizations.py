@@ -3,7 +3,7 @@ import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 import seaborn as sns
 from scipy.interpolate import griddata
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, to_rgb
 import matplotlib.colors as colors
 import pandas as pd
 import numpy as np
@@ -180,13 +180,13 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig, ax = plt.subplots(figsize=(14, 12))
     
     # Hide axis
     ax.axis('off')
     
-    # Replace "_" with " " in the Result column
-    df['Result'] = df['Result'].str.replace('_', ' ')
+    # Replace first space with newline in Player names
+    df['Player'] = df['Player'].str.replace(' ', '\n', n=1)
     
     # Create color mapping for teams
     team_colors = dict(zip(df['Team'], df['team_color']))
@@ -203,31 +203,61 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Set font size and style for column labels and cells
     for (row, col), cell in table.get_celld().items():
         if row == 0:
-            cell.set_text_props(weight='bold', fontsize=14)
+            cell.set_text_props(weight='bold', fontsize=16)
         else:
-            cell.set_text_props(fontsize=12)
+            cell.set_text_props(fontsize=14)
         cell.set_height(0.07)
     
-    # Function to apply color gradient
-    def color_scale(values, cmap_name='RdYlGn'):
-        cmap = plt.cm.get_cmap(cmap_name)
-        norm = plt.Normalize(vmin=values.min(), vmax=values.max())
-        colors = cmap(norm(values))
-        colors = (colors * 0.7) + 0.3  # Make colors less intense
+    # Function to determine if color is dark
+    def is_dark(color):
+        r, g, b = to_rgb(color)
+        return (r * 0.299 + g * 0.587 + b * 0.114) < 0.5
+
+    # Function to apply color gradient for Estimated Bases
+    def color_scale(values):
+        min_val, max_val = min(values), max(values)
+        norm = plt.Normalize(min_val, max_val)
+        colors = []
+        for value in values:
+            if value >= (max_val - min_val) * 0.75 + min_val:
+                color = 'red'
+            elif value >= (max_val - min_val) * 0.5 + min_val:
+                color = 'orange'
+            elif value >= (max_val - min_val) * 0.25 + min_val:
+                color = 'yellow'
+            else:
+                color = 'white'
+            rgb = to_rgb(color)
+            hsv = colorsys.rgb_to_hsv(*rgb)
+            rgb = colorsys.hsv_to_rgb(hsv[0], hsv[1] * 0.5, hsv[2])  # Reduce intensity
+            colors.append(rgb)
         return colors
     
-    # Apply conditional formatting to Estimated Bases column
+    # Apply formatting to Team column
+    team_col_index = df.columns.get_loc('Team')
+    for row in range(1, len(df) + 1):
+        team = df.iloc[row-1]['Team']
+        cell = table[(row, team_col_index)]
+        cell.set_facecolor(team_colors[team])
+        if is_dark(team_colors[team]):
+            cell.get_text().set_color('white')
+    
+    # Apply formatting to Estimated Bases column
     col_index = df.columns.get_loc('Estimated Bases')
     column_values = df['Estimated Bases'].values
     colors = color_scale(column_values)
     for row in range(1, len(df) + 1):
-        table[(row, col_index)].set_facecolor(colors[row - 1])
+        cell = table[(row, col_index)]
+        cell.set_facecolor(colors[row - 1])
     
-    # Color the Team column
-    team_col_index = df.columns.get_loc('Team')
+    # Apply formatting to Result column
+    result_col_index = df.columns.get_loc('Result')
     for row in range(1, len(df) + 1):
-        team = df.iloc[row-1]['Team']
-        table[(row, team_col_index)].set_facecolor(team_colors[team])
+        result = df.iloc[row-1]['Result']
+        cell = table[(row, result_col_index)]
+        if result == 'Out':
+            cell.set_facecolor('red')
+            cell.set_alpha(0.3)
     
     # Add watermark
     fig.text(0.375, 0.02, 'Data: MLB', fontsize=12, color='darkgray', ha='left', va='bottom')
@@ -247,7 +277,8 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'), 
                 bbox_inches='tight', dpi=300)
     plt.close()
-    
+
+
 def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
     # Create a bar plot for estimated total bases
