@@ -11,7 +11,7 @@ def reload_module_from_file(file_name, branch = 'main'):
     Parameters:
     - file_path (str): Path to the Python file containing the module code.
 
-    The function changes the current working directory to '/content/Helium_Athletic/Heatmaps', pulls the latest updates from the 'main'
+    The function changes the current working directory to '/content/baseball_game_simulator', pulls the latest updates from the 'main'
     branch of the Git repository, reads the contents of the specified file, and executes the code in a separate namespace.
     It then updates the current namespace with the new definitions.
     """
@@ -48,7 +48,7 @@ def reload_functions_from_module(module_name, function_names, branch):
     - module_name (str): Name of the module to reload.
     - function_names (list): List of function names as strings to import into the global namespace after reloading the module.
 
-    The function changes the current working directory to '/content/Helium_Athletic/Heatmaps', pulls the latest updates from the 'main' 
+    The function changes the current working directory to '/content/baseball_game_simulator', pulls the latest updates from the 'main' 
     branch of the Git repository, reloads the module, and then imports the specified functions into the global namespace, making them 
     directly callable.
     """
