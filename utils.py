@@ -28,7 +28,7 @@ def reload_module_from_file(file_name, branch = 'main'):
         print(result.stderr, file=sys.stderr)
 
     # Read the contents of the file
-    with open(f"{heatmap_dir}/{file_name}.py", 'r') as file:
+    with open(f"/content/baseball_game_simulator/{file_name}.py", 'r') as file:
         code = file.read()
 
     # Execute the code in a separate namespace
