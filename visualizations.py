@@ -37,7 +37,7 @@ def get_team_logo(team_name, mlb_team_logos):
     print(f"Logo not found for {team_name}")
     return None
 
-def getImage(path, zoom=0.325, size=(50, 50), alpha=0.65):
+def getImage(path, zoom=0.3, size=(50, 50), alpha=0.65):
     try:
         response = requests.get(path)
         img = Image.open(BytesIO(response.content))
@@ -141,7 +141,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     home_logo_url = get_team_logo(home_team, mlb_team_logos)
     if home_logo_url:
         for x, y in zip(home_ev, home_la):
-            img = getImage(home_logo_url, alpha=0.7)  # Adjust alpha as needed
+            img = getImage(home_logo_url, alpha=0.75)  # Adjust alpha as needed
             if img:
                 ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
                 plt.gca().add_artist(ab)
@@ -152,7 +152,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     away_logo_url = get_team_logo(away_team, mlb_team_logos)
     if away_logo_url:
         for x, y in zip(away_ev, away_la):
-            img = getImage(away_logo_url, alpha=0.65)  # Adjust alpha as needed
+            img = getImage(away_logo_url, alpha=0.6)  # Adjust alpha as needed
             if img:
                 ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
                 plt.gca().add_artist(ab)
