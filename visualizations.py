@@ -37,7 +37,7 @@ def get_team_logo(team_name, mlb_team_logos):
     print(f"Logo not found for {team_name}")
     return None
 
-def getImage(path, zoom=0.5, size=(50, 50)):
+def getImage(path, zoom=0.35, size=(50, 50), alpha=0.8):
     try:
         response = requests.get(path)
         img = Image.open(BytesIO(response.content))
@@ -49,11 +49,23 @@ def getImage(path, zoom=0.5, size=(50, 50)):
         enhancer = ImageEnhance.Sharpness(img)
         img = enhancer.enhance(2.0)  # Increase sharpness, adjust as needed
         
+        # Add alpha channel
+        img = img.convert("RGBA")
+        data = img.getdata()
+        new_data = []
+        for item in data:
+            # Change all white (also shades of whites) pixels to transparent
+            if item[0] > 200 and item[1] > 200 and item[2] > 200:
+                new_data.append((255, 255, 255, 0))
+            else:
+                new_data.append(item[:3] + (int(255 * alpha),))  # Apply alpha to non-white pixels
+        img.putdata(new_data)
+        
         return OffsetImage(img, zoom=zoom)
     except Exception as e:
         print(f"Error loading image from {path}: {str(e)}")
         return None
-
+        
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, mlb_team_logos, images_dir="images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
