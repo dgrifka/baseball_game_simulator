@@ -11,7 +11,10 @@ import numpy as np
 from scipy import stats
 
 from constants import team_colors
-
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+import requests
+from io import BytesIO
+from PIL import Image
 import os
 
 
@@ -25,7 +28,14 @@ def launch_angle_range(exit_velocity):
         max_launch_angle = 30 + (exit_velocity - 98) * (2 if exit_velocity <= 116 else 3)
         return min_launch_angle, max_launch_angle
     
-def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images"):
+
+def get_team_logo(team_name, mlb_team_logos):
+    for team in mlb_team_logos:
+        if team['team'] == team_name:
+            return team['logo_url']
+    return None
+
+def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, mlb_team_logos, images_dir="images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
     tie_percentage_str = f"{tie_percentage:.0f}"
@@ -75,10 +85,28 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Add colorbar with specific ticks
     cbar = plt.colorbar(contour, label='Average Total Bases', ticks=levels)
     cbar.set_ticklabels([f'{level:.1f}' for level in levels])  # Format tick labels to one decimal place
-    
-    plt.scatter(home_ev, home_la, s=175, alpha=0.65, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
-    plt.scatter(away_ev, away_la, s=175, alpha=0.65, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
-    plt.axhline(y=0, color='black', alpha = 0.8, linewidth=0.8)
+
+    # Function to create image marker
+    def getImage(path, zoom=0.05):
+        response = requests.get(path)
+        img = Image.open(BytesIO(response.content))
+        return OffsetImage(img, zoom=zoom)
+
+    # Plot home team logo markers
+    home_logo_url = get_team_logo(home_team, mlb_team_logos)
+    if home_logo_url:
+        for x, y in zip(home_ev, home_la):
+            ab = AnnotationBbox(getImage(home_logo_url), (x, y), frameon=False)
+            plt.gca().add_artist(ab)
+
+    # Plot away team logo markers
+    away_logo_url = get_team_logo(away_team, mlb_team_logos)
+    if away_logo_url:
+        for x, y in zip(away_ev, away_la):
+            ab = AnnotationBbox(getImage(away_logo_url), (x, y), frameon=False)
+            plt.gca().add_artist(ab)
+
+    plt.axhline(y=0, color='black', alpha=0.8, linewidth=0.8)
 
     plt.text(0.05, 0.95, 'Walks/HBP', transform=plt.gca().transAxes, fontsize=16, verticalalignment='top')
     plt.text(0.05, 0.947, '___________', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
@@ -88,16 +116,15 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     ## Add watermark
     plt.text(-.06, -.1, 'Data: MLB', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='left', va='bottom')
     plt.text(-.06, -.122, 'By: @mlb_simulator', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='left', va='bottom')
-    # plt.text(0.05, 0.75, 'Estimated Total Bases', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
-    # plt.text(0.05, 0.745, '_____________________', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
-    # plt.text(0.05, 0.70, f'{away_team}: {away_estimated_total_bases}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
-    # plt.text(0.05, 0.65, f'{home_team}: {home_estimated_total_bases}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
 
     plt.xlabel('Exit Velocity (mph)', fontsize=18)
     plt.ylabel('Launch Angle', fontsize=18)
-    plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
+    plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc='left', pad=12)
 
-    plt.legend(loc='upper right')  # Add a legend in the upper right corner
+    # Add legend
+    plt.legend([plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="w", markersize=15, label=home_team),
+                plt.Line2D([0], [0], marker="^", color="w", markerfacecolor="w", markersize=15, label=away_team)],
+               [home_team, away_team], loc='upper right')
 
     plt.xticks(fontsize=16)
     plt.yticks(fontsize=16)
