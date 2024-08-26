@@ -254,7 +254,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
     
-def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, mlb_team_logos, images_dir):
+def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir, mlb_team_logos):
     # Create a new figure and axis, ensuring it's clear of any previous content
     fig, ax = plt.subplots(figsize=(11, 7))  # Reduced figure height
     
@@ -306,32 +306,32 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         colors = [cmap(norm(value)) for value in values]
         return [(r, g, b, alpha) for r, g, b, _ in colors]
     
-    # Apply formatting to Team column and add team logos
+    # Create a dictionary to map team names to logo URLs
+    team_logo_dict = {team['team']: team['logo_url'] for team in mlb_team_logos}
+    
+    # Function to load and resize image
+    def load_image(url, zoom=0.15):
+        response = requests.get(url)
+        img = plt.imread(BytesIO(response.content))
+        return OffsetImage(img, zoom=zoom)
+    
+    # Apply formatting to Team column and add logos
     team_col_index = df.columns.get_loc('Team')
     for row in range(1, len(df) + 1):
         team = df.iloc[row-1]['Team']
         cell = table[(row, team_col_index)]
         cell.set_facecolor(team_colors[team])
         
-        # Clear existing text
+        # Remove text from the cell
         cell.get_text().set_text('')
         
-        # Get team logo
-        logo_url = next((item['logo_url'] for item in mlb_team_logos if item['team'] == team), None)
-        if logo_url:
-            img = getImage(logo_url, zoom=0.15, size=(30, 30))  # Adjust size and zoom as needed
-            if img:
-                # Get the center coordinates of the cell
-                bbox = cell.get_bbox()
-                x = (bbox.x0 + bbox.x1) / 2
-                y = (bbox.y0 + bbox.y1) / 2
-                
-                # Add the image to the cell
-                imagebox = OffsetImage(img.get_children()[0].get_array(), zoom=0.5)  # Adjust zoom as needed
-                ab = AnnotationBbox(imagebox, (x, y), frameon=False, 
-                                    xycoords='figure pixels', boxcoords="offset points",
-                                    box_alignment=(0.5, 0.5))
-                ax.add_artist(ab)
+        # Add team logo
+        if team in team_logo_dict:
+            logo = load_image(team_logo_dict[team])
+            ab = AnnotationBbox(logo, cell.get_xy(), xybox=(20, 20), 
+                                xycoords='data', boxcoords="offset points", 
+                                box_alignment=(0.5, 0.5), pad=0)
+            ax.add_artist(ab)
     
     # Apply formatting to Estimated Bases column
     col_index = df.columns.get_loc('Estimated\nBases')
