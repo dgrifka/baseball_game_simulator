@@ -321,9 +321,15 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         if logo_url:
             img = getImage(logo_url, zoom=0.15, size=(30, 30))  # Adjust size and zoom as needed
             if img:
-                imagebox = OffsetImage(img.get_children()[0].get_array())
-                ab = AnnotationBbox(imagebox, cell.get_xy(), frameon=False, 
-                                    xycoords='data', boxcoords="offset points",
+                # Get the center coordinates of the cell
+                bbox = cell.get_bbox()
+                x = (bbox.x0 + bbox.x1) / 2
+                y = (bbox.y0 + bbox.y1) / 2
+                
+                # Add the image to the cell
+                imagebox = OffsetImage(img.get_children()[0].get_array(), zoom=0.5)  # Adjust zoom as needed
+                ab = AnnotationBbox(imagebox, (x, y), frameon=False, 
+                                    xycoords='figure pixels', boxcoords="offset points",
                                     box_alignment=(0.5, 0.5))
                 ax.add_artist(ab)
     
