@@ -135,11 +135,6 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.ylabel('Launch Angle', fontsize=18)
     plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc='left', pad=12)
 
-    # Add legend
-    plt.legend([plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="blue", markersize=15, label=home_team),
-                plt.Line2D([0], [0], marker="^", color="w", markerfacecolor="red", markersize=15, label=away_team)],
-               [home_team, away_team], loc='upper right')
-
     plt.xticks(fontsize=16)
     plt.yticks(fontsize=16)
     # Format y-tick labels as degrees
