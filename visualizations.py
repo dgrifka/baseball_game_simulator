@@ -330,29 +330,11 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         # Add team logo
         if team in team_logo_dict:
             logo = load_image(team_logo_dict[team])
-            
-            # Create a new figure for the logo
-            logo_fig = plt.figure(figsize=(1, 1), dpi=72)
-            logo_ax = logo_fig.add_subplot(111)
-            logo_ax.axis('off')
-            
-            # Add the logo to the new figure
-            logo_ax.add_artist(AnnotationBbox(logo, (0.5, 0.5), xycoords='axes fraction', frameon=False))
-            
-            # Convert the figure to an image
-            canvas = FigureCanvasAgg(logo_fig)
-            canvas.draw()
-            logo_array = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')
-            logo_array = logo_array.reshape(canvas.get_width_height()[::-1] + (3,))
-            
-            # Close the logo figure
-            plt.close(logo_fig)
-            
-            # Add the logo image to the cell
-            cell.get_text().set_visible(False)
-            cell.set_facecolor('none')
-            cell.set_edgecolor('none')
-            im = ax.imshow(logo_array, extent=cell.get_bbox().bounds, aspect='auto', zorder=3)
+            cell_bbox = cell.get_bbox()
+            ab = AnnotationBbox(logo, ((cell_bbox.x0 + cell_bbox.x1)/2, (cell_bbox.y0 + cell_bbox.y1)/2),
+                                xycoords='figure pixels', boxcoords="figure pixels", 
+                                box_alignment=(0.5, 0.5), pad=0)
+            ax.add_artist(ab)
     
     # Apply formatting to Estimated Bases column
     col_index = df.columns.get_loc('Estimated\nBases')
@@ -389,7 +371,6 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'), 
                 bbox_inches='tight', dpi=300)
     plt.close()
-
 def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
     # Create a bar plot for estimated total bases
