@@ -37,7 +37,7 @@ def get_team_logo(team_name, mlb_team_logos):
     print(f"Logo not found for {team_name}")
     return None
 
-def getImage(path, zoom=0.31, size=(50, 50), alpha=0.7):
+def getImage(path, zoom=0.325, size=(50, 50), alpha=0.5):
     try:
         response = requests.get(path)
         img = Image.open(BytesIO(response.content))
