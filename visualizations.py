@@ -11,8 +11,12 @@ import numpy as np
 from scipy import stats
 
 from constants import team_colors
-
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+import requests
+from io import BytesIO
+from PIL import Image, ImageEnhance
 import os
+import ast
 
 
 def launch_angle_range(exit_velocity):
@@ -25,7 +29,64 @@ def launch_angle_range(exit_velocity):
         max_launch_angle = 30 + (exit_velocity - 98) * (2 if exit_velocity <= 116 else 3)
         return min_launch_angle, max_launch_angle
     
-def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, images_dir = "images"):
+
+def get_team_logo(team_name, mlb_team_logos):
+    for team in mlb_team_logos:
+        if team['team'] == team_name:
+            return team['logo_url']
+    print(f"Logo not found for {team_name}")
+    return None
+
+def getImage(path, zoom=0.37, size=(50, 50), alpha=0.65):
+    try:
+        response = requests.get(path)
+        img = Image.open(BytesIO(response.content))
+        
+        # Resize the image
+        img = img.resize(size, Image.LANCZOS)
+        
+        # Sharpen the image
+        enhancer = ImageEnhance.Sharpness(img)
+        img = enhancer.enhance(2.5)  # Increase sharpness, adjust as needed
+        
+        # Convert to RGBA if it's not already
+        img = img.convert("RGBA")
+        
+        # Get the image data
+        data = np.array(img)
+        
+        # Create a mask for non-transparent pixels
+        mask = data[:, :, 3] > 0
+        
+        # Get the bounding box of non-transparent pixels
+        rows = np.any(mask, axis=1)
+        cols = np.any(mask, axis=0)
+        ymin, ymax = np.where(rows)[0][[0, -1]]
+        xmin, xmax = np.where(cols)[0][[0, -1]]
+        
+        # Crop the image to the bounding box
+        cropped = img.crop((xmin, ymin, xmax+1, ymax+1))
+        
+        # Create a new transparent image of the original size
+        new_img = Image.new('RGBA', size, (255, 255, 255, 0))
+        
+        # Calculate position to paste cropped image (centered)
+        paste_pos = ((size[0] - cropped.width) // 2, (size[1] - cropped.height) // 2)
+        
+        # Paste the cropped image
+        new_img.paste(cropped, paste_pos, cropped)
+        
+        # Apply overall alpha
+        data = np.array(new_img)
+        data[:, :, 3] = (data[:, :, 3] * alpha).astype(np.uint8)
+        
+        return OffsetImage(Image.fromarray(data), zoom=zoom)
+    except Exception as e:
+        print(f"Error loading image from {path}: {str(e)}")
+        return None
+        
+        
+def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, mlb_team_logos, images_dir="images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
     home_win_percentage_str = f"{home_win_percentage:.0f}"
     tie_percentage_str = f"{tie_percentage:.0f}"
@@ -75,10 +136,30 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Add colorbar with specific ticks
     cbar = plt.colorbar(contour, label='Average Total Bases', ticks=levels)
     cbar.set_ticklabels([f'{level:.1f}' for level in levels])  # Format tick labels to one decimal place
-    
-    plt.scatter(home_ev, home_la, s=175, alpha=0.65, label=f'{home_team}', color=team_colors[home_team][0], marker='o')
-    plt.scatter(away_ev, away_la, s=175, alpha=0.65, label=f'{away_team}', color=team_colors[away_team][0], marker="^")
-    plt.axhline(y=0, color='black', alpha = 0.8, linewidth=0.8)
+
+    # Plot home team logo markers
+    home_logo_url = get_team_logo(home_team, mlb_team_logos)
+    if home_logo_url:
+        for x, y in zip(home_ev, home_la):
+            img = getImage(home_logo_url, alpha=0.6)  # Adjust alpha as needed
+            if img:
+                ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
+                plt.gca().add_artist(ab)
+    else:
+        plt.scatter(home_ev, home_la, s=175, alpha=0.65, label=f'{home_team}', color='blue', marker='o')
+
+    # Plot away team logo markers
+    away_logo_url = get_team_logo(away_team, mlb_team_logos)
+    if away_logo_url:
+        for x, y in zip(away_ev, away_la):
+            img = getImage(away_logo_url, alpha=0.6)  # Adjust alpha as needed
+            if img:
+                ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
+                plt.gca().add_artist(ab)
+    else:
+        plt.scatter(away_ev, away_la, s=175, alpha=0.65, label=f'{away_team}', color='red', marker='^')
+
+    plt.axhline(y=0, color='black', alpha=0.8, linewidth=0.8)
 
     plt.text(0.05, 0.95, 'Walks/HBP', transform=plt.gca().transAxes, fontsize=16, verticalalignment='top')
     plt.text(0.05, 0.947, '___________', transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
@@ -88,16 +169,10 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     ## Add watermark
     plt.text(-.06, -.1, 'Data: MLB', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='left', va='bottom')
     plt.text(-.06, -.122, 'By: @mlb_simulator', transform=plt.gca().transAxes, fontsize=7, color='darkgray', ha='left', va='bottom')
-    # plt.text(0.05, 0.75, 'Estimated Total Bases', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
-    # plt.text(0.05, 0.745, '_____________________', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
-    # plt.text(0.05, 0.70, f'{away_team}: {away_estimated_total_bases}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
-    # plt.text(0.05, 0.65, f'{home_team}: {home_estimated_total_bases}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
 
     plt.xlabel('Exit Velocity (mph)', fontsize=18)
     plt.ylabel('Launch Angle', fontsize=18)
-    plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc = 'left', pad=12)
-
-    plt.legend(loc='upper right')  # Add a legend in the upper right corner
+    plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc='left', pad=12)
 
     plt.xticks(fontsize=16)
     plt.yticks(fontsize=16)
@@ -179,6 +254,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
     
+
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a new figure and axis, ensuring it's clear of any previous content
     fig, ax = plt.subplots(figsize=(11, 7))  # Reduced figure height
@@ -285,6 +361,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'), 
                 bbox_inches='tight', dpi=300)
     plt.close()
+
 
 def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
