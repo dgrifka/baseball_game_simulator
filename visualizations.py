@@ -37,7 +37,7 @@ def get_team_logo(team_name, mlb_team_logos):
     print(f"Logo not found for {team_name}")
     return None
 
-def getImage(path, zoom=0.35, size=(50, 50), alpha=0.8):
+def getImage(path, zoom=0.29, size=(50, 50), alpha=0.85):
     try:
         response = requests.get(path)
         img = Image.open(BytesIO(response.content))
@@ -61,10 +61,15 @@ def getImage(path, zoom=0.35, size=(50, 50), alpha=0.8):
                 new_data.append(item[:3] + (int(255 * alpha),))  # Apply alpha to non-white pixels
         img.putdata(new_data)
         
-        return OffsetImage(img, zoom=zoom)
+        # Create a fully transparent background
+        background = Image.new('RGBA', size, (255, 255, 255, 0))
+        background.paste(img, (0, 0), img)
+        
+        return OffsetImage(background, zoom=zoom)
     except Exception as e:
         print(f"Error loading image from {path}: {str(e)}")
         return None
+        
         
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, mlb_team_logos, images_dir="images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
@@ -121,9 +126,9 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     home_logo_url = get_team_logo(home_team, mlb_team_logos)
     if home_logo_url:
         for x, y in zip(home_ev, home_la):
-            img = getImage(home_logo_url)
+            img = getImage(home_logo_url, alpha=0.8)  # Adjust alpha as needed
             if img:
-                ab = AnnotationBbox(img, (x, y), frameon=False)
+                ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
                 plt.gca().add_artist(ab)
     else:
         plt.scatter(home_ev, home_la, s=175, alpha=0.65, label=f'{home_team}', color='blue', marker='o')
@@ -132,9 +137,9 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     away_logo_url = get_team_logo(away_team, mlb_team_logos)
     if away_logo_url:
         for x, y in zip(away_ev, away_la):
-            img = getImage(away_logo_url)
+            img = getImage(away_logo_url, alpha=0.8)  # Adjust alpha as needed
             if img:
-                ab = AnnotationBbox(img, (x, y), frameon=False)
+                ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
                 plt.gca().add_artist(ab)
     else:
         plt.scatter(away_ev, away_la, s=175, alpha=0.65, label=f'{away_team}', color='red', marker='^')
