@@ -14,7 +14,7 @@ from constants import team_colors
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import requests
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageEnhance
 import os
 import ast
 
@@ -36,6 +36,23 @@ def get_team_logo(team_name, mlb_team_logos):
             return team['logo_url']
     print(f"Logo not found for {team_name}")
     return None
+
+def getImage(path, zoom=0.065, size=(50, 50)):
+    try:
+        response = requests.get(path)
+        img = Image.open(BytesIO(response.content))
+        
+        # Resize the image
+        img = img.resize(size, Image.LANCZOS)
+        
+        # Sharpen the image
+        enhancer = ImageEnhance.Sharpness(img)
+        img = enhancer.enhance(2.0)  # Increase sharpness, adjust as needed
+        
+        return OffsetImage(img, zoom=zoom)
+    except Exception as e:
+        print(f"Error loading image from {path}: {str(e)}")
+        return None
 
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, mlb_team_logos, images_dir="images"):
     away_win_percentage_str = f"{away_win_percentage:.0f}"
@@ -87,16 +104,6 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Add colorbar with specific ticks
     cbar = plt.colorbar(contour, label='Average Total Bases', ticks=levels)
     cbar.set_ticklabels([f'{level:.1f}' for level in levels])  # Format tick labels to one decimal place
-
-    # Function to create image marker
-    def getImage(path, zoom=0.05):
-        try:
-            response = requests.get(path)
-            img = Image.open(BytesIO(response.content))
-            return OffsetImage(img, zoom=zoom)
-        except:
-            print(f"Error loading image from {path}")
-            return None
 
     # Plot home team logo markers
     home_logo_url = get_team_logo(home_team, mlb_team_logos)
