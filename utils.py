@@ -19,8 +19,7 @@ def reload_module_from_file(file_name, branch = 'main'):
     assert isinstance(file_name, str), "file_path must be a string"
 
     # Change directory and pull updates from Git
-    heatmap_dir = "/content/Helium_Athletic/Heatmaps"
-    os.chdir(heatmap_dir)
+    os.chdir('/content/baseball_game_simulator')
     result = subprocess.run(['git', 'pull', 'origin', branch], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     # Print the output and error (if any) from the Git pull command
@@ -58,7 +57,7 @@ def reload_functions_from_module(module_name, function_names, branch):
     assert isinstance(function_names, list) and all(isinstance(name, str) for name in function_names), "function_names must be a list of strings"
 
     # Change directory and pull updates from Git
-    os.chdir('/content/Helium_Athletic/Heatmaps')
+    os.chdir('/content/baseball_game_simulator')
     result = subprocess.run(['git', 'pull', 'origin', branch], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     
     # Print the output and error (if any) from the Git pull command
