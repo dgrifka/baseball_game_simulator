@@ -254,7 +254,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
     
-def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
+def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, mlb_team_logos, images_dir):
     # Create a new figure and axis, ensuring it's clear of any previous content
     fig, ax = plt.subplots(figsize=(11, 7))  # Reduced figure height
     
@@ -306,14 +306,26 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         colors = [cmap(norm(value)) for value in values]
         return [(r, g, b, alpha) for r, g, b, _ in colors]
     
-    # Apply formatting to Team column
+    # Apply formatting to Team column and add team logos
     team_col_index = df.columns.get_loc('Team')
     for row in range(1, len(df) + 1):
         team = df.iloc[row-1]['Team']
         cell = table[(row, team_col_index)]
         cell.set_facecolor(team_colors[team])
-        if is_dark(team_colors[team]):
-            cell.get_text().set_color('white')
+        
+        # Clear existing text
+        cell.get_text().set_text('')
+        
+        # Get team logo
+        logo_url = next((item['logo_url'] for item in mlb_team_logos if item['team'] == team), None)
+        if logo_url:
+            img = getImage(logo_url, zoom=0.15, size=(30, 30))  # Adjust size and zoom as needed
+            if img:
+                imagebox = OffsetImage(img.get_children()[0].get_array())
+                ab = AnnotationBbox(imagebox, cell.get_xy(), frameon=False, 
+                                    xycoords='data', boxcoords="offset points",
+                                    box_alignment=(0.5, 0.5))
+                ax.add_artist(ab)
     
     # Apply formatting to Estimated Bases column
     col_index = df.columns.get_loc('Estimated\nBases')
