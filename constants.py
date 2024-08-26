@@ -92,7 +92,3 @@ mlb_teams = [
     {"team": "TOR", "logo_url": "https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/scoreboard/tor.png&h=500&w=500"},
     {"team": "WSN", "logo_url": "https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/scoreboard/wsh.png&h=500&w=500"}
 ]
-# Create a DataFrame from the list of dictionaries
-df_image = pd.DataFrame(mlb_teams)
-# Map the team names to the corresponding logo URLs
-image_dict = df_image.set_index('team')['logo_url'].to_dict()
