@@ -255,13 +255,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.close()
     
 
-def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir, mlb_team_logos):
-    # Create a dictionary to map team names to logo URLs
-    team_logo_dict = {team['team']: team['logo_url'] for team in mlb_team_logos}
-    
-    # Add a new column with logo URLs
-    df['Logo_URL'] = df['Team'].map(team_logo_dict)
-    
+def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a new figure and axis, ensuring it's clear of any previous content
     fig, ax = plt.subplots(figsize=(11, 7))  # Reduced figure height
     
@@ -313,31 +307,14 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         colors = [cmap(norm(value)) for value in values]
         return [(r, g, b, alpha) for r, g, b, _ in colors]
     
-    # Function to load and resize image
-    def load_image(url, zoom=0.15):
-        response = requests.get(url)
-        img = plt.imread(BytesIO(response.content))
-        return OffsetImage(img, zoom=zoom)
-    
-    # Apply formatting to Team column and add logos
+    # Apply formatting to Team column
     team_col_index = df.columns.get_loc('Team')
     for row in range(1, len(df) + 1):
         team = df.iloc[row-1]['Team']
-        logo_url = df.iloc[row-1]['Logo_URL']
         cell = table[(row, team_col_index)]
         cell.set_facecolor(team_colors[team])
-        
-        # Remove text from the cell
-        cell.get_text().set_text('')
-        
-        # Add team logo
-        if logo_url:
-            logo = load_image(logo_url)
-            cell_bbox = cell.get_bbox()
-            ab = AnnotationBbox(logo, ((cell_bbox.x0 + cell_bbox.x1)/2, (cell_bbox.y0 + cell_bbox.y1)/2),
-                                xycoords='figure pixels', boxcoords="offset points", 
-                                box_alignment=(0.5, 0.5), pad=0)
-            ax.add_artist(ab)
+        if is_dark(team_colors[team]):
+            cell.get_text().set_color('white')
     
     # Apply formatting to Estimated Bases column
     col_index = df.columns.get_loc('Estimated\nBases')
@@ -356,8 +333,15 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_facecolor('red')
             cell.set_alpha(0.25)
     
-    # Remove the Logo_URL column from the table
-    table.remove_column(df.columns.get_loc('Logo_URL'))
+    # Remove any existing texts or other elements
+    for text in ax.texts:
+        text.remove()
+    
+    # Clear collections and patches
+    while ax.collections:
+        ax.collections[0].remove()
+    while ax.patches:
+        ax.patches[0].remove()
     
     # Add watermark above the table
     fig.text(0.5, 1.095, 'Data: MLB    By: @mlb_simulator', fontsize=13, color='darkgray', ha='center', va='center')
@@ -377,7 +361,8 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'), 
                 bbox_inches='tight', dpi=300)
     plt.close()
-    
+
+
 def tb_barplot(home_estimated_total_bases, away_estimated_total_bases, home_win_percentage, away_win_percentage, tie_percentage, home_team, away_team, home_score, away_score, images_dir = "images"):
 
     # Create a bar plot for estimated total bases
