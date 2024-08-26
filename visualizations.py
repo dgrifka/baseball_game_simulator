@@ -16,6 +16,7 @@ import requests
 from io import BytesIO
 from PIL import Image
 import os
+import ast
 
 
 def launch_angle_range(exit_velocity):
@@ -30,9 +31,14 @@ def launch_angle_range(exit_velocity):
     
 
 def get_team_logo(team_name, mlb_team_logos):
-    for team in mlb_team_logos:
-        if team['team'] == team_name:
-            return team['logo_url']
+    try:
+        # Try to parse the string as a list of dictionaries
+        logos_list = ast.literal_eval(mlb_team_logos)
+        for team in logos_list:
+            if team['team'] == team_name:
+                return team['logo_url']
+    except:
+        print(f"Error parsing mlb_team_logos for {team_name}")
     return None
 
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, mlb_team_logos, images_dir="images"):
@@ -88,23 +94,35 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
     # Function to create image marker
     def getImage(path, zoom=0.05):
-        response = requests.get(path)
-        img = Image.open(BytesIO(response.content))
-        return OffsetImage(img, zoom=zoom)
+        try:
+            response = requests.get(path)
+            img = Image.open(BytesIO(response.content))
+            return OffsetImage(img, zoom=zoom)
+        except:
+            print(f"Error loading image from {path}")
+            return None
 
     # Plot home team logo markers
     home_logo_url = get_team_logo(home_team, mlb_team_logos)
     if home_logo_url:
         for x, y in zip(home_ev, home_la):
-            ab = AnnotationBbox(getImage(home_logo_url), (x, y), frameon=False)
-            plt.gca().add_artist(ab)
+            img = getImage(home_logo_url)
+            if img:
+                ab = AnnotationBbox(img, (x, y), frameon=False)
+                plt.gca().add_artist(ab)
+    else:
+        plt.scatter(home_ev, home_la, s=175, alpha=0.65, label=f'{home_team}', color='blue', marker='o')
 
     # Plot away team logo markers
     away_logo_url = get_team_logo(away_team, mlb_team_logos)
     if away_logo_url:
         for x, y in zip(away_ev, away_la):
-            ab = AnnotationBbox(getImage(away_logo_url), (x, y), frameon=False)
-            plt.gca().add_artist(ab)
+            img = getImage(away_logo_url)
+            if img:
+                ab = AnnotationBbox(img, (x, y), frameon=False)
+                plt.gca().add_artist(ab)
+    else:
+        plt.scatter(away_ev, away_la, s=175, alpha=0.65, label=f'{away_team}', color='red', marker='^')
 
     plt.axhline(y=0, color='black', alpha=0.8, linewidth=0.8)
 
@@ -122,8 +140,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\nActual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\nDeserve-to-Win: {away_team} {str(away_win_percentage_str)}%, {home_team} {str(home_win_percentage_str)}%, Tie {tie_percentage_str}%', fontsize=16, loc='left', pad=12)
 
     # Add legend
-    plt.legend([plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="w", markersize=15, label=home_team),
-                plt.Line2D([0], [0], marker="^", color="w", markerfacecolor="w", markersize=15, label=away_team)],
+    plt.legend([plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="blue", markersize=15, label=home_team),
+                plt.Line2D([0], [0], marker="^", color="w", markerfacecolor="red", markersize=15, label=away_team)],
                [home_team, away_team], loc='upper right')
 
     plt.xticks(fontsize=16)
