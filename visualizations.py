@@ -12,6 +12,7 @@ from scipy import stats
 
 from constants import team_colors
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import requests
 from io import BytesIO
 from PIL import Image, ImageEnhance
@@ -37,7 +38,7 @@ def get_team_logo(team_name, mlb_team_logos):
     print(f"Logo not found for {team_name}")
     return None
 
-def getImage(path, zoom=0.34, size=(50, 50), alpha=0.65):
+def getImage(path, zoom=0.37, size=(50, 50), alpha=0.65):
     try:
         response = requests.get(path)
         img = Image.open(BytesIO(response.content))
@@ -141,7 +142,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     home_logo_url = get_team_logo(home_team, mlb_team_logos)
     if home_logo_url:
         for x, y in zip(home_ev, home_la):
-            img = getImage(home_logo_url, alpha=0.55)  # Adjust alpha as needed
+            img = getImage(home_logo_url, alpha=0.6)  # Adjust alpha as needed
             if img:
                 ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
                 plt.gca().add_artist(ab)
@@ -152,7 +153,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     away_logo_url = get_team_logo(away_team, mlb_team_logos)
     if away_logo_url:
         for x, y in zip(away_ev, away_la):
-            img = getImage(away_logo_url, alpha=0.5)  # Adjust alpha as needed
+            img = getImage(away_logo_url, alpha=0.6)  # Adjust alpha as needed
             if img:
                 ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
                 plt.gca().add_artist(ab)
@@ -254,6 +255,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.savefig(os.path.join(images_dir, f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{str(away_win_percentage_str)}-{str(home_win_percentage_str)}_rd.png'), bbox_inches='tight')
     plt.close()
     
+
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir, mlb_team_logos):
     # Create a new figure and axis, ensuring it's clear of any previous content
     fig, ax = plt.subplots(figsize=(11, 7))  # Reduced figure height
@@ -328,10 +330,29 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         # Add team logo
         if team in team_logo_dict:
             logo = load_image(team_logo_dict[team])
-            ab = AnnotationBbox(logo, cell.get_xy(), xybox=(20, 20), 
-                                xycoords='data', boxcoords="offset points", 
-                                box_alignment=(0.5, 0.5), pad=0)
-            ax.add_artist(ab)
+            
+            # Create a new figure for the logo
+            logo_fig = plt.figure(figsize=(1, 1), dpi=72)
+            logo_ax = logo_fig.add_subplot(111)
+            logo_ax.axis('off')
+            
+            # Add the logo to the new figure
+            logo_ax.add_artist(AnnotationBbox(logo, (0.5, 0.5), xycoords='axes fraction', frameon=False))
+            
+            # Convert the figure to an image
+            canvas = FigureCanvasAgg(logo_fig)
+            canvas.draw()
+            logo_array = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')
+            logo_array = logo_array.reshape(canvas.get_width_height()[::-1] + (3,))
+            
+            # Close the logo figure
+            plt.close(logo_fig)
+            
+            # Add the logo image to the cell
+            cell.get_text().set_visible(False)
+            cell.set_facecolor('none')
+            cell.set_edgecolor('none')
+            im = ax.imshow(logo_array, extent=cell.get_bbox().bounds, aspect='auto', zorder=3)
     
     # Apply formatting to Estimated Bases column
     col_index = df.columns.get_loc('Estimated\nBases')
@@ -349,16 +370,6 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         if result == 'Out':
             cell.set_facecolor('red')
             cell.set_alpha(0.25)
-    
-    # Remove any existing texts or other elements
-    for text in ax.texts:
-        text.remove()
-    
-    # Clear collections and patches
-    while ax.collections:
-        ax.collections[0].remove()
-    while ax.patches:
-        ax.patches[0].remove()
     
     # Add watermark above the table
     fig.text(0.5, 1.095, 'Data: MLB    By: @mlb_simulator', fontsize=13, color='darkgray', ha='center', va='center')
