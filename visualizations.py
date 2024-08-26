@@ -37,7 +37,7 @@ def get_team_logo(team_name, mlb_team_logos):
     print(f"Logo not found for {team_name}")
     return None
 
-def getImage(path, zoom=0.065, size=(50, 50), alpha=0.8):
+def getImage(path, zoom=0.3, size=(50, 50), alpha=0.8):
     try:
         response = requests.get(path)
         img = Image.open(BytesIO(response.content))
@@ -47,7 +47,7 @@ def getImage(path, zoom=0.065, size=(50, 50), alpha=0.8):
         
         # Sharpen the image
         enhancer = ImageEnhance.Sharpness(img)
-        img = enhancer.enhance(2.0)  # Increase sharpness, adjust as needed
+        img = enhancer.enhance(2.5)  # Increase sharpness, adjust as needed
         
         # Convert to RGBA if it's not already
         img = img.convert("RGBA")
