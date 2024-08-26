@@ -31,14 +31,10 @@ def launch_angle_range(exit_velocity):
     
 
 def get_team_logo(team_name, mlb_team_logos):
-    try:
-        # Try to parse the string as a list of dictionaries
-        logos_list = ast.literal_eval(mlb_team_logos)
-        for team in logos_list:
-            if team['team'] == team_name:
-                return team['logo_url']
-    except:
-        print(f"Error parsing mlb_team_logos for {team_name}")
+    for team in mlb_team_logos:
+        if team['team'] == team_name:
+            return team['logo_url']
+    print(f"Logo not found for {team_name}")
     return None
 
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, mlb_team_logos, images_dir="images"):
