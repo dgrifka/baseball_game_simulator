@@ -37,7 +37,7 @@ def get_team_logo(team_name, mlb_team_logos):
     print(f"Logo not found for {team_name}")
     return None
 
-def getImage(path, zoom=0.29, size=(50, 50), alpha=0.85):
+def getImage(path, zoom=0.065, size=(50, 50), alpha=0.8):
     try:
         response = requests.get(path)
         img = Image.open(BytesIO(response.content))
@@ -49,23 +49,38 @@ def getImage(path, zoom=0.29, size=(50, 50), alpha=0.85):
         enhancer = ImageEnhance.Sharpness(img)
         img = enhancer.enhance(2.0)  # Increase sharpness, adjust as needed
         
-        # Add alpha channel
+        # Convert to RGBA if it's not already
         img = img.convert("RGBA")
-        data = img.getdata()
-        new_data = []
-        for item in data:
-            # Change all white (also shades of whites) pixels to transparent
-            if item[0] > 200 and item[1] > 200 and item[2] > 200:
-                new_data.append((255, 255, 255, 0))
-            else:
-                new_data.append(item[:3] + (int(255 * alpha),))  # Apply alpha to non-white pixels
-        img.putdata(new_data)
         
-        # Create a fully transparent background
-        background = Image.new('RGBA', size, (255, 255, 255, 0))
-        background.paste(img, (0, 0), img)
+        # Get the image data
+        data = np.array(img)
         
-        return OffsetImage(background, zoom=zoom)
+        # Create a mask for non-transparent pixels
+        mask = data[:, :, 3] > 0
+        
+        # Get the bounding box of non-transparent pixels
+        rows = np.any(mask, axis=1)
+        cols = np.any(mask, axis=0)
+        ymin, ymax = np.where(rows)[0][[0, -1]]
+        xmin, xmax = np.where(cols)[0][[0, -1]]
+        
+        # Crop the image to the bounding box
+        cropped = img.crop((xmin, ymin, xmax+1, ymax+1))
+        
+        # Create a new transparent image of the original size
+        new_img = Image.new('RGBA', size, (255, 255, 255, 0))
+        
+        # Calculate position to paste cropped image (centered)
+        paste_pos = ((size[0] - cropped.width) // 2, (size[1] - cropped.height) // 2)
+        
+        # Paste the cropped image
+        new_img.paste(cropped, paste_pos, cropped)
+        
+        # Apply overall alpha
+        data = np.array(new_img)
+        data[:, :, 3] = (data[:, :, 3] * alpha).astype(np.uint8)
+        
+        return OffsetImage(Image.fromarray(data), zoom=zoom)
     except Exception as e:
         print(f"Error loading image from {path}: {str(e)}")
         return None
