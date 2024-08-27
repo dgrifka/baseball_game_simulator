@@ -280,7 +280,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     
     # Create the table with equal column widths
     n_cols = len(df.columns)
-    col_width = 0.925 / n_cols
+    col_width = 1.01 / n_cols
     table = ax.table(cellText=df.values,
                      colLabels=df.columns,
                      loc='center',
