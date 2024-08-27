@@ -257,7 +257,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
 
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score, away_win_percentage, home_win_percentage, images_dir):
     # Create a new figure and axis, ensuring it's clear of any previous content
-    fig, ax = plt.subplots(figsize=(11, 7))  # Reduced figure height
+    fig, ax = plt.subplots(figsize=(15, 8))
     
     # Clear the axis completely
     ax.clear()
@@ -280,7 +280,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     
     # Create the table with equal column widths
     n_cols = len(df.columns)
-    col_width = 0.925 / n_cols
+    col_width = 1.01 / n_cols
     table = ax.table(cellText=df.values,
                      colLabels=df.columns,
                      loc='center',
@@ -290,10 +290,10 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Set font size and style for column labels and cells
     for (row, col), cell in table.get_celld().items():
         if row == 0:
-            cell.set_text_props(weight='bold', fontsize=17)  # Increased font size for headers
+            cell.set_text_props(weight='bold', fontsize=35)  # Increased font size for headers
         else:
-            cell.set_text_props(fontsize=15)  # Increased font size for cell content
-        cell.set_height(0.08)
+            cell.set_text_props(fontsize=30)  # Increased font size for cell content
+        cell.set_height(0.09)
     
     # Function to determine if color is dark
     def is_dark(color):
@@ -344,13 +344,13 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         ax.patches[0].remove()
     
     # Add watermark above the table
-    fig.text(0.5, 1.095, 'Data: MLB    By: @mlb_simulator', fontsize=13, color='darkgray', ha='center', va='center')
+    fig.text(0.5, .975, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
     
     # Set combined title above the watermark, aligned to the left
-    plt.title(f'Top 15 Estimated Bases\n'
+    plt.title(f'Top 10 Estimated Bases\n'
               f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
               f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
-              fontsize=16.5, loc='left', y=1.18)
+              fontsize=17.5, loc='left', y=1.03)
     
     # Adjust layout and save
     plt.tight_layout()

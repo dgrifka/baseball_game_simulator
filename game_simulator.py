@@ -134,9 +134,9 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
     total_team_outcomes_sorted = total_team_outcomes.sort_values(by='Estimated Bases', ascending=False)
 
     # Get top 10 estimated bases
-    top_15 = total_team_outcomes_sorted.head(15)
+    top_10 = total_team_outcomes_sorted.head(10)
 
-    return top_15
+    return top_10
     
 def simulate_game(outcomes_df):
     outs = 0
