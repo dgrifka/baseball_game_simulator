@@ -110,7 +110,7 @@ def _play_info(df, column):
   return total_pbp
 
 
-def get_game_info(game_id):
+def get_game_info(game_id, all_columns = False):
 
     # Columns to process in the json
     columns_to_process = ['result', 'about', 'count', 'matchup', 'runners', 'playEvents']
@@ -170,8 +170,9 @@ def get_game_info(game_id):
     total_pbp_filtered['eventType'] = total_pbp_filtered['eventType'].str.replace("hit_by_pitch", "walk")
 
     ## Filter to only columns needed
-    cols_needed = ["gamePk", "batter.fullName", "playId", "ab_num", "eventType", "description", "outs",
-                   "isOut", "isTopInning", "inning", "hitData.launchSpeed", "hitData.launchAngle"]
-    total_pbp_filtered = total_pbp_filtered[cols_needed]
+    if all_columns == False:
+        cols_needed = ["gamePk", "batter.fullName", "playId", "ab_num", "eventType", "description", "outs",
+                       "isOut", "isTopInning", "inning", "hitData.launchSpeed", "hitData.launchAngle"]
+        total_pbp_filtered = total_pbp_filtered[cols_needed]
 
     return total_pbp_filtered
