@@ -290,9 +290,9 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Set font size and style for column labels and cells
     for (row, col), cell in table.get_celld().items():
         if row == 0:
-            cell.set_text_props(weight='bold', fontsize=110)  # Increased font size for headers
+            cell.set_text_props(weight='bold', fontsize=35)  # Increased font size for headers
         else:
-            cell.set_text_props(fontsize=100)  # Increased font size for cell content
+            cell.set_text_props(fontsize=30)  # Increased font size for cell content
         cell.set_height(0.09)
     
     # Function to determine if color is dark
@@ -344,13 +344,13 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         ax.patches[0].remove()
     
     # Add watermark above the table
-    fig.text(0.5, 1.025, 'Data: MLB    By: @mlb_simulator', fontsize=13, color='darkgray', ha='center', va='center')
+    fig.text(0.5, .99, 'Data: MLB    By: @mlb_simulator', fontsize=14, color='darkgray', ha='center', va='center')
     
     # Set combined title above the watermark, aligned to the left
-    plt.title(f'Top 15 Estimated Bases\n'
+    plt.title(f'Top 10 Estimated Bases\n'
               f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
               f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%', 
-              fontsize=16.5, loc='left', y=1.1)
+              fontsize=17.5, loc='left', y=1.05)
     
     # Adjust layout and save
     plt.tight_layout()
