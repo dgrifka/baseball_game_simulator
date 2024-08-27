@@ -162,10 +162,6 @@ def get_game_info(game_id, all_columns = False):
     other_plays = ['walk', 'hit_by_pitch', 'strikeout']
     total_pbp_filtered = total_pbp_filtered[(total_pbp_filtered['details.isInPlay'] == True) | (total_pbp_filtered['eventType'].isin(other_plays))]
 
-    ## Add non batted balls, such as errors, sb, cs, and pickoffs
-    non_bb = total_pbp.copy()
-    non_bb = non_bb[(non_bb['details.isInPlay'] != True)]
-
     ## Then, filter to the last record of this occurrence, since each playId includes other irrelevant information, such as stolen bases, etc.
     total_pbp_filtered = total_pbp_filtered.drop_duplicates(subset="ab_num", keep="last")
 
@@ -179,4 +175,5 @@ def get_game_info(game_id, all_columns = False):
                        "isOut", "isTopInning", "inning", "hitData.launchSpeed", "hitData.launchAngle"]
         total_pbp_filtered = total_pbp_filtered[cols_needed]
 
-    return total_pbp_filtered, non_bb
+    ## Return total_pbp for errors, sb, cs, and pickoffs
+    return total_pbp_filtered, total_pbp
