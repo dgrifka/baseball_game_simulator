@@ -293,7 +293,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_text_props(weight='bold', fontsize=110)  # Increased font size for headers
         else:
             cell.set_text_props(fontsize=100)  # Increased font size for cell content
-        cell.set_height(0.1)
+        cell.set_height(0.05)
     
     # Function to determine if color is dark
     def is_dark(color):
