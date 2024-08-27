@@ -37,7 +37,7 @@ def get_team_logo(team_name, mlb_team_logos):
     print(f"Logo not found for {team_name}")
     return None
 
-def getImage(path, zoom=0.37, size=(50, 50), alpha=0.65):
+def getImage(path, zoom=0.39, size=(50, 50), alpha=0.65):
     try:
         response = requests.get(path)
         img = Image.open(BytesIO(response.content))
@@ -141,23 +141,23 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     home_logo_url = get_team_logo(home_team, mlb_team_logos)
     if home_logo_url:
         for x, y in zip(home_ev, home_la):
-            img = getImage(home_logo_url, alpha=0.635)  # Adjust alpha as needed
+            img = getImage(home_logo_url, alpha=0.765)  # Adjust alpha as needed
             if img:
                 ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
                 plt.gca().add_artist(ab)
     else:
-        plt.scatter(home_ev, home_la, s=175, alpha=0.65, label=f'{home_team}', color='blue', marker='o')
+        plt.scatter(home_ev, home_la, s=175, alpha=0.85, label=f'{home_team}', color='blue', marker='o')
 
     # Plot away team logo markers
     away_logo_url = get_team_logo(away_team, mlb_team_logos)
     if away_logo_url:
         for x, y in zip(away_ev, away_la):
-            img = getImage(away_logo_url, alpha=0.625)  # Adjust alpha as needed
+            img = getImage(away_logo_url, alpha=0.75)  # Adjust alpha as needed
             if img:
                 ab = AnnotationBbox(img, (x, y), frameon=False, bboxprops=dict(alpha=0))
                 plt.gca().add_artist(ab)
     else:
-        plt.scatter(away_ev, away_la, s=175, alpha=0.65, label=f'{away_team}', color='red', marker='^')
+        plt.scatter(away_ev, away_la, s=175, alpha=0.85, label=f'{away_team}', color='red', marker='^')
 
     plt.axhline(y=0, color='black', alpha=0.8, linewidth=0.8)
 
