@@ -66,15 +66,13 @@ def fetch_games(days_ago, all_columns = False):
 
     ## Return yesterday's game as a list
     games_list = filtered_games_df['gamePk'].unique()
-    ## Return the venues as well, since we use this information in the model
-    venues_list = filtered_games_df['venue.name'].unique()
 
     # Filter the DataFrame based on venue_names
     filtered_games_df = filtered_games_df[filtered_games_df['venue.name'].isin(venue_names)].reset_index(drop=True)
 
     ## Trim the columns down to save memory
     if all_columns == False:
-        filtered_games_df = filtered_games_df[["gamePk", "officialDate", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]]
+        filtered_games_df = filtered_games_df[["gamePk", "officialDate", "venue.name", "teams.away.team.id", "teams.away.team.name", "teams.away.score", "teams.home.team.id", "teams.home.team.name", "teams.home.score", "teams.home.isWinner"]]
     
     ## Print game information for troubleshooting
     print(list(games_list))
@@ -83,7 +81,7 @@ def fetch_games(days_ago, all_columns = False):
     print(filtered_games_df[["gamePk", "teams.away.team.name", "teams.home.team.name"]]
         .apply(lambda row: f"{row['gamePk']}: {row['teams.away.team.name']}-{row['teams.home.team.name']}", axis=1))
 
-    return filtered_games_df, games_list, venues_list
+    return filtered_games_df, games_list
 
 
 ## Now, we want to get each game's info
@@ -110,7 +108,7 @@ def _play_info(df, column):
   return total_pbp
 
 
-def get_game_info(game_id):
+def get_game_info(game_id, all_columns = False):
 
     # Columns to process in the json
     columns_to_process = ['result', 'about', 'count', 'matchup', 'runners', 'playEvents']
@@ -170,8 +168,10 @@ def get_game_info(game_id):
     total_pbp_filtered['eventType'] = total_pbp_filtered['eventType'].str.replace("hit_by_pitch", "walk")
 
     ## Filter to only columns needed
-    cols_needed = ["gamePk", "batter.fullName", "playId", "ab_num", "eventType", "description", "outs",
-                   "isOut", "isTopInning", "inning", "hitData.launchSpeed", "hitData.launchAngle"]
-    total_pbp_filtered = total_pbp_filtered[cols_needed]
+    if all_columns == False:
+        cols_needed = ["gamePk", "batter.fullName", "playId", "ab_num", "eventType", "description", "outs",
+                       "isOut", "isTopInning", "inning", "hitData.launchSpeed", "hitData.launchAngle"]
+        total_pbp_filtered = total_pbp_filtered[cols_needed]
 
-    return total_pbp_filtered
+    ## Return total_pbp for errors, sb, cs, and pickoffs
+    return total_pbp_filtered, total_pbp
