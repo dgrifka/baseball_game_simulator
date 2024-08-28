@@ -66,8 +66,6 @@ def fetch_games(days_ago, all_columns = False):
 
     ## Return yesterday's game as a list
     games_list = filtered_games_df['gamePk'].unique()
-    ## Return the venues as well, since we use this information in the model
-    venues_list = filtered_games_df['venue.name'].unique()
 
     # Filter the DataFrame based on venue_names
     filtered_games_df = filtered_games_df[filtered_games_df['venue.name'].isin(venue_names)].reset_index(drop=True)
@@ -83,7 +81,7 @@ def fetch_games(days_ago, all_columns = False):
     print(filtered_games_df[["gamePk", "teams.away.team.name", "teams.home.team.name"]]
         .apply(lambda row: f"{row['gamePk']}: {row['teams.away.team.name']}-{row['teams.home.team.name']}", axis=1))
 
-    return filtered_games_df, games_list, venues_list
+    return filtered_games_df, games_list
 
 
 ## Now, we want to get each game's info
