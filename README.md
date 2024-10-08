@@ -44,13 +44,16 @@ Model Testing:
 ##
 Outputs:
 
-![bb img](https://github.com/user-attachments/assets/6b9e37e5-d503-45b8-ab8a-53682dfe5112)
-![img2](https://github.com/user-attachments/assets/79f93289-a542-433f-923a-670255bd55ce)
+![image](https://github.com/user-attachments/assets/21e0a3b1-2114-4134-88d6-0284c76af581)
+![image](https://github.com/user-attachments/assets/94a04426-ba4e-40a0-ac36-06533fba7b6e)
 ![image](https://github.com/user-attachments/assets/75a29e0d-7eff-490b-bac1-34fe6c9af2d9)
 
+##
+2024 Research:
 
+![image](https://github.com/user-attachments/assets/c3482c9c-cbfd-426d-b2a2-71b01165d0fb)
 
-
+![image](https://github.com/user-attachments/assets/e74267f4-fe24-47f3-a075-1f9405c27612)
 
 
 
