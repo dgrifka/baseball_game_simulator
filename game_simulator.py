@@ -7,10 +7,10 @@ from tqdm import tqdm
 from constants import team_colors
 
 # Load the saved model and fitted preprocessor
-with open('gb_classifier_model.pkl', 'rb') as file:
+with open('Model/gb_classifier_model.pkl', 'rb') as file:
     loaded_model = pickle.load(file)
 
-with open('preprocessor.pkl', 'rb') as file:
+with open('Model/preprocessor.pkl', 'rb') as file:
     preprocessor = pickle.load(file)
 
 def outcomes(game_data, home_or_away):
