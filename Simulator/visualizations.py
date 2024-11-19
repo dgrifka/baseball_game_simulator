@@ -117,6 +117,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         outcomes[team]['ev'] = [o[0] for o in team_outcomes if isinstance(o, list)]
         outcomes[team]['la'] = [o[1] for o in team_outcomes if isinstance(o, list)]
 
+    # Create a new figure for each call
     plt.figure(figsize=(10, 6))
 
     # Load and process contour data
@@ -150,18 +151,20 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         
         if logo_url:
             for x, y in zip(data['ev'], data['la']):
+                # Create a new image instance for each point
                 img = getImage(logo_url, alpha=0.765 if team == 'home' else 0.75)
                 if img:
-                    plt.gca().add_artist(AnnotationBbox(img, (x, y), frameon=False))
+                    # Create a new AnnotationBbox instance for each point
+                    ab = AnnotationBbox(img, (x, y), frameon=False)
+                    plt.gca().add_artist(ab)
         else:
             plt.scatter(data['ev'], data['la'], s=175, alpha=0.85, 
                        label=team_name, color='blue' if team == 'home' else 'red',
                        marker='o' if team == 'home' else '^')
 
-    # Add formatting and labels
+    # Rest of the formatting code remains the same
     plt.axhline(y=0, color='black', alpha=0.8, linewidth=0.8)
     
-    # Add walks information
     plt.text(0.05, 0.95, 'Walks/HBP', transform=plt.gca().transAxes, 
              fontsize=16, verticalalignment='top')
     plt.text(0.05, 0.947, '___________', transform=plt.gca().transAxes, 
@@ -171,13 +174,11 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.text(0.05, 0.85, f'{home_team}: {outcomes["home"]["walks"]}', 
              transform=plt.gca().transAxes, fontsize=15, verticalalignment='top')
 
-    # Add metadata
     plt.text(-.06, -.1, 'Data: MLB', transform=plt.gca().transAxes, 
              fontsize=8, color='black', ha='left', va='bottom')
     plt.text(-.06, -.122, 'By: @mlb_simulator', transform=plt.gca().transAxes, 
              fontsize=8, color='black', ha='left', va='bottom')
 
-    # Set labels and title
     plt.xlabel('Exit Velocity (mph)', fontsize=18)
     plt.ylabel('Launch Angle', fontsize=18)
     plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\n'
@@ -186,14 +187,13 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
               f'{percentages["home"]}%, Tie {percentages["tie"]}%', 
               fontsize=16, loc='left', pad=12)
 
-    # Format ticks and spines
     plt.xticks(fontsize=16)
     plt.yticks(fontsize=16)
     plt.gca().yaxis.set_major_formatter(ticker.FormatStrFormatter('%d°'))
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
 
-    # Save visualization
+    # Save and close the figure
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
     plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight')
