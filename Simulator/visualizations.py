@@ -88,7 +88,7 @@ def getImage(path, zoom=0.39, size=(50, 50), alpha=0.65, image_cache={}):
 
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, 
                 home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, 
-                tie_percentage, mlb_team_logos, images_dir="images"):
+                tie_percentage, mlb_team_logos, formatted_date, images_dir="images"):
     """
     Creates launch angle vs exit velocity visualization with team performance overlay.
     
@@ -99,6 +99,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         home/away_score (int): Actual game scores
         home/away/tie_win_percentage (float): Win percentages from simulation
         mlb_team_logos (list): Team logo URLs
+        formatted_date (str): Formatted date string to display
         images_dir (str): Output directory for saved visualization
     """
     percentages = {
@@ -182,7 +183,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.xlabel('Exit Velocity (mph)', fontsize=18)
     plt.ylabel('Launch Angle', fontsize=18)
     plt.title(f'Batted Ball Exit Velo / Launch Angle by Team\n'
-              f'Actual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}\n'
+              f'Actual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}  ({formatted_date})\n'
               f'Deserve-to-Win: {away_team} {percentages["away"]}%, {home_team} '
               f'{percentages["home"]}%, Tie {percentages["tie"]}%', 
               fontsize=16, loc='left', pad=12)
@@ -201,7 +202,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
-             images_dir="images"):
+             formatted_date, images_dir="images"):
     """
     Creates visualization of run distribution from simulations.
     
@@ -211,6 +212,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         home/away_team (str): Team names
         home/away_score (int): Actual game scores
         home/away/tie_win_percentage (float): Win percentages from simulation
+        formatted_date (str): Formatted date string to display
         images_dir (str): Output directory for saved visualization
     """
     percentages = {
@@ -281,7 +283,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
 
 
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score,
-                               away_win_percentage, home_win_percentage, images_dir):
+                               away_win_percentage, home_win_percentage, formatted_date, images_dir):
     """
     Creates formatted table visualization of estimated bases statistics.
     
@@ -290,6 +292,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         away/home_team (str): Team names
         away/home_score (int): Actual game scores
         away/home_win_percentage (float): Win percentages from simulation
+        formatted_date (str): Formatted date string to display
         images_dir (str): Output directory for saved visualization
     """
     fig, ax = plt.subplots(figsize=(15, 8))
@@ -361,7 +364,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
              fontsize=14, color='black', ha='center', va='center')
     
     plt.title(f'Top 10 Estimated Bases\n'
-              f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
+              f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
               f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - '
               f'{home_team} {home_win_percentage:.0f}%',
               fontsize=17.5, loc='left', y=1.03)
