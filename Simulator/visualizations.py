@@ -118,6 +118,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         outcomes[team]['ev'] = [o[0] for o in team_outcomes if isinstance(o, list)]
         outcomes[team]['la'] = [o[1] for o in team_outcomes if isinstance(o, list)]
 
+    plt.clf()  # Clear the previous figure (if there was one)
     # Create a new figure for each call
     plt.figure(figsize=(10, 6))
 
