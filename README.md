@@ -9,8 +9,11 @@ In the future, I'd like to use a Bayesian Multiniomial model to utilize better p
 
 The data was gathered from the MLB Stats API.
 
-The main.py will run the simulations and create visualizations about the run distributions and batted ball outcomes, which are then saved in the images folder.
+The main.ipynb will run the simulations and create visualizations about the run distributions and batted ball outcomes, which are then saved in the images folder.
 
+2025 Additions:
+
+- Games played at George M. Steinbrenner Field will be converted to Yankee Stadium in the model, since the dimensions are similar.
 ##
 Future ideas:
 
