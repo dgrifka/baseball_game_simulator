@@ -1,5 +1,7 @@
 # baseball_simulator
-MLB Deserve-to-Win Simulator - https://x.com/mlb_simulator - (inspired by @MoneyPuckdotcom)
+## MLB Deserve-to-Win Simulator - https://x.com/mlb_simulator - (inspired by @MoneyPuckdotcom)
+
+# Description
 
 I wanted to analyze how game outcomes can change, depending on when a hit occurred. For example, I wanted to determine if a team hit well, but struggled to string together hits. I essentially wanted to determine a team's "luck" factor by how their hits were dispersed in a game vs many simulations. For example, leaving 15 batters on base to end the game can be incredibly frustrating for fans. So, this can let them know that they should have won!
 
@@ -11,24 +13,23 @@ The data was gathered from the MLB Stats API.
 
 The main.ipynb will run the simulations and create visualizations about the run distributions and batted ball outcomes, which are then saved in the images folder.
 
-2025 Additions:
+# 2025 Additions:
 
 - Games played at George M. Steinbrenner Field will be converted to Yankee Stadium in the model, since the dimensions are similar.
-##
-Future ideas:
+
+# Future ideas:
 
 Incorporate double plays into the simulations, depending on ground ball probabilities.
 
 Utilize linear algebra/matrices to speed up simulations.
 
-##
-Assumptions:
+# Assumptions:
 
 The number of strikeouts and walks/hbp remain the same.
 
 The simulation can have fewer/more ABs/innings than the real game, since the outcomes will be distributed differently.
-##
-Reasons actual vs simulation can vary:
+
+# Reasons actual vs simulation can vary:
 
 This simulation is outcome agnostic, so different outcomes can be assigned to each player. So, even if Player A hits a home run in the real game, this home run could be assigned to a different player in the simulation. So, a team can outperform the simulation if the roster is constructed better than the simulation.
 
@@ -38,22 +39,37 @@ If the away team went up to bat in the 9th inning, while the home team did not, 
 
 Fielding errors are not accounted for, so a team can outperform or underperform in the simulation depending on errors.
 
-##
-Model Testing (Expected Bases):
+# Project Structure
+
+├── baseball_game_simulator/
+├── .gitignore
+├── README.md # Data and project documentation
+└── main.ipynb # Colab file used to run and save the visualizations
+├── Model/
+│   ├── Base_Model.ipynb # Colab file used to create and save model
+│   └── gb_classifier_pipeline.pkl # Model used to assign outcome probabilities
+├── Research/
+│   └── 2024_Season_WP_Model.ipynb # Analyzing batted ball outcomes by team with a Bayesian hierarchical model
+├── Simulator/
+│   ├── constants.py # Hard-coded values used in the simulator
+│   ├── game_simulator.py # Code used to simulate batted ball outcomes
+│   ├── get_game_information.py # Scrapes MLB Stats API for game info
+│   ├── utils.py # Misc helper code
+│   └── visualizations.py # Code for all plots
+├── Data/
+│   └── contour_data.csv # Underlying contour data used in the EV/LA graph
+
+# Model Testing (Expected Bases):
 
 ![image](https://github.com/user-attachments/assets/4c8390a4-3467-4992-b160-f6d54e4af679)
 
-
-
-##
-Outputs:
+# Outputs:
 
 ![image](https://github.com/user-attachments/assets/21e0a3b1-2114-4134-88d6-0284c76af581)
 ![image](https://github.com/user-attachments/assets/94a04426-ba4e-40a0-ac36-06533fba7b6e)
 ![image](https://github.com/user-attachments/assets/75a29e0d-7eff-490b-bac1-34fe6c9af2d9)
 
-##
-2024 Research:
+# 2024 Research:
 
 ![image](https://github.com/user-attachments/assets/c3482c9c-cbfd-426d-b2a2-71b01165d0fb)
 
