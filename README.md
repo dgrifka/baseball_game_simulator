@@ -2,10 +2,10 @@
 
 ## Table of Contents
 - [Description](#description)
-- [2025 Additions](#2025-additions)
 - [Future Ideas](#future-ideas)
 - [Assumptions](#assumptions)
 - [Reasons Actual vs Simulation Can Vary](#reasons-actual-vs-simulation-can-vary)
+- [2025 Additions](#2025-additions)
 - [Project Structure](#project-structure)
 - [Model Testing](#model-testing-expected-bases)
 - [Outputs](#outputs)
