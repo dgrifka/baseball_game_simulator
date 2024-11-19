@@ -299,8 +299,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         formatted_date (str): Formatted date string to display
         images_dir (str): Output directory for saved visualization
     """
-    # Increased figure size
-    fig, ax = plt.subplots(figsize=(20, 11))  # Increased from (15, 8)
+    fig, ax = plt.subplots(figsize=(15, 8))
     ax.axis('off')
     
     # Preprocess DataFrame
@@ -313,7 +312,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     df = df.drop('team_color', axis=1)
     df.columns = df.columns.str.replace(' ', '\n')
     
-    # Create table with adjusted cell height
+    # Create table
     col_width = 1.01 / len(df.columns)
     table = ax.table(cellText=df.values,
                     colLabels=df.columns,
@@ -321,13 +320,13 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
                     cellLoc='center',
                     colWidths=[col_width] * len(df.columns))
     
-    # Format cells with larger height to accommodate bigger font
+    # Format cells with larger font sizes
     for (row, col), cell in table.get_celld().items():
-        cell.set_height(0.11)  # Increased from 0.09
+        cell.set_height(0.09)
         if row == 0:
-            cell.set_text_props(weight='bold', fontsize=40)
+            cell.set_text_props(weight='bold', fontsize=40)  # Increased header font
         else:
-            cell.set_text_props(fontsize=35)
+            cell.set_text_props(fontsize=35)  # Increased regular font
     
     def is_dark_color(color):
         r, g, b = to_rgb(color)
@@ -356,8 +355,9 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     for row in range(1, len(df) + 1):
         cell = table[(row, bases_col)]
         color = list(colors[row - 1])
-        color[3] = 0.7  # Alpha set to 0.7
+        color[3] = 0.7  # Set alpha to 0.7 for better readability
         cell.set_facecolor(color)
+        # Make text white for better contrast on darker backgrounds
         if norm(values[row - 1]) > 0.6:
             cell.get_text().set_color('white')
     
@@ -369,7 +369,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_alpha(0.25)
     
     # Add title and metadata with larger font
-    fig.text(0.5, .9725, 'Data: MLB    By: @mlb_simulator', 
+    fig.text(0.5, .9721, 'Data: MLB    By: @mlb_simulator', 
              fontsize=16, color='black', ha='center', va='center')
     
     plt.title(f'Top 10 Estimated Bases\n'
