@@ -3,15 +3,11 @@ import pickle
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-
 from constants import team_colors
 
-# Load the saved model and fitted preprocessor
-with open('Model/gb_classifier_model.pkl', 'rb') as file:
-    loaded_model = pickle.load(file)
-
-with open('Model/preprocessor.pkl', 'rb') as file:
-    preprocessor = pickle.load(file)
+# Load the pipeline
+with open('Model/gb_classifier_pipeline.pkl', 'rb') as file:
+    pipeline = pickle.load(file)
 
 def outcomes(game_data, home_or_away):
     home_or_away_team = game_data.copy()
@@ -22,17 +18,14 @@ def outcomes(game_data, home_or_away):
     
     outcomes = []
 
-    # Handle automatic outs (strikeouts)
     automatic_outs = home_or_away_team[(home_or_away_team['eventType'] == 'out') & (home_or_away_team['hitData.launchSpeed'].isnull())]
     for _, row in automatic_outs.iterrows():
         outcomes.append(("strikeout", row['eventType'], row['batter.fullName']))
 
-    # Handle walks
     walks = home_or_away_team[home_or_away_team['eventType'] == 'walk']
     for _, row in walks.iterrows():
         outcomes.append(("walk", row['eventType'], row['batter.fullName']))
 
-    # Handle balls put in play
     put_in_play = home_or_away_team[~home_or_away_team['hitData.launchSpeed'].isnull()].reset_index(drop=True)
     for _, row in put_in_play.iterrows():
         outcomes.append(([row['hitData.launchSpeed'], row['hitData.launchAngle'], row['venue.name']], row['eventType'], row['batter.fullName']))
@@ -55,22 +48,17 @@ def calculate_total_bases(outcomes):
         else:
             launch_speed, launch_angle, stadium = outcome
             event_type = "in_play"
-            # Create a DataFrame with the new example
             new_example = pd.DataFrame({
                 'hitData_launchSpeed': [launch_speed],
                 'hitData_launchAngle': [launch_angle],
                 'venue_name': [stadium]
             })
-            # Preprocess the new example using the loaded preprocessor
-            new_example_preprocessed = preprocessor.transform(new_example)
-            # Get predicted probabilities
-            probabilities = loaded_model.predict_proba(new_example_preprocessed)[0]
-            # Calculate bases for the current outcome
+            probabilities = pipeline.predict_proba(new_example)[0]
             bases = (
-                probabilities[1] * 1 +  # Single
-                probabilities[2] * 2 +  # Double
-                probabilities[3] * 3 +  # Triple
-                probabilities[4] * 4    # Home Run
+                probabilities[1] * 1 +
+                probabilities[2] * 2 +
+                probabilities[3] * 3 +
+                probabilities[4] * 4
             )
         
         result_list.append({
@@ -141,11 +129,9 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
 def simulate_game(outcomes_df):
     outs = 0
     runs = 0
-    bases = [False, False, False]  # First, Second, Third base
+    bases = [False, False, False]
+    outcomes_copy = outcomes_df.copy()
     
-    outcomes_copy = outcomes_df.copy()  # Create a copy of the outcomes list
-    
-    # Calculate probabilities for each outcome before the loop
     probabilities_dict = {}
     for outcome in outcomes_copy:
         if isinstance(outcome, list) and len(outcome) == 3:
@@ -155,29 +141,24 @@ def simulate_game(outcomes_df):
                 'hitData_launchAngle': [launch_angle],
                 'venue_name': [stadium]
             })
-            new_example_preprocessed = preprocessor.transform(new_example)
-            probabilities = loaded_model.predict_proba(new_example_preprocessed)[0]
+            probabilities = pipeline.predict_proba(new_example)[0]
             probabilities_dict[tuple(outcome)] = probabilities
     
-    while outcomes_copy:  # Continue until all outcomes are used
+    while outcomes_copy:
         if outs == 3:
             outs = 0
-            bases = [False, False, False]  # Clear the bases after 3 outs
+            bases = [False, False, False]
         
-        # Sample an outcome from the list
         outcome = random.choice(outcomes_copy)
-        outcomes_copy.remove(outcome)  # Remove the sampled outcome from the copy
+        outcomes_copy.remove(outcome)
         
         if outcome == "strikeout":
             outs += 1
         elif outcome == "walk":
             runs += advance_runner(bases, is_walk=True)
         elif isinstance(outcome, list) and len(outcome) == 3:
-            # Get the pre-calculated probabilities for the outcome
             probabilities = probabilities_dict[tuple(outcome)]
-            # Generate a random value between 0 and 1
             random_value = random.random()
-            # Determine the outcome based on the probabilities
             if random_value < probabilities[0]:
                 outs += 1
             elif random_value < probabilities[0] + probabilities[1]:
