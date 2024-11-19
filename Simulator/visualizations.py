@@ -320,13 +320,13 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
                     cellLoc='center',
                     colWidths=[col_width] * len(df.columns))
     
-    # Format cells
+    # Format cells with larger font sizes
     for (row, col), cell in table.get_celld().items():
         cell.set_height(0.09)
         if row == 0:
-            cell.set_text_props(weight='bold', fontsize=35)
+            cell.set_text_props(weight='bold', fontsize=40)  # Increased header font
         else:
-            cell.set_text_props(fontsize=30)
+            cell.set_text_props(fontsize=35)  # Increased regular font
     
     def is_dark_color(color):
         r, g, b = to_rgb(color)
@@ -346,7 +346,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         if is_dark_color(color):
             cell.get_text().set_color('white')
     
-    # Estimated bases heat map
+    # Estimated bases heat map with alpha
     values = df['Estimated\nBases'].values
     cmap = plt.cm.YlOrRd
     norm = plt.Normalize(min(values), max(values))
@@ -354,7 +354,12 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     
     for row in range(1, len(df) + 1):
         cell = table[(row, bases_col)]
-        cell.set_facecolor(colors[row - 1])
+        color = list(colors[row - 1])
+        color[3] = 0.7  # Set alpha to 0.7 for better readability
+        cell.set_facecolor(color)
+        # Make text white for better contrast on darker backgrounds
+        if norm(values[row - 1]) > 0.6:
+            cell.get_text().set_color('white')
     
     # Result highlighting
     for row in range(1, len(df) + 1):
@@ -363,15 +368,15 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_facecolor('red')
             cell.set_alpha(0.25)
     
-    # Add title and metadata
+    # Add title and metadata with larger font
     fig.text(0.5, .9725, 'Data: MLB    By: @mlb_simulator', 
-             fontsize=14, color='black', ha='center', va='center')
+             fontsize=16, color='black', ha='center', va='center')
     
     plt.title(f'Top 10 Estimated Bases\n'
               f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
               f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - '
               f'{home_team} {home_win_percentage:.0f}%',
-              fontsize=17.5, loc='left', y=1.03)
+              fontsize=20, loc='left', y=1.03)
     
     # Save visualization
     plt.tight_layout()
