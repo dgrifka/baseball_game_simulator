@@ -369,7 +369,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_alpha(0.25)
     
     # Add title and metadata with larger font
-    fig.text(0.7, .985, 'Data: MLB    By: @mlb_simulator', 
+    fig.text(0.75, 1, 'Data: MLB    By: @mlb_simulator', 
              fontsize=16, color='black', ha='center', va='center')
     
     plt.title(f'Top 10 Estimated Bases\n'
