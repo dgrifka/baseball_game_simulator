@@ -102,6 +102,9 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         formatted_date (str): Formatted date string to display
         images_dir (str): Output directory for saved visualization
     """
+    # Clear any existing figures
+    plt.close('all')
+    
     percentages = {
         'away': f"{away_win_percentage:.0f}",
         'home': f"{home_win_percentage:.0f}",
@@ -118,9 +121,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         outcomes[team]['ev'] = [o[0] for o in team_outcomes if isinstance(o, list)]
         outcomes[team]['la'] = [o[1] for o in team_outcomes if isinstance(o, list)]
 
-    plt.clf()  # Clear the previous figure (if there was one)
-    # Create a new figure for each call
-    plt.figure(figsize=(10, 6))
+    # Create a new figure
+    fig = plt.figure(figsize=(10, 6))
 
     # Load and process contour data
     contour_data = pd.read_csv('Data/contour_data.csv').dropna()
@@ -164,7 +166,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
                        label=team_name, color='blue' if team == 'home' else 'red',
                        marker='o' if team == 'home' else '^')
 
-    # Rest of the formatting code remains the same
+    # Rest of the formatting code
     plt.axhline(y=0, color='black', alpha=0.8, linewidth=0.8)
     
     plt.text(0.05, 0.95, 'Walks/HBP', transform=plt.gca().transAxes, 
@@ -199,7 +201,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
     plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight')
-    plt.close()
+    plt.close(fig)  # Close the specific figure
 
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
