@@ -154,12 +154,23 @@ def advance_runner(bases, count=1, is_walk=False):
     bases = bases.copy()
     
     if is_walk:
-        runs = int(all(bases))  # Force in run if bases loaded
-        bases = [True] + bases[:-1]  # Shift runners
+        # Force in run if bases loaded
+        if all(bases):
+            runs += 1
+        # Shift runners
+        for i in range(len(bases)-1, 0, -1):
+            bases[i] = bases[i-1]
+        bases[0] = True
     else:
-        runs = sum(bases[2-i:3] for i in range(count))  # Score appropriate runners
-        bases = [True] * count + bases[:-count if count < 3 else 3]  # Advance runners
-        
+        # Score runs and advance runners
+        for _ in range(count):
+            if bases[2]:  # Runner on third scores
+                runs += 1
+            # Shift runners
+            bases[2] = bases[1]
+            bases[1] = bases[0]
+            bases[0] = True
+            
     return runs
 
 def simulate_game(outcomes_df):
