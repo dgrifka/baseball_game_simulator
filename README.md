@@ -1,5 +1,4 @@
-# baseball_simulator
-## MLB Deserve-to-Win Simulator - https://x.com/mlb_simulator - (inspired by @MoneyPuckdotcom)
+# *MLB Deserve-to-Win Simulator - https://x.com/mlb_simulator - (inspired by @MoneyPuckdotcom)*
 
 # Description
 
