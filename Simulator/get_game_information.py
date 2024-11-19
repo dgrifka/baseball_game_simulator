@@ -69,6 +69,8 @@ def fetch_games(days_ago, all_columns = False):
 
     # Filter the DataFrame based on venue_names
     filtered_games_df = filtered_games_df[filtered_games_df['venue.name'].isin(venue_names)].reset_index(drop=True)
+    # Convert 'George M. Steinbrenner Field' to 'Yankee Stadium' for the Rays' season
+    filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace('George M. Steinbrenner Field', 'Yankee Stadium')
 
     ## Trim the columns down to save memory
     if all_columns == False:
