@@ -42,21 +42,37 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 # Project Structure
 
 ├── baseball_game_simulator/
+
 ├── .gitignore
+
 ├── README.md # Data and project documentation
+
 └── main.ipynb # Colab file used to run and save the visualizations
+
 ├── Model/
+
 │   ├── Base_Model.ipynb # Colab file used to create and save model
+
 │   └── gb_classifier_pipeline.pkl # Model used to assign outcome probabilities
+
 ├── Research/
+
 │   └── 2024_Season_WP_Model.ipynb # Analyzing batted ball outcomes by team with a Bayesian hierarchical model
+
 ├── Simulator/
+
 │   ├── constants.py # Hard-coded values used in the simulator
+
 │   ├── game_simulator.py # Code used to simulate batted ball outcomes
+
 │   ├── get_game_information.py # Scrapes MLB Stats API for game info
+
 │   ├── utils.py # Misc helper code
+
 │   └── visualizations.py # Code for all plots
+
 ├── Data/
+
 │   └── contour_data.csv # Underlying contour data used in the EV/LA graph
 
 # Model Testing (Expected Bases):
