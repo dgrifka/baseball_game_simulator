@@ -3,7 +3,7 @@ import pickle
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from constants import team_colors
+from Simulator.constants import team_colors
 
 # Load the pipeline
 with open('Model/gb_classifier_pipeline.pkl', 'rb') as file:
