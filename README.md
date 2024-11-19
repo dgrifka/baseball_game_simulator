@@ -1,4 +1,4 @@
-# MLB Deserve-to-Win Simulator - https://x.com/mlb_simulator - (inspired by @MoneyPuckdotcom)
+# MLB Deserve-to-Win Simulator - https://x.com/mlb_simulator
 
 ## Table of Contents
 - [Description](#description)
@@ -22,6 +22,8 @@ In the future, I'd like to use a Bayesian Multiniomial model to utilize better p
 The data was gathered from the MLB Stats API.
 
 The main.ipynb will run the simulations and create visualizations about the run distributions and batted ball outcomes, which are then saved in the images folder.
+
+This account was inspired by @MoneyPuckdotcom.
 
 ## 2025 Additions:
 
@@ -85,6 +87,10 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 
 │   └── contour_data.csv # Underlying contour data used in the EV/LA graph
 
+## Contact
+
+Derek Grifka – dmgrifka@gmail.com - https://dgrifka.github.io/
+
 ## Model Testing (Expected Bases):
 
 ![image](https://github.com/user-attachments/assets/4c8390a4-3467-4992-b160-f6d54e4af679)
@@ -92,7 +98,9 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 ## Outputs:
 
 ![image](https://github.com/user-attachments/assets/21e0a3b1-2114-4134-88d6-0284c76af581)
+
 ![image](https://github.com/user-attachments/assets/94a04426-ba4e-40a0-ac36-06533fba7b6e)
+
 ![image](https://github.com/user-attachments/assets/75a29e0d-7eff-490b-bac1-34fe6c9af2d9)
 
 ## 2024 Research:
@@ -100,7 +108,5 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 ![image](https://github.com/user-attachments/assets/c3482c9c-cbfd-426d-b2a2-71b01165d0fb)
 
 ![image](https://github.com/user-attachments/assets/e74267f4-fe24-47f3-a075-1f9405c27612)
-
-
 
 
