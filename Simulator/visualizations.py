@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 
-from constants import team_colors
+from Simulator.constants import team_colors
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import requests
 from io import BytesIO
