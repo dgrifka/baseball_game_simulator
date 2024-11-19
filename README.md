@@ -25,10 +25,6 @@ The main.ipynb will run the simulations and create visualizations about the run 
 
 This account was inspired by @MoneyPuckdotcom.
 
-## 2025 Additions:
-
-- Games played at George M. Steinbrenner Field will be converted to Yankee Stadium in the model, since the dimensions are similar.
-
 ## Future ideas:
 
 Incorporate double plays into the simulations, depending on ground ball probabilities.
@@ -50,6 +46,12 @@ This model uses launch angle and exit velocity to predict outcomes, so a great d
 If the away team went up to bat in the 9th inning, while the home team did not, then the away team could be favored more than the home team in the simulation.
 
 Fielding errors are not accounted for, so a team can outperform or underperform in the simulation depending on errors.
+
+## 2025 Additions:
+
+- Improved code docstrings and documentation.
+- Games played at George M. Steinbrenner Field will be converted to Yankee Stadium in the model, since the dimensions are similar.
+- Dates added to visualizations
 
 ## Project Structure
 
