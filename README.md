@@ -1,5 +1,18 @@
-# *MLB Deserve-to-Win Simulator - https://x.com/mlb_simulator - (inspired by @MoneyPuckdotcom)*
+# MLB Deserve-to-Win Simulator - https://x.com/mlb_simulator - (inspired by @MoneyPuckdotcom)
 
+# MLB Deserve-to-Win Simulator
+
+## Table of Contents
+- [Description](#description)
+- [2025 Additions](#2025-additions)
+- [Future Ideas](#future-ideas)
+- [Assumptions](#assumptions)
+- [Reasons Actual vs Simulation Can Vary](#reasons-actual-vs-simulation-can-vary)
+- [Project Structure](#project-structure)
+- [Model Testing](#model-testing-expected-bases)
+- [Outputs](#outputs)
+- [2024 Research](#2024-research)
+- 
 # Description
 
 I wanted to analyze how game outcomes can change, depending on when a hit occurred. For example, I wanted to determine if a team hit well, but struggled to string together hits. I essentially wanted to determine a team's "luck" factor by how their hits were dispersed in a game vs many simulations. For example, leaving 15 batters on base to end the game can be incredibly frustrating for fans. So, this can let them know that they should have won!
