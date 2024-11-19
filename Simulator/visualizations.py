@@ -27,6 +27,7 @@ def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
     Args:
         team_name (str): MLB team name
         mlb_team_logos (list): List of team logo URL dictionaries
+        logo_cache (dict): Cache for logo URLs
         
     Returns:
         str: Logo URL or None if not found
@@ -44,48 +45,48 @@ def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
 
 def getImage(path, zoom=0.39, size=(50, 50), alpha=0.65, image_cache={}):
     """
-    Processes team logo image with caching.
+    Processes team logo image with caching of raw image data.
     
     Args:
         path (str): Image URL
         zoom (float): Image zoom level
         size (tuple): Target image size
         alpha (float): Transparency level
+        image_cache (dict): Cache for processed image data
         
     Returns:
-        OffsetImage: Processed image for plot annotation
+        OffsetImage: Fresh OffsetImage instance for each call
     """
-    if path in image_cache:
-        return image_cache[path]
-        
     try:
-        img = Image.open(BytesIO(requests.get(path).content))
-        img = img.resize(size, Image.LANCZOS).convert("RGBA")
+        # Cache the processed image data, not the OffsetImage
+        if path not in image_cache:
+            img = Image.open(BytesIO(requests.get(path).content))
+            img = img.resize(size, Image.LANCZOS).convert("RGBA")
+            
+            # Enhance and crop
+            img = ImageEnhance.Sharpness(img).enhance(2.5)
+            data = np.array(img)
+            mask = data[:, :, 3] > 0
+            ymin, ymax = np.where(np.any(mask, axis=1))[0][[0, -1]]
+            xmin, xmax = np.where(np.any(mask, axis=0))[0][[0, -1]]
+            
+            # Create transparent background
+            new_img = Image.new('RGBA', size, (255, 255, 255, 0))
+            cropped = img.crop((xmin, ymin, xmax+1, ymax+1))
+            paste_pos = tuple((s - c) // 2 for s, c in zip(size, cropped.size))
+            new_img.paste(cropped, paste_pos, cropped)
+            
+            # Apply alpha and store the processed data
+            data = np.array(new_img)
+            data[:, :, 3] = (data[:, :, 3] * alpha).astype(np.uint8)
+            image_cache[path] = data
         
-        # Enhance and crop
-        img = ImageEnhance.Sharpness(img).enhance(2.5)
-        data = np.array(img)
-        mask = data[:, :, 3] > 0
-        ymin, ymax = np.where(np.any(mask, axis=1))[0][[0, -1]]
-        xmin, xmax = np.where(np.any(mask, axis=0))[0][[0, -1]]
-        
-        # Create transparent background
-        new_img = Image.new('RGBA', size, (255, 255, 255, 0))
-        cropped = img.crop((xmin, ymin, xmax+1, ymax+1))
-        paste_pos = tuple((s - c) // 2 for s, c in zip(size, cropped.size))
-        new_img.paste(cropped, paste_pos, cropped)
-        
-        # Apply alpha
-        data = np.array(new_img)
-        data[:, :, 3] = (data[:, :, 3] * alpha).astype(np.uint8)
-        
-        result = OffsetImage(Image.fromarray(data), zoom=zoom)
-        image_cache[path] = result
-        return result
+        # Create a fresh OffsetImage instance for each call
+        return OffsetImage(Image.fromarray(image_cache[path].copy()), zoom=zoom)
+    
     except Exception as e:
         print(f"Error loading image from {path}: {str(e)}")
         return None
-
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, 
                 home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, 
                 tie_percentage, mlb_team_logos, formatted_date, images_dir="images"):
