@@ -21,7 +21,7 @@ venue_names = ['Oriole Park at Camden Yards', 'Great American Ball Park',
        'Target Field', 'Busch Stadium', 'Yankee Stadium', 'Comerica Park',
        'Coors Field', 'PNC Park', 'Oracle Park', 'Truist Park',
        'Angel Stadium', 'Progressive Field', 'Rogers Centre',
-       'Fenway Park']
+       'Fenway Park', 'George M. Steinbrenner Field']
 
 ## Colors and Logo
 team_colors = {
