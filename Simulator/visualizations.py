@@ -259,7 +259,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.ylabel('Frequency', fontsize=14)
     
     plt.title(f'Distribution of Runs Scored ({num_simulations} Simulations)\n'
-              f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
+              f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
               f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} '
               f'{percentages["home"]}%, Tie {percentages["tie"]}%\n'
               f'Most Likely Outcome: {away_team} {mode_strs["away"]} - {home_team} '
