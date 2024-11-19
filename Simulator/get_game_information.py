@@ -5,7 +5,7 @@ from pandas import json_normalize
 import pytz
 import datetime
 
-from constants import base_url, league, season, endpoint, team_ver, schedule_ver, game_ver, venue_names
+from Simulator.constants import base_url, league, season, endpoint, team_ver, schedule_ver, game_ver, venue_names
 
 def response_code(base_url, ver, endpoint):
     """
