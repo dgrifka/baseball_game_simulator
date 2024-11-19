@@ -173,9 +173,9 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
     # Add metadata
     plt.text(-.06, -.1, 'Data: MLB', transform=plt.gca().transAxes, 
-             fontsize=7, color='darkgray', ha='left', va='bottom')
+             fontsize=8, color='black', ha='left', va='bottom')
     plt.text(-.06, -.122, 'By: @mlb_simulator', transform=plt.gca().transAxes, 
-             fontsize=7, color='darkgray', ha='left', va='bottom')
+             fontsize=8, color='black', ha='left', va='bottom')
 
     # Set labels and title
     plt.xlabel('Exit Velocity (mph)', fontsize=18)
@@ -262,9 +262,9 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
     # Add metadata
     plt.text(-.05, -.09, 'Data: MLB', transform=plt.gca().transAxes,
-             fontsize=7, color='darkgray', ha='left', va='bottom')
+             fontsize=8, color='black', ha='left', va='bottom')
     plt.text(-.05, -.11, 'By: @mlb_simulator', transform=plt.gca().transAxes,
-             fontsize=7, color='darkgray', ha='left', va='bottom')
+             fontsize=8, color='black', ha='left', va='bottom')
     
     # Format ticks and legend
     plt.xticks(range(max_runs + 2), fontsize=12)
@@ -357,8 +357,8 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             cell.set_alpha(0.25)
     
     # Add title and metadata
-    fig.text(0.5, .975, 'Data: MLB    By: @mlb_simulator', 
-             fontsize=14, color='darkgray', ha='center', va='center')
+    fig.text(0.5, .9725, 'Data: MLB    By: @mlb_simulator', 
+             fontsize=14, color='black', ha='center', va='center')
     
     plt.title(f'Top 10 Estimated Bases\n'
               f'Actual Score: {away_team} {away_score} - {home_team} {home_score}\n'
