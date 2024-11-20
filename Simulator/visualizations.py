@@ -203,7 +203,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
              formatted_date, images_dir="images"):
     
-    plt.style.use('seaborn-v0_8')  # Changed from seaborn-v0_8-whitegrid to remove gridlines
+    plt.style.use('seaborn-v0_8-whitegrid')
     plt.close('all')
     
     percentages = {
