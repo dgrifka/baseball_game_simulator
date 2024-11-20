@@ -1,3 +1,14 @@
+import random
+import pickle
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from Simulator.constants import team_colors
+
+# Load the pipeline
+with open('Model/gb_classifier_pipeline.pkl', 'rb') as file:
+    pipeline = pickle.load(file)
+
 def outcomes(game_data, home_or_away):
     """
     Extract batting outcomes from game data for either home or away team.
