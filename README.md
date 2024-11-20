@@ -17,13 +17,9 @@ I wanted to analyze how game outcomes can change, depending on when a hit occurr
 
 Additionally, I wanted to utilize a model that uses launch angle, exit velocity, and ballpark to determine luck, since I wanted to reward teams that hit the ball hard. In the future, I'd like to add a new sim that only resamples the existing outcomes, instead of using LA/EV, but selfishly I also wanted to my modeling skills to the test. I've included the methodology behind my model as an ipynb. Please, feel free to rip it up and improve it!
 
-In the future, I'd like to use a Bayesian Multiniomial model to utilize better priors for batted ball outcomes.
+The main.ipynb will run the simulations and create visualizations about the run distributions and batted ball outcomes. I maintain a separate Colab file that saves and Tweets the images automatically. 
 
-The data was gathered from the MLB Stats API.
-
-The main.ipynb will run the simulations and create visualizations about the run distributions and batted ball outcomes, which are then saved in the images folder.
-
-This account was inspired by @MoneyPuckdotcom.
+This account was inspired by @MoneyPuckdotcom. The data was gathered from MLB Stats API.
 
 ## Future ideas:
 
