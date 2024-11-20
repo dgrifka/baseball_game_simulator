@@ -127,10 +127,10 @@ def secondary_play_type(non_batted, play):
     Returns:
         pd.DataFrame: DataFrame with steals or pickoffs
     """
-  non_batted_play = non_batted[non_batted['details.movementReason'].str.contains(play, na=False)].copy()
-  non_batted_play = non_batted_play[non_batted_play['isBaseRunningPlay'].notnull()]
-  non_batted_play['play'] = play
-  return non_batted_play
+    non_batted_play = non_batted[non_batted['details.movementReason'].str.contains(play, na=False)].copy()
+    non_batted_play = non_batted_play[non_batted_play['isBaseRunningPlay'].notnull()]
+    non_batted_play['play'] = play
+    return non_batted_play
     
 def get_game_info(game_id, all_columns=False):
     """
