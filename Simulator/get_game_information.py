@@ -116,6 +116,21 @@ def play_info(df, column):
     
     return pd.concat(df_list)
 
+def secondary_play_type(non_batted, play):
+    """
+    Returns DataFrame with non batted-ball data (i.e. steals, pickoffs).
+    
+    Args:
+        non_batted (pd.DataFrame): DataFrame containing play-by-play data
+        play (str): Name of secondary play type
+    
+    Returns:
+        pd.DataFrame: DataFrame with non-batted ball events
+    """
+  non_batted_play = non_batted[non_batted['details.movementReason'].str.contains(play, na=False)].copy()
+  non_batted_play = non_batted_play[non_batted_play['isBaseRunningPlay'].notnull()]
+  return non_batted_play
+    
 def get_game_info(game_id, all_columns=False):
     """
     Retrieves and processes detailed game play-by-play information.
@@ -166,8 +181,10 @@ def get_game_info(game_id, all_columns=False):
         (total_pbp_filtered['eventType'].isin(other_plays))
     ]
     
-    # Create DataFrame for non-batted balls
+    # Create DataFrame for non-batted balls (i.e. steals and pickoffs)
     non_batted_balls = total_pbp[total_pbp['details.isInPlay'] != True].copy()
+    steals = secondary_play_type(non_batted_balls, "stolen_base")
+    pickoffs = secondary_play_type(non_batted_balls, "pickoff")
     
     # Clean up event types for filtered data
     total_pbp_filtered = (total_pbp_filtered
@@ -187,4 +204,4 @@ def get_game_info(game_id, all_columns=False):
         total_pbp_filtered = total_pbp_filtered[cols_needed]
         non_batted_balls = non_batted_balls[cols_needed]
     
-    return total_pbp_filtered, total_pbp, non_batted_balls
+    return total_pbp_filtered, total_pbp, steals, pickoffs
