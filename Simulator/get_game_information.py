@@ -96,7 +96,7 @@ def fetch_games(days_ago, all_columns=False):
     
     return filtered_games_df, games_list
 
-def _play_info(df, column):
+def play_info(df, column):
     """
     Parses play-by-play data from nested JSON columns.
     
@@ -125,10 +125,10 @@ def get_game_info(game_id, all_columns=False):
         all_columns (bool): If True, returns all columns; if False, returns subset
     
     Returns:
-        tuple: (filtered_pbp, total_pbp, non_batted_pbp)
-            - filtered_pbp: DataFrame of filtered play-by-play data
-            - total_pbp: DataFrame of all play-by-play data
-            - non_batted_pbp: DataFrame of non-batted ball plays
+        tuple: (filtered_pbp, total_pbp, non_batted_balls) 
+        - filtered_pbp: DataFrame of filtered play-by-play data
+        - total_pbp: DataFrame of all play-by-play data
+        - non_batted_balls: DataFrame of non-batted ball events
     """
     endpoint = f'game/{game_id}/feed/live'
     game = response_code(base_url, game_ver, endpoint)
@@ -138,7 +138,7 @@ def get_game_info(game_id, all_columns=False):
     except KeyError:
         print("Key 'liveData' not found in game:", game)
         return
-    
+        
     all_plays_df = pd.DataFrame(all_plays)
     if len(all_plays_df) == 0:
         return
@@ -147,49 +147,44 @@ def get_game_info(game_id, all_columns=False):
     columns_to_process = ['result', 'about', 'count', 'matchup', 'runners', 'playEvents']
     
     for col in columns_to_process:
-        col_pbp = _play_info(all_plays_df, col)
+        col_pbp = play_info(all_plays_df, col)
         
         if col == 'playEvents':
             col_pbp = (col_pbp[col_pbp['details.event'] != "Game Advisory"]
-                      .drop(columns=['startTime', 'endTime', 'type', 
-                                   'details.event', 'details.eventType', 'index'])
+                      .drop(columns=['startTime', 'endTime', 'type', 'details.event', 'details.eventType', 'index'])
                       .reset_index(drop=True))
         
         total_pbp = col_pbp if total_pbp.empty else total_pbp.merge(col_pbp, on='ab_num', how='left')
     
     total_pbp['gamePk'] = game_id
     
-    # Get non-batted ball plays
-    non_batted_pbp = total_pbp[total_pbp['details.isInPlay'] != True].copy()
-    non_batted_pbp = non_batted_pbp.drop_duplicates(subset="ab_num", keep="last")
-    
-    if not all_columns:
-        non_batted_cols = ["gamePk", "batter.fullName", "playId", "ab_num", 
-                          "eventType", "description", "outs", "isOut", 
-                          "isTopInning", "inning", "details.call.code", 
-                          "details.call.description"]
-        non_batted_pbp = non_batted_pbp[non_batted_cols]
-    
-    # Filter plays for batted balls and specific events
+    # Create copy for filtered batted balls
     total_pbp_filtered = total_pbp.copy()
     other_plays = ['walk', 'hit_by_pitch', 'strikeout']
     total_pbp_filtered = total_pbp_filtered[
-        (total_pbp_filtered['details.isInPlay'] == True) | 
+        (total_pbp_filtered['details.isInPlay'] == True) |
         (total_pbp_filtered['eventType'].isin(other_plays))
     ]
     
-    # Clean up event types
+    # Create DataFrame for non-batted balls
+    non_batted_balls = total_pbp[total_pbp['details.isInPlay'] != True].copy()
+    
+    # Clean up event types for filtered data
     total_pbp_filtered = (total_pbp_filtered
         .drop_duplicates(subset="ab_num", keep="last")
         .assign(eventType=lambda x: x['eventType'].apply(
-            lambda y: y if y in ['single', 'double', 'triple', 'home_run', 'walk', 'hit_by_pitch'] else 'out')
-        ))
+            lambda y: y if y in ['single', 'double', 'triple', 'home_run', 'walk', 'hit_by_pitch'] 
+            else 'out'
+        )))
     total_pbp_filtered['eventType'] = total_pbp_filtered['eventType'].str.replace("hit_by_pitch", "walk")
     
     if not all_columns:
-        cols_needed = ["gamePk", "batter.fullName", "playId", "ab_num", "eventType",
-                      "description", "outs", "isOut", "isTopInning", "inning",
-                      "hitData.launchSpeed", "hitData.launchAngle"]
+        cols_needed = [
+            "gamePk", "batter.fullName", "playId", "ab_num", "eventType", 
+            "description", "outs", "isOut", "isTopInning", "inning",
+            "hitData.launchSpeed", "hitData.launchAngle"
+        ]
         total_pbp_filtered = total_pbp_filtered[cols_needed]
+        non_batted_balls = non_batted_balls[cols_needed]
     
-    return total_pbp_filtered, total_pbp, non_batted_pbp
+    return total_pbp_filtered, total_pbp, non_batted_balls
