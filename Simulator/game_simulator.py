@@ -1,15 +1,15 @@
-import random
-import pickle
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
-from Simulator.constants import team_colors
-
-# Load the pipeline
-with open('Model/gb_classifier_pipeline.pkl', 'rb') as file:
-    pipeline = pickle.load(file)
-
 def outcomes(game_data, home_or_away):
+    """
+    Extract batting outcomes from game data for either home or away team.
+    
+    Args:
+        game_data (pd.DataFrame): DataFrame containing game events
+        home_or_away (str): 'home' or 'away' to filter team data
+        
+    Returns:
+        list: Tuples of (outcome_data, event_type, batter_name) where outcome_data is either
+              a string ('strikeout'/'walk') or list [launch_speed, launch_angle, venue]
+    """
     home_or_away_team = game_data.copy()
     if home_or_away == 'home':
         home_or_away_team = home_or_away_team[home_or_away_team['isTopInning'] == False]
@@ -33,6 +33,15 @@ def outcomes(game_data, home_or_away):
     return outcomes
 
 def calculate_total_bases(outcomes):
+    """
+    Calculate expected bases and outcome probabilities for each batting event.
+    
+    Args:
+        outcomes (list): List of outcome tuples from outcomes()
+        
+    Returns:
+        pd.DataFrame: Detailed stats including launch data, probabilities, and estimated bases
+    """
     result_list = []
     for outcome, original_event_type, full_name in outcomes:
         if outcome == "strikeout":
@@ -79,54 +88,59 @@ def calculate_total_bases(outcomes):
     return pd.DataFrame(result_list)
 
 def create_detailed_outcomes_df(game_data, home_or_away):
-    # Get outcomes
-    outcomes_list = outcomes(game_data, home_or_away)
+    """
+    Create a detailed DataFrame of batting outcomes for specified team.
     
-    # Calculate total bases and get detailed DataFrame
+    Args:
+        game_data (pd.DataFrame): Original game data
+        home_or_away (str): 'home' or 'away' team selection
+        
+    Returns:
+        pd.DataFrame: Processed and cleaned batting outcomes with probabilities
+    """
+    outcomes_list = outcomes(game_data, home_or_away)
     detailed_df = calculate_total_bases(outcomes_list)
     detailed_df = detailed_df.dropna().reset_index(drop=True)
-
     return detailed_df
 
 def outcome_rankings(home_detailed_df, away_detailed_df):
-    # Create total dataframe
+    """
+    Combine and rank batting outcomes from both teams by estimated bases.
+    
+    Args:
+        home_detailed_df (pd.DataFrame): Home team detailed outcomes
+        away_detailed_df (pd.DataFrame): Away team detailed outcomes
+        
+    Returns:
+        pd.DataFrame: Top 10 outcomes ranked by estimated bases, formatted for display
+    """
     total_team_outcomes = pd.concat([home_detailed_df, away_detailed_df])
-
-    # Convert launch_angle to int and round estimated_bases
     total_team_outcomes['launch_angle'] = total_team_outcomes['launch_angle'].astype(int)
     total_team_outcomes['estimated_bases'] = total_team_outcomes['estimated_bases'].round(2)
-
-    # Clean up probability columns
+    
     prob_columns = [col for col in total_team_outcomes.columns if '_prob' in col]
     for col in prob_columns:
         total_team_outcomes[col] = (total_team_outcomes[col] * 100).round(0).astype(int).astype(str) + '%'
-
-    # Select relevant columns
-    selected_columns = ['team', 'player', 'launch_speed', 'launch_angle', "original_event_type", 'estimated_bases', "out_prob", "single_prob", "double_prob", "triple_prob", "hr_prob"]
+    
+    selected_columns = ['team', 'player', 'launch_speed', 'launch_angle', "original_event_type", 'estimated_bases', 
+                       "out_prob", "single_prob", "double_prob", "triple_prob", "hr_prob"]
     total_team_outcomes = total_team_outcomes[selected_columns]
-
-    # Capitalize original_event_type values
     total_team_outcomes['original_event_type'] = total_team_outcomes['original_event_type'].str.title()
-
-    # Rename columns
     total_team_outcomes.columns = total_team_outcomes.columns.str.replace('_', ' ').str.title()
     total_team_outcomes = total_team_outcomes.rename(columns={'Original Event Type': 'Result', 'Full Name': 'Player'})
+    total_team_outcomes['team_color'] = total_team_outcomes['Team'].map({team: colors[0] for team, colors in team_colors.items()})
+    return total_team_outcomes.sort_values(by='Estimated Bases', ascending=False).head(10)
 
-    # Create a dictionary mapping team names to their corresponding colors
-    color_mapping = {team: colors[0] for team, colors in team_colors.items()}
-
-    # Add the 'team_color' column to the DataFrame
-    total_team_outcomes['team_color'] = total_team_outcomes['Team'].map(color_mapping)
-
-    # Sort the DataFrame by estimated bases
-    total_team_outcomes_sorted = total_team_outcomes.sort_values(by='Estimated Bases', ascending=False)
-
-    # Get top 10 estimated bases
-    top_10 = total_team_outcomes_sorted.head(10)
-
-    return top_10
-    
 def simulate_game(outcomes_df):
+    """
+    Simulate one game's worth of plate appearances and calculate runs scored.
+    
+    Args:
+        outcomes_df (pd.DataFrame): DataFrame containing possible batting outcomes
+        
+    Returns:
+        int: Total runs scored in the simulated game
+    """
     outs = 0
     runs = 0
     bases = [False, False, False]
@@ -173,29 +187,34 @@ def simulate_game(outcomes_df):
     return runs
 
 def advance_runner(bases, count=1, is_walk=False):
+    """
+    Calculate runs scored and update base runners after a hit/walk.
+    
+    Args:
+        bases (list): Current base occupancy [1st, 2nd, 3rd]
+        count (int): Number of bases advanced (1-4)
+        is_walk (bool): True if event is a walk
+        
+    Returns:
+        int: Runs scored on this play
+    """
     runs = 0
     if is_walk:
-        # Handle walk scenario
         if bases[2] and bases[1] and bases[0]:
-            # Bases loaded, force in a run
             runs += 1
             bases[2] = bases[1]
             bases[1] = bases[0]
             bases[0] = True
         elif bases[1] and bases[0]:
-            # Runners on first and second, advance to second and third
             bases[2] = bases[1]
             bases[1] = bases[0]
             bases[0] = True
         elif bases[0]:
-            # Runner on first, advance to second
             bases[1] = bases[0]
             bases[0] = True
         else:
-            # No runners on, just put batter on first
             bases[0] = True
     else:
-        # Handle non-walk scenarios (hits)
         for _ in range(count):
             if bases[2]:
                 runs += 1
@@ -206,16 +225,24 @@ def advance_runner(bases, count=1, is_walk=False):
     return runs
 
 def simulator(num_simulations, home_outcomes, away_outcomes):
-    # Simulate the game for home_outcomes and away_outcomes using NumPy
+    """
+    Run multiple game simulations and calculate win probabilities.
+    
+    Args:
+        num_simulations (int): Number of games to simulate
+        home_outcomes (list): List of possible home team batting outcomes
+        away_outcomes (list): List of possible away team batting outcomes
+        
+    Returns:
+        tuple: (home_runs_array, away_runs_array, home_win_pct, away_win_pct, tie_pct)
+    """
     home_runs_scored = np.zeros(num_simulations, dtype=int)
     away_runs_scored = np.zeros(num_simulations, dtype=int)
     
-    # Create a tqdm progress bar
     for i in tqdm(range(num_simulations), desc="Simulating games", unit="sim"):
         home_runs_scored[i] = simulate_game(home_outcomes)
         away_runs_scored[i] = simulate_game(away_outcomes)
 
-    # Compare the scores and calculate win/tie/loss percentages
     home_wins = np.sum(home_runs_scored > away_runs_scored)
     away_wins = np.sum(home_runs_scored < away_runs_scored)
     ties = np.sum(home_runs_scored == away_runs_scored)
