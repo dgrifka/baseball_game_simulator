@@ -88,6 +88,7 @@ def getImage(path, zoom=0.39, size=(50, 50), alpha=0.65, image_cache={}):
         print(f"Error loading image from {path}: {str(e)}")
         return None
         
+
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, 
                 home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, 
                 tie_percentage, mlb_team_logos, formatted_date, images_dir="images"):
@@ -125,8 +126,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     X, Y = np.meshgrid(xi, yi)
     Z = griddata((x, y), z, (X, Y), method='cubic', fill_value=0)
     
-    # Enhanced colormap with better contrast
-    colors_list = ["#FFFFFF", "#E6E6FA", "#B0C4DE", "#87CEEB", "#4682B4", "#000080"]
+    # Grayscale colormap
+    colors_list = ["white", "#E6E6E6", "#CCCCCC", "#B3B3B3", "#999999", "#808080", "#666666", "#4A4A4A"]
     levels = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]
     cmap = colors.LinearSegmentedColormap.from_list("custom", colors_list, N=256)
     
@@ -164,9 +165,9 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.text(0.05, 0.85, f'{home_team}: {outcomes["home"]["walks"]}', 
              transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
     
-    # Enhanced metadata
+    # Enhanced metadata with larger font
     plt.text(0.02, 0.02, 'Data: MLB\nBy: @mlb_simulator', transform=plt.gca().transAxes, 
-             fontsize=10, color='gray', ha='left', va='bottom')
+             fontsize=12, color='gray', ha='left', va='bottom')
     
     # Improved labels and title
     plt.xlabel('Exit Velocity (mph)', fontsize=16, labelpad=12)
@@ -197,7 +198,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
     plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
     plt.close(fig)
-
+                    
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
              formatted_date, images_dir="images"):
