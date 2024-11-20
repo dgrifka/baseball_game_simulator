@@ -40,7 +40,7 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
     # Process baserunning events
     if not baserunning_events.empty:
         for _, row in baserunning_events.iterrows():
-            outcomes.append((row['play'], row['play'], row['runner.fullName']))
+            outcomes.append((row['play'], row['play'], row['batter.fullName']))
     
     # Sort outcomes by their original order
     return outcomes
