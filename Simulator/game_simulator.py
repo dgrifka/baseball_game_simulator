@@ -121,7 +121,7 @@ def calculate_total_bases(outcomes):
     
     return pd.DataFrame(result_list)
 
-def create_detailed_outcomes_df(game_data, home_or_away):
+def create_detailed_outcomes_df(game_data, steals_and_pickoffs, home_or_away):
     """
     Create a detailed DataFrame of batting outcomes for specified team.
     
@@ -132,7 +132,7 @@ def create_detailed_outcomes_df(game_data, home_or_away):
     Returns:
         pd.DataFrame: Processed and cleaned batting outcomes with probabilities
     """
-    outcomes_list = outcomes(game_data, home_or_away)
+    outcomes_list = outcomes(game_data, steals_and_pickoffs, home_or_away)
     detailed_df = calculate_total_bases(outcomes_list)
     # Filter out stolen bases and pickoffs
     detailed_df = detailed_df[~detailed_df['event_type'].isin(['stolen_base', 'pickoff'])]
