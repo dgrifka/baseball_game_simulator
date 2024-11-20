@@ -50,8 +50,8 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 ## 2025 Additions:
 
 - Improved code docstrings and documentation.
+- Cleaner and improved visuals
 - Games played at George M. Steinbrenner Field will be converted to Yankee Stadium in the model, since the dimensions are similar.
-- Dates added to visualizations
 
 ## Project Structure
 
