@@ -99,11 +99,12 @@ Derek Grifka – dmgrifka@gmail.com - https://dgrifka.github.io/
 
 ## Outputs:
 
-![image](https://github.com/user-attachments/assets/21e0a3b1-2114-4134-88d6-0284c76af581)
+![Dodgers_Yankees_7-6--27-66_bb](https://github.com/user-attachments/assets/378f8eba-5450-46bf-b430-96ec639d3960)
 
-![image](https://github.com/user-attachments/assets/94a04426-ba4e-40a0-ac36-06533fba7b6e)
+![Dodgers_Yankees_7-6--27-66_rd](https://github.com/user-attachments/assets/3b4921b7-0e00-4cee-a3ad-c431877e2766)
 
-![image](https://github.com/user-attachments/assets/75a29e0d-7eff-490b-bac1-34fe6c9af2d9)
+![Dodgers_Yankees_7-6--27-66_estimated_bases](https://github.com/user-attachments/assets/329c809c-5eba-49de-8c3a-38fd6ce688d5)
+
 
 ## 2024 Research:
 
