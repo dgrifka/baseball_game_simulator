@@ -134,6 +134,8 @@ def create_detailed_outcomes_df(game_data, home_or_away):
     """
     outcomes_list = outcomes(game_data, home_or_away)
     detailed_df = calculate_total_bases(outcomes_list)
+    # Filter out stolen bases and pickoffs
+    detailed_df = detailed_df[~detailed_df['event_type'].isin(['stolen_base', 'pickoff'])]
     detailed_df = detailed_df.dropna().reset_index(drop=True)
     return detailed_df
 
@@ -148,6 +150,10 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
     Returns:
         pd.DataFrame: Top 10 outcomes ranked by estimated bases, formatted for display
     """
+    # Combine team outcomes, excluding any remaining stolen bases or pickoffs
+    home_detailed_df = home_detailed_df[~home_detailed_df['event_type'].isin(['stolen_base', 'pickoff'])]
+    away_detailed_df = away_detailed_df[~away_detailed_df['event_type'].isin(['stolen_base', 'pickoff'])]
+    
     total_team_outcomes = pd.concat([home_detailed_df, away_detailed_df])
     total_team_outcomes['launch_angle'] = total_team_outcomes['launch_angle'].astype(int)
     total_team_outcomes['estimated_bases'] = total_team_outcomes['estimated_bases'].round(2)
