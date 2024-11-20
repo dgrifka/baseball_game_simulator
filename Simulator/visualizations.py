@@ -202,18 +202,10 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
              formatted_date, images_dir="images"):
-    """
-    Creates visualization of run distribution from simulations.
     
-    Args:
-        num_simulations (int): Number of simulations run
-        home/away_runs_scored (array): Simulated runs for each team
-        home/away_team (str): Team names
-        home/away_score (int): Actual game scores
-        home/away/tie_win_percentage (float): Win percentages from simulation
-        formatted_date (str): Formatted date string to display
-        images_dir (str): Output directory for saved visualization
-    """
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.close('all')
+    
     percentages = {
         'away': f"{away_win_percentage:.0f}",
         'home': f"{home_win_percentage:.0f}",
@@ -226,63 +218,70 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         'away': stats.mode(away_runs_scored, keepdims=True)
     }
     
-    def format_mode(mode_result):
-        if hasattr(mode_result, 'mode'):
-            values = mode_result.mode.flatten()
-        elif isinstance(mode_result, np.ndarray):
-            values = mode_result.flatten()
-        else:
-            values = [mode_result]
-        return ','.join(map(str, values))
+    mode_strs = {team: ','.join(map(str, 
+                mode.mode.flatten() if hasattr(mode, 'mode') 
+                else mode.flatten() if isinstance(mode, np.ndarray)
+                else [mode])) 
+                for team, mode in modes.items()}
     
-    mode_strs = {team: format_mode(mode) for team, mode in modes.items()}
+    # Create figure with improved resolution
+    plt.figure(figsize=(12, 8), dpi=150)
     
-    plt.figure(figsize=(10, 6))
-    
-    # Center x-axis labels
+    # Set up bins and colors
     max_runs = max(max(home_runs_scored), max(away_runs_scored))
     bins = range(max_runs + 2)
     
-    # Create histograms first
-    for runs, team, pattern in [(home_runs_scored, home_team, '/'), 
-                               (away_runs_scored, away_team, '\\')]:
-        plt.hist(runs, bins=bins, alpha=0.6, label=team,
-                color=team_colors[team][0], edgecolor='black',
-                linewidth=1, hatch=pattern)
+    # Custom colors with better contrast
+    home_color = team_colors[home_team][0]
+    away_color = team_colors[away_team][0]
+    
+    # Create histograms with enhanced styling
+    for runs, team, color, pattern in [
+        (home_runs_scored, home_team, home_color, '//'),
+        (away_runs_scored, away_team, away_color, '\\')
+    ]:
+        plt.hist(runs, bins=bins, alpha=0.75, label=team,
+                color=color, edgecolor='black',
+                linewidth=1.2, hatch=pattern)
 
-    # Then set the ticks and labels
+    # Enhanced axis formatting
     ax = plt.gca()
     ax.set_xticks(np.arange(max_runs + 1) + 0.5)
     ax.set_xticklabels(range(max_runs + 1), fontsize=12)
+    plt.yticks(fontsize=12)
     
-    # Add labels and formatting
-    plt.xlabel('Runs Scored', fontsize=14)
-    plt.ylabel('Frequency', fontsize=14)
+    # Improved labels
+    plt.xlabel('Runs Scored', fontsize=14, labelpad=10)
+    plt.ylabel('Frequency', fontsize=14, labelpad=10)
     
-    plt.title(f'Distribution of Runs Scored ({num_simulations} Simulations)\n'
-              f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
-              f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} '
-              f'{percentages["home"]}%, Tie {percentages["tie"]}%\n'
-              f'Most Likely Outcome: {away_team} {mode_strs["away"]} - {home_team} '
-              f'{mode_strs["home"]}',
-              fontsize=16, loc='left', pad=20)
+    # Enhanced title with better spacing
+    title = (f'Distribution of Runs Scored ({num_simulations:,} Simulations)\n'
+            f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
+            f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} '
+            f'{percentages["home"]}%, Tie {percentages["tie"]}%\n'
+            f'Most Likely Outcome: {away_team} {mode_strs["away"]} - {home_team} '
+            f'{mode_strs["home"]}')
     
-    # Add metadata
-    plt.text(-.05, -.09, 'Data: MLB', transform=plt.gca().transAxes,
-             fontsize=8, color='black', ha='left', va='bottom')
-    plt.text(-.05, -.11, 'By: @mlb_simulator', transform=plt.gca().transAxes,
-             fontsize=8, color='black', ha='left', va='bottom')
+    plt.title(title, fontsize=16, loc='left', pad=15, fontweight='bold')
     
-    # Format ticks and legend
-    plt.yticks(fontsize=12)                 
-    plt.legend(fontsize=12)
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
-
-    # Save visualization
+    # Larger watermark
+    plt.text(0.01, -0.12, 'Data: MLB', transform=plt.gca().transAxes,
+             fontsize=12, color='gray', ha='left', va='bottom')
+    plt.text(0.01, -0.15, 'By: @mlb_simulator', transform=plt.gca().transAxes,
+             fontsize=12, color='gray', ha='left', va='bottom')
+    
+    # Enhanced legend
+    plt.legend(fontsize=12, frameon=True, framealpha=0.9,
+              edgecolor='black', fancybox=True)
+    
+    # Clean up spines
+    for spine in ['top', 'right']:
+        plt.gca().spines[spine].set_visible(False)
+    
+    # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_rd.png'
-    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight')
+    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
     plt.close()
 
 
