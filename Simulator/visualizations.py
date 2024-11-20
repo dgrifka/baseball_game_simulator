@@ -254,6 +254,10 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
                 color=team_colors[team][0], edgecolor='black',
                 linewidth=1, hatch=pattern)
     
+    # Center x-axis labels
+    plt.gca().set_xticks(np.arange(0.5, max_runs + 1.5))
+    plt.gca().set_xticklabels(range(max_runs + 2))
+    
     # Add labels and formatting
     plt.xlabel('Runs Scored', fontsize=14)
     plt.ylabel('Frequency', fontsize=14)
