@@ -203,7 +203,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
              formatted_date, images_dir="images"):
     
-    plt.style.use('seaborn-v0_8')
+    plt.style.use('seaborn-v0_8')  # Changed from seaborn-v0_8-whitegrid to remove gridlines
     plt.close('all')
     
     percentages = {
@@ -268,9 +268,9 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.title(title, fontsize=16, loc='left', pad=15, fontweight='bold')
     
     # Larger watermark
-    plt.text(0.01, -0.1, 'Data: MLB', transform=plt.gca().transAxes,
+    plt.text(0.01, -0.12, 'Data: MLB', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='left', va='bottom')
-    plt.text(0.01, -0.13, 'By: @mlb_simulator', transform=plt.gca().transAxes,
+    plt.text(0.01, -0.15, 'By: @mlb_simulator', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='left', va='bottom')
     
     # Enhanced legend in top right
