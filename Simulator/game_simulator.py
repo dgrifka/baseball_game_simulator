@@ -1,3 +1,14 @@
+import random
+import pickle
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from Simulator.constants import team_colors
+
+# Load the pipeline
+with open('Model/gb_classifier_pipeline.pkl', 'rb') as file:
+    pipeline = pickle.load(file)
+
 def outcomes(game_data, steals_and_pickoffs, home_or_away):
     """
     Extract batting outcomes and baserunning events from game data for either home or away team.
@@ -193,6 +204,12 @@ def simulate_game(outcomes_df):
             outs += 1
         elif outcome == "walk":
             runs += advance_runner(bases, is_walk=True)
+        elif outcome == "stolen_base":
+            if any(bases):  # Only attempt steal if runners on base
+                runs += attempt_steal(bases)
+        elif outcome == "pickoff":
+            if any(bases):  # Only attempt pickoff if runners on base
+                outs += attempt_pickoff(bases)
         elif isinstance(outcome, list) and len(outcome) == 3:
             probabilities = probabilities_dict[tuple(outcome)]
             random_value = random.random()
@@ -208,6 +225,47 @@ def simulate_game(outcomes_df):
                 runs += advance_runner(bases, 4)
     
     return runs
+
+def attempt_steal(bases):
+    """
+    Attempt to steal with the lead runner.
+    
+    Args:
+        bases (list): Current base occupancy [1st, 2nd, 3rd]
+        
+    Returns:
+        int: Runs scored (1 if stealing home successfully, 0 otherwise)
+    """
+    if bases[2]:  # Runner on third attempts to steal home
+        bases[2] = False
+        return 1
+    elif bases[1]:  # Runner on second advances to third
+        bases[2] = True
+        bases[1] = False
+        return 0
+    elif bases[0]:  # Runner on first advances to second
+        bases[1] = True
+        bases[0] = False
+        return 0
+    return 0
+
+def attempt_pickoff(bases):
+    """
+    Attempt pickoff of lead runner.
+    
+    Args:
+        bases (list): Current base occupancy [1st, 2nd, 3rd]
+        
+    Returns:
+        int: 1 if pickoff successful, 0 otherwise
+    """
+    if bases[2]:  # Pick off runner on third
+        bases[2] = False
+    elif bases[1]:  # Pick off runner on second
+        bases[1] = False
+    elif bases[0]:  # Pick off runner on first
+        bases[0] = False
+    return 1
 
 def advance_runner(bases, count=1, is_walk=False):
     """
