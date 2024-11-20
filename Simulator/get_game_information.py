@@ -147,7 +147,7 @@ def get_game_info(game_id, all_columns=False):
     columns_to_process = ['result', 'about', 'count', 'matchup', 'runners', 'playEvents']
     
     for col in columns_to_process:
-        col_pbp = *play*info(all_plays_df, col)
+        col_pbp = _play_info(all_plays_df, col)
         
         if col == 'playEvents':
             col_pbp = (col_pbp[col_pbp['details.event'] != "Game Advisory"]
