@@ -1,46 +1,48 @@
-import random
-import pickle
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
-from Simulator.constants import team_colors
-
-# Load the pipeline
-with open('Model/gb_classifier_pipeline.pkl', 'rb') as file:
-    pipeline = pickle.load(file)
-
-def outcomes(game_data, home_or_away):
+def outcomes(game_data, steals_and_pickoffs, home_or_away):
     """
-    Extract batting outcomes from game data for either home or away team.
+    Extract batting outcomes and baserunning events from game data for either home or away team.
     
     Args:
         game_data (pd.DataFrame): DataFrame containing game events
+        steals_and_pickoffs (pd.DataFrame): DataFrame containing stolen base and pickoff events
         home_or_away (str): 'home' or 'away' to filter team data
         
     Returns:
-        list: Tuples of (outcome_data, event_type, batter_name) where outcome_data is either
-              a string ('strikeout'/'walk') or list [launch_speed, launch_angle, venue]
+        list: Tuples of (outcome_data, event_type, player_name) where outcome_data is either
+              a string ('strikeout'/'walk'/'stolen_base'/'pickoff') or 
+              list [launch_speed, launch_angle, venue]
     """
     home_or_away_team = game_data.copy()
     if home_or_away == 'home':
         home_or_away_team = home_or_away_team[home_or_away_team['isTopInning'] == False]
+        baserunning_events = steals_and_pickoffs[steals_and_pickoffs['isTopInning'] == False]
     else:
         home_or_away_team = home_or_away_team[home_or_away_team['isTopInning'] == True]
+        baserunning_events = steals_and_pickoffs[steals_and_pickoffs['isTopInning'] == True]
     
     outcomes = []
-
-    automatic_outs = home_or_away_team[(home_or_away_team['eventType'] == 'out') & (home_or_away_team['hitData.launchSpeed'].isnull())]
+    
+    # Process batting outcomes
+    automatic_outs = home_or_away_team[(home_or_away_team['eventType'] == 'out') & 
+                                     (home_or_away_team['hitData.launchSpeed'].isnull())]
     for _, row in automatic_outs.iterrows():
         outcomes.append(("strikeout", row['eventType'], row['batter.fullName']))
-
+        
     walks = home_or_away_team[home_or_away_team['eventType'] == 'walk']
     for _, row in walks.iterrows():
         outcomes.append(("walk", row['eventType'], row['batter.fullName']))
-
+        
     put_in_play = home_or_away_team[~home_or_away_team['hitData.launchSpeed'].isnull()].reset_index(drop=True)
     for _, row in put_in_play.iterrows():
-        outcomes.append(([row['hitData.launchSpeed'], row['hitData.launchAngle'], row['venue.name']], row['eventType'], row['batter.fullName']))
-
+        outcomes.append(([row['hitData.launchSpeed'], row['hitData.launchAngle'], row['venue.name']], 
+                       row['eventType'], row['batter.fullName']))
+    
+    # Process baserunning events
+    if not baserunning_events.empty:
+        for _, row in baserunning_events.iterrows():
+            outcomes.append((row['play'], row['play'], row['runner.fullName']))
+    
+    # Sort outcomes by their original order
     return outcomes
 
 def calculate_total_bases(outcomes):
