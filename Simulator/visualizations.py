@@ -244,12 +244,6 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
     plt.figure(figsize=(10, 6))
     
-    # Center x-axis labels
-    max_runs = max(max(home_runs_scored), max(away_runs_scored))
-    bins = range(max_runs + 2)
-    plt.gca().set_xticks(np.arange(max_runs + 1) + 0.5)  # Adjust tick positions
-    plt.gca().set_xticklabels(range(max_runs + 1))  # Match number of labels to ticks
-    
     for runs, team, pattern in [(home_runs_scored, home_team, '/'), 
                                (away_runs_scored, away_team, '\\')]:
         plt.hist(runs, bins=bins, alpha=0.6, label=team,
@@ -275,12 +269,17 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
              fontsize=8, color='black', ha='left', va='bottom')
     
     # Format ticks and legend
-    plt.xticks(range(max_runs + 2), fontsize=12)
     plt.yticks(fontsize=12)
+    # Center x-axis labels
+    max_runs = max(max(home_runs_scored), max(away_runs_scored))
+    bins = range(max_runs + 2)
+    plt.gca().set_xticks(np.arange(max_runs + 1) + 0.5)  # Adjust tick positions
+    plt.gca().set_xticklabels(range(max_runs + 1))  # Match number of labels to ticks
+                 
     plt.legend(fontsize=12)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
-    
+
     # Save visualization
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_rd.png'
