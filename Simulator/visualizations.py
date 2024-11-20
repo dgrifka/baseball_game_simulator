@@ -255,10 +255,10 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
                 color=team_colors[team][0], edgecolor='black',
                 linewidth=1, hatch=pattern)
 
-# Then set the ticks and labels
-ax = plt.gca()
-ax.set_xticks(np.arange(max_runs + 1) + 0.5)
-ax.set_xticklabels(range(max_runs + 1), fontsize=12)
+    # Then set the ticks and labels
+    ax = plt.gca()
+    ax.set_xticks(np.arange(max_runs + 1) + 0.5)
+    ax.set_xticklabels(range(max_runs + 1), fontsize=12)
     
     # Add labels and formatting
     plt.xlabel('Runs Scored', fontsize=14)
