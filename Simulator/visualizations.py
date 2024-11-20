@@ -203,7 +203,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
              formatted_date, images_dir="images"):
     
-    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.style.use('seaborn-v0_8')
     plt.close('all')
     
     percentages = {
@@ -376,11 +376,11 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - '
             f'{home_team} {home_win_percentage:.0f}%')
     
-    plt.title(title, fontsize=14, loc='left', pad=10, fontweight='bold')
+    plt.title(title, fontsize=14, loc='left', pad=9, fontweight='bold')
     
     # Right-aligned metadata
-    plt.text(0.99, 0.99, 'Data: MLB    By: @mlb_simulator', 
-             transform=ax.transAxes, fontsize=10, 
+    plt.text(0.99, 1.015, 'Data: MLB    By: @mlb_simulator', 
+             transform=ax.transAxes, fontsize=12, 
              ha='right', va='top')
     
     # Save with high quality
