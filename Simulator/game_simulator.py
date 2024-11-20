@@ -47,7 +47,7 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
 
 def calculate_total_bases(outcomes):
     """
-    Calculate expected bases and outcome probabilities for each batting event.
+    Calculate expected bases and outcome probabilities for each batting/baserunning event.
     
     Args:
         outcomes (list): List of outcome tuples from outcomes()
@@ -66,6 +66,16 @@ def calculate_total_bases(outcomes):
             bases = 1
             event_type = "walk"
             probabilities = [0, 1, 0, 0, 0]
+            launch_speed, launch_angle, stadium = None, None, None
+        elif outcome == "stolen_base":
+            bases = 1
+            event_type = "stolen_base"
+            probabilities = [0, 1, 0, 0, 0]
+            launch_speed, launch_angle, stadium = None, None, None
+        elif outcome == "pickoff":
+            bases = 0
+            event_type = "pickoff"
+            probabilities = [1, 0, 0, 0, 0]
             launch_speed, launch_angle, stadium = None, None, None
         else:
             launch_speed, launch_angle, stadium = outcome
