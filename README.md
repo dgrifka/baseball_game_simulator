@@ -1,6 +1,6 @@
 # MLB Deserve-to-Win Simulator
-## https://x.com/mlb_simulator
-## @mlb-simulator.bsky.social
+### https://x.com/mlb_simulator
+### [@mlb-simulator.bsky.social](https://bsky.app/profile/mlb-simulator.bsky.social)
 
 ## Table of Contents
 - [Description](#description)
