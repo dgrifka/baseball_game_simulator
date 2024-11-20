@@ -248,6 +248,9 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     ax = plt.gca()
     ax.set_xticks(np.arange(max_runs + 1) + 0.5)
     ax.set_xticklabels(range(max_runs + 1), fontsize=12)
+    
+    # Set integer y-axis ticks
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     plt.yticks(fontsize=12)
     
     # Improved labels
@@ -265,14 +268,14 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.title(title, fontsize=16, loc='left', pad=15, fontweight='bold')
     
     # Larger watermark
-    plt.text(0.01, -0.12, 'Data: MLB', transform=plt.gca().transAxes,
+    plt.text(0.01, -0.1, 'Data: MLB', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='left', va='bottom')
-    plt.text(0.01, -0.15, 'By: @mlb_simulator', transform=plt.gca().transAxes,
+    plt.text(0.01, -0.13, 'By: @mlb_simulator', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='left', va='bottom')
     
-    # Enhanced legend
+    # Enhanced legend in top right
     plt.legend(fontsize=12, frameon=True, framealpha=0.9,
-              edgecolor='black', fancybox=True)
+              edgecolor='black', fancybox=True, loc='upper right')
     
     # Clean up spines
     for spine in ['top', 'right']:
