@@ -125,9 +125,10 @@ def get_game_info(game_id, all_columns=False):
         all_columns (bool): If True, returns all columns; if False, returns subset
     
     Returns:
-        tuple: (filtered_pbp, total_pbp)
+        tuple: (filtered_pbp, total_pbp, non_batted_pbp)
             - filtered_pbp: DataFrame of filtered play-by-play data
             - total_pbp: DataFrame of all play-by-play data
+            - non_batted_pbp: DataFrame of non-batted ball plays
     """
     endpoint = f'game/{game_id}/feed/live'
     game = response_code(base_url, game_ver, endpoint)
@@ -146,7 +147,7 @@ def get_game_info(game_id, all_columns=False):
     columns_to_process = ['result', 'about', 'count', 'matchup', 'runners', 'playEvents']
     
     for col in columns_to_process:
-        col_pbp = _play_info(all_plays_df, col)
+        col_pbp = *play*info(all_plays_df, col)
         
         if col == 'playEvents':
             col_pbp = (col_pbp[col_pbp['details.event'] != "Game Advisory"]
@@ -158,7 +159,18 @@ def get_game_info(game_id, all_columns=False):
     
     total_pbp['gamePk'] = game_id
     
-    # Filter plays
+    # Get non-batted ball plays
+    non_batted_pbp = total_pbp[total_pbp['details.isInPlay'] != True].copy()
+    non_batted_pbp = non_batted_pbp.drop_duplicates(subset="ab_num", keep="last")
+    
+    if not all_columns:
+        non_batted_cols = ["gamePk", "batter.fullName", "playId", "ab_num", 
+                          "eventType", "description", "outs", "isOut", 
+                          "isTopInning", "inning", "details.call.code", 
+                          "details.call.description"]
+        non_batted_pbp = non_batted_pbp[non_batted_cols]
+    
+    # Filter plays for batted balls and specific events
     total_pbp_filtered = total_pbp.copy()
     other_plays = ['walk', 'hit_by_pitch', 'strikeout']
     total_pbp_filtered = total_pbp_filtered[
@@ -180,4 +192,4 @@ def get_game_info(game_id, all_columns=False):
                       "hitData.launchSpeed", "hitData.launchAngle"]
         total_pbp_filtered = total_pbp_filtered[cols_needed]
     
-    return total_pbp_filtered, total_pbp
+    return total_pbp_filtered, total_pbp, non_batted_pbp
