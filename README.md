@@ -27,9 +27,11 @@ Feel free to submit a pull request with modifications/improvements!
 
 ## Future ideas:
 
-Incorporate double plays into the simulations, depending on ground ball probabilities.
+Layer the expected outcome model by predicting outcomes conditional on other outcome probabilities.
 
-Incorporate player speed into the hit probabilities.
+Add sprint speed or stolen bases per PA to account for player speed.
+
+Incorporate double plays into the simulations, depending on ground ball probabilities.
 
 Incorporate prior run distribution into likelihood of the simulations.
 
