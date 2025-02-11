@@ -36,11 +36,10 @@ def team_info():
     flattened_teams = json_normalize(team_info['teams'])
 
     teams_df = (flattened_teams[flattened_teams['sport.id'] == float(league)]
-                .loc[flattened_teams['season'] == season]
                 .rename(columns={"id": "team.id"})
                 .reset_index(drop=True))
     
-    return teams_df, flattened_teams
+    return teams_df
 
 def fetch_games(days_ago, all_columns=False):
     """
