@@ -40,7 +40,7 @@ def team_info():
                 .rename(columns={"id": "team.id"})
                 .reset_index(drop=True))
     
-    return teams_df
+    return teams_df, flattened_teams
 
 def fetch_games(days_ago, all_columns=False):
     """
