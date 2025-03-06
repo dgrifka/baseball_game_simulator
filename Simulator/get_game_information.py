@@ -61,7 +61,7 @@ def fetch_games(days_ago, all_columns=False):
     games_df = pd.concat(games_list, ignore_index=True)
     
     # Filter to finished games within date range
-    finished_games = games_df[games_df['status.abstractGameState'] == 'Final']
+    finished_games = games_df[games_df['status.abstractGameState'] == 'Final'].copy()
     finished_games['gameDate'] = pd.to_datetime(finished_games['gameDate'])
     
     current_date_time = datetime.datetime.now(pytz.UTC)
