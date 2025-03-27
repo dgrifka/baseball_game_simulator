@@ -78,6 +78,8 @@ def fetch_games(days_ago, all_columns=False):
         'George M. Steinbrenner Field', 'Yankee Stadium')
     filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(
         'Sutter Health Park', 'Oakland Coliseum')
+    filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(
+        'Daikin Park', 'Minute Maid Park')
     
     if not all_columns:
         filtered_games_df = filtered_games_df[[
