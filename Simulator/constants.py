@@ -15,7 +15,7 @@ game_ver = 'v1.1'
 venue_names = ['Oriole Park at Camden Yards', 'Great American Ball Park',
        'Petco Park', 'Dodger Stadium', 'Tropicana Field',
        'Kauffman Stadium', 'Guaranteed Rate Field', 'loanDepot park',
-       'Minute Maid Park', 'Globe Life Field', 'Oakland Coliseum',
+       'Daikin Park', 'Globe Life Field', 'Oakland Coliseum',
        'Chase Field', 'T-Mobile Park', 'Citi Field', 'Citizens Bank Park',
        'Wrigley Field', 'Nationals Park', 'American Family Field',
        'Target Field', 'Busch Stadium', 'Yankee Stadium', 'Comerica Park',
