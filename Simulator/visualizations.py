@@ -43,7 +43,7 @@ def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
         print(f"Logo not found for {team_name}")
     return logo_url
 
-def getImage(path, zoom=0.39, size=(50, 50), alpha=0.65, image_cache={}):
+def getImage(path, zoom=0.41, size=(50, 50), alpha=0.65, image_cache={}):
     """
     Processes team logo image with caching of raw image data.
     
@@ -106,16 +106,17 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     
     # Extract data
     outcomes = {
-        'home': {'ev': [], 'la': [], 'walks': home_outcomes.count('walk')},
-        'away': {'ev': [], 'la': [], 'walks': away_outcomes.count('walk')}
+        'home': {'ev': [], 'la': [], 'walks': home_outcomes.count('walk'), 
+                'stolen_base': home_outcomes.count('stolen_base')},
+        'away': {'ev': [], 'la': [], 'walks': away_outcomes.count('walk'),
+                'stolen_base': away_outcomes.count('stolen_base')}
     }
     
     for team, team_outcomes in [('home', home_outcomes), ('away', away_outcomes)]:
         outcomes[team]['ev'] = [o[0] for o in team_outcomes if isinstance(o, list)]
         outcomes[team]['la'] = [o[1] for o in team_outcomes if isinstance(o, list)]
-
-    # Create figure with higher DPI for sharper rendering
-    fig = plt.figure(figsize=(12, 8), dpi=150)
+    # Create figure with higher DPI for sharper rendering. Add constrained_layout instead of tight bbox_inches
+    fig = plt.figure(figsize=(12, 8), dpi=150, constrained_layout=True)
     
     # Load and process contour data with improved interpolation
     contour_data = pd.read_csv('Data/contour_data.csv').dropna()
@@ -157,12 +158,12 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Enhanced formatting
     plt.axhline(y=0, color='black', alpha=0.6, linewidth=1.0, linestyle='--')
     
-    # Walks/HBP section with improved typography
-    plt.text(0.05, 0.95, 'Walks/HBP', transform=plt.gca().transAxes, 
+    # Walks/HBP/SB section with improved typography
+    plt.text(0.05, 0.95, 'Walks/HBP/SB', transform=plt.gca().transAxes, 
              fontsize=16, fontweight='bold', verticalalignment='top')
-    plt.text(0.05, 0.90, f'{away_team}: {outcomes["away"]["walks"]}', 
+    plt.text(0.05, 0.90, f'{away_team}: {outcomes["away"]["walks"] + outcomes["away"]["stolen_base"]}', 
              transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
-    plt.text(0.05, 0.85, f'{home_team}: {outcomes["home"]["walks"]}', 
+    plt.text(0.05, 0.85, f'{home_team}: {outcomes["home"]["walks"] + outcomes["home"]["stolen_base"]}', 
              transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
     
     # Enhanced metadata with larger font
@@ -196,7 +197,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
-    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
+    # plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
+    plt.savefig(os.path.join(images_dir, filename), dpi=300)
     plt.close(fig)
                     
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
