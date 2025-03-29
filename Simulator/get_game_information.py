@@ -121,18 +121,28 @@ def play_info(df, column):
 
 def secondary_play_type(non_batted, play):
     """
-    Returns DataFrame with non batted-ball data (i.e. steals, pickoffs).
+    Extract non-batted ball plays (steals, pickoffs) from play-by-play data.
     
     Args:
-        non_batted (pd.DataFrame): DataFrame containing play-by-play data
-        play (str): Name of secondary play type
-    
+        non_batted (pd.DataFrame): DataFrame of non-batted ball events
+        play (str): Type of play to extract (e.g., "stolen_base", "pickoff")
+        
     Returns:
-        pd.DataFrame: DataFrame with steals or pickoffs
+        pd.DataFrame: Filtered DataFrame containing only the specified play type
     """
+    # Filter for rows containing the specified play in movementReason
     non_batted_play = non_batted[non_batted['details.movementReason'].str.contains(play, na=False)].copy()
+    
+    # Check if 'isBaseRunningPlay' column exists, if not, create it with default value 0
+    if 'isBaseRunningPlay' not in non_batted_play.columns:
+        non_batted_play['isBaseRunningPlay'] = 0
+    
+    # Filter for non-null values of isBaseRunningPlay (now all should be non-null)
     non_batted_play = non_batted_play[non_batted_play['isBaseRunningPlay'].notnull()]
+    
+    # Add a 'play' column to identify the play type
     non_batted_play['play'] = play
+    
     return non_batted_play
     
 def get_game_info(game_id, all_columns=False):
