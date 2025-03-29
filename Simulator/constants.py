@@ -14,7 +14,7 @@ game_ver = 'v1.1'
 ## Venue names to filter for the model, since we don't have batted ball data on games played at different parks
 venue_names = ['Oriole Park at Camden Yards', 'Great American Ball Park',
        'Petco Park', 'Dodger Stadium', 'Tropicana Field',
-       'Kauffman Stadium', 'Guaranteed Rate Field', 'loanDepot park',
+       'Kauffman Stadium', 'Rate Field', 'loanDepot park',
        'Daikin Park', 'Globe Life Field', 'Oakland Coliseum',
        'Chase Field', 'T-Mobile Park', 'Citi Field', 'Citizens Bank Park',
        'Wrigley Field', 'Nationals Park', 'American Family Field',
