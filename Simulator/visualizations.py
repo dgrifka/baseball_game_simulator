@@ -115,8 +115,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     for team, team_outcomes in [('home', home_outcomes), ('away', away_outcomes)]:
         outcomes[team]['ev'] = [o[0] for o in team_outcomes if isinstance(o, list)]
         outcomes[team]['la'] = [o[1] for o in team_outcomes if isinstance(o, list)]
-    # Create figure with higher DPI for sharper rendering
-    fig = plt.figure(figsize=(12, 8), dpi=150)
+    # Create figure with higher DPI for sharper rendering. Add constrained_layout instead of tight bbox_inches
+    fig = plt.figure(figsize=(12, 8), dpi=150, constrained_layout=True)
     
     # Load and process contour data with improved interpolation
     contour_data = pd.read_csv('Data/contour_data.csv').dropna()
@@ -197,7 +197,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
-    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
+    # plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
+    plt.savefig(os.path.join(images_dir, filename), dpi=300)
     plt.close(fig)
                     
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
