@@ -80,6 +80,8 @@ def fetch_games(days_ago, all_columns=False):
         'Sutter Health Park', 'Oakland Coliseum')
     filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(
         'Daikin Park', 'Minute Maid Park')
+    filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(
+        'Rate Field', 'Guaranteed Rate Field')
     
     if not all_columns:
         filtered_games_df = filtered_games_df[[
