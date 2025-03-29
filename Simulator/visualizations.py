@@ -43,7 +43,7 @@ def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
         print(f"Logo not found for {team_name}")
     return logo_url
 
-def getImage(path, zoom=0.39, size=(50, 50), alpha=0.65, image_cache={}):
+def getImage(path, zoom=0.41, size=(50, 50), alpha=0.65, image_cache={}):
     """
     Processes team logo image with caching of raw image data.
     
