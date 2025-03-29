@@ -161,9 +161,9 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Walks/HBP/SB section with improved typography
     plt.text(0.05, 0.95, 'Walks/HBP/SB', transform=plt.gca().transAxes, 
              fontsize=16, fontweight='bold', verticalalignment='top')
-    plt.text(0.05, 0.90, f'{away_team}: {outcomes["away"]["walks"]} / {outcomes["away"]["stolen_base"]}', 
+    plt.text(0.05, 0.90, f'{away_team}: {outcomes["away"]["walks"] + outcomes["away"]["stolen_base"]}', 
              transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
-    plt.text(0.05, 0.85, f'{home_team}: {outcomes["home"]["walks"]} / {outcomes["home"]["stolen_base"]}', 
+    plt.text(0.05, 0.85, f'{home_team}: {outcomes["home"]["walks"] + outcomes["home"]["stolen_base"]}', 
              transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
     
     # Enhanced metadata with larger font
