@@ -43,7 +43,7 @@ def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
         print(f"Logo not found for {team_name}")
     return logo_url
 
-def getImage(path, zoom=0.41, size=(50, 50), alpha=0.65, image_cache={}):
+def getImage(path, zoom=0.45, size=(50, 50), alpha=0.625, image_cache={}):
     """
     Processes team logo image with caching of raw image data.
     
@@ -159,8 +159,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         
         if logo_url:
             for x, y in zip(data['ev'], data['la']):
-                img = getImage(logo_url, zoom=0.45 if team == 'home' else 0.42,
-                             alpha=0.85 if team == 'home' else 0.8)
+                img = getImage(logo_url, zoom=0.5 if team == 'home' else 0.465,
+                             alpha=0.825 if team == 'home' else 0.795)
                 if img:
                     ab = AnnotationBbox(img, (x, y), frameon=False)
                     plt.gca().add_artist(ab)
