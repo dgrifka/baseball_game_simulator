@@ -286,7 +286,9 @@ def advance_runner(bases, count=1, is_walk=False):
         int: Runs scored on this play
     """
     runs = 0
+    
     if is_walk:
+        # Walk logic stays the same
         if bases[2] and bases[1] and bases[0]:
             runs += 1
             bases[2] = bases[1]
@@ -301,13 +303,34 @@ def advance_runner(bases, count=1, is_walk=False):
             bases[0] = True
         else:
             bases[0] = True
-    else:
-        for _ in range(count):
-            if bases[2]:
-                runs += 1
-            bases[2] = bases[1]
-            bases[1] = bases[0]
+    
+    elif count == 4:  # Home run - special case
+        # Count all runners on base plus the batter
+        runs = sum(bases) + 1
+        # Clear all bases
+        bases[0] = False
+        bases[1] = False
+        bases[2] = False
+    
+    else:  # Singles, doubles, triples
+        # Move existing runners
+        for i in range(2, -1, -1):  # Work backwards from 3rd to 1st
+            if bases[i]:
+                new_position = i + count
+                if new_position >= 3:  # Runner scores
+                    runs += 1
+                    bases[i] = False
+                else:  # Runner advances but doesn't score
+                    bases[new_position] = True
+                    bases[i] = False
+        
+        # Put batter on base
+        if count == 1:
             bases[0] = True
+        elif count == 2:
+            bases[1] = True
+        elif count == 3:
+            bases[2] = True
     
     return runs
 
