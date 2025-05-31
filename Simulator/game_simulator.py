@@ -349,16 +349,22 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     home_runs_scored = np.zeros(num_simulations, dtype=int)
     away_runs_scored = np.zeros(num_simulations, dtype=int)
     
-    for i in tqdm(range(num_simulations), desc="Simulating games", unit="sim"):
+    # Fixed tqdm with proper parameters
+    for i in tqdm(range(num_simulations), 
+                  desc="Simulating games", 
+                  unit="sim",
+                  position=0,
+                  leave=True,
+                  ncols=80,
+                  ascii=True):
         home_runs_scored[i] = simulate_game(home_outcomes)
         away_runs_scored[i] = simulate_game(away_outcomes)
-
+    
     home_wins = np.sum(home_runs_scored > away_runs_scored)
     away_wins = np.sum(home_runs_scored < away_runs_scored)
     ties = np.sum(home_runs_scored == away_runs_scored)
-
     home_win_percentage = home_wins / num_simulations * 100
     away_win_percentage = away_wins / num_simulations * 100
     tie_percentage = ties / num_simulations * 100
-
+    
     return home_runs_scored, away_runs_scored, home_win_percentage, away_win_percentage, tie_percentage
