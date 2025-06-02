@@ -171,67 +171,6 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
     total_team_outcomes['team_color'] = total_team_outcomes['Team'].map({team: colors[0] for team, colors in team_colors.items()})
     return total_team_outcomes.sort_values(by='Estimated Bases', ascending=False).head(10)
 
-def simulate_game(outcomes_df):
-    """
-    Simulate one game's worth of plate appearances and calculate runs scored.
-    
-    Args:
-        outcomes_df (pd.DataFrame): DataFrame containing possible batting outcomes
-        
-    Returns:
-        int: Total runs scored in the simulated game
-    """
-    outs = 0
-    runs = 0
-    bases = [False, False, False]
-    outcomes_copy = outcomes_df.copy()
-    
-    probabilities_dict = {}
-    for outcome in outcomes_copy:
-        if isinstance(outcome, list) and len(outcome) == 3:
-            launch_speed, launch_angle, stadium = outcome
-            new_example = pd.DataFrame({
-                'hitData_launchSpeed': [launch_speed],
-                'hitData_launchAngle': [launch_angle],
-                'venue_name': [stadium]
-            })
-            probabilities = pipeline.predict_proba(new_example)[0]
-            probabilities_dict[tuple(outcome)] = probabilities
-    
-    while outcomes_copy:
-        if outs == 3:
-            outs = 0
-            bases = [False, False, False]
-        
-        outcome = random.choice(outcomes_copy)
-        outcomes_copy.remove(outcome)
-        
-        if outcome == "strikeout":
-            outs += 1
-        elif outcome == "walk":
-            runs += advance_runner(bases, is_walk=True)
-        elif outcome == "stolen_base":
-            if any(bases):  # Only attempt steal if runners on base
-                runs += attempt_steal(bases)
-        elif outcome == "pickoff":
-            if any(bases):  # Only attempt pickoff if runners on base
-                outs += attempt_pickoff(bases)
-        elif isinstance(outcome, list) and len(outcome) == 3:
-            probabilities = probabilities_dict[tuple(outcome)]
-            random_value = random.random()
-            if random_value < probabilities[0]:
-                outs += 1
-            elif random_value < probabilities[0] + probabilities[1]:
-                runs += advance_runner(bases, 1)
-            elif random_value < probabilities[0] + probabilities[1] + probabilities[2]:
-                runs += advance_runner(bases, 2)
-            elif random_value < probabilities[0] + probabilities[1] + probabilities[2] + probabilities[3]:
-                runs += advance_runner(bases, 3)
-            else:
-                runs += advance_runner(bases, 4)
-    
-    return runs
-
 def attempt_steal(bases):
     """
     Attempt to steal with the lead runner.
@@ -334,9 +273,56 @@ def advance_runner(bases, count=1, is_walk=False):
     
     return runs
 
+def simulate_game(outcomes_list, prob_cache):
+    """
+    Simulate one game's worth of plate appearances and calculate runs scored using pre-computed probabilities.
+    """
+    outs = 0
+    runs = 0
+    bases = [False, False, False]
+    
+    # Use numpy for faster random sampling WITHOUT replacement
+    n_outcomes = len(outcomes_list)
+    indices = np.random.permutation(n_outcomes)  # Shuffle indices
+    
+    for idx in indices:
+        if outs == 3:
+            outs = 0
+            bases = [False, False, False]
+        
+        outcome = outcomes_list[idx]
+        
+        if outcome == "strikeout":
+            outs += 1
+        elif outcome == "walk":
+            runs += advance_runner(bases, is_walk=True)
+        elif outcome == "stolen_base":
+            if any(bases):
+                runs += attempt_steal(bases)
+        elif outcome == "pickoff":
+            if any(bases):
+                outs += attempt_pickoff(bases)
+        elif isinstance(outcome, list) and len(outcome) == 3:
+            # Use pre-computed probabilities
+            probabilities = prob_cache[tuple(outcome)]
+            random_value = random.random()
+            
+            if random_value < probabilities[0]:
+                outs += 1
+            elif random_value < probabilities[0] + probabilities[1]:
+                runs += advance_runner(bases, 1)
+            elif random_value < probabilities[0] + probabilities[1] + probabilities[2]:
+                runs += advance_runner(bases, 2)
+            elif random_value < probabilities[0] + probabilities[1] + probabilities[2] + probabilities[3]:
+                runs += advance_runner(bases, 3)
+            else:
+                runs += advance_runner(bases, 4)
+    
+    return runs
+
 def simulator(num_simulations, home_outcomes, away_outcomes):
     """
-    Run multiple game simulations and calculate win probabilities.
+    Simulator with pre-computed probabilities.
     
     Args:
         num_simulations (int): Number of games to simulate
@@ -346,23 +332,58 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     Returns:
         tuple: (home_runs_array, away_runs_array, home_win_pct, away_win_pct, tie_pct)
     """
+    # Clean up outcomes format (handle tuples from original format)
+    home_outcomes_clean = []
+    away_outcomes_clean = []
+    
+    for outcome in home_outcomes:
+        if isinstance(outcome, tuple):
+            home_outcomes_clean.append(outcome[0])
+        else:
+            home_outcomes_clean.append(outcome)
+    
+    for outcome in away_outcomes:
+        if isinstance(outcome, tuple):
+            away_outcomes_clean.append(outcome[0])
+        else:
+            away_outcomes_clean.append(outcome)
+    
+    # Pre-compute ALL probabilities ONCE before simulations
+    prob_cache = {}
+    all_outcomes = home_outcomes_clean + away_outcomes_clean
+    
+    for outcome in all_outcomes:
+        if isinstance(outcome, list) and len(outcome) == 3:
+            key = tuple(outcome)
+            if key not in prob_cache:
+                launch_speed, launch_angle, stadium = outcome
+                new_example = pd.DataFrame({
+                    'hitData_launchSpeed': [launch_speed],
+                    'hitData_launchAngle': [launch_angle],
+                    'venue_name': [stadium]
+                })
+                prob_cache[key] = pipeline.predict_proba(new_example)[0]
+    
+    # Initialize arrays for results
     home_runs_scored = np.zeros(num_simulations, dtype=int)
     away_runs_scored = np.zeros(num_simulations, dtype=int)
     
-    # Fixed tqdm with proper parameters
+    # Run simulations with progress bar
     for i in tqdm(range(num_simulations), 
-                  desc="Simulating games", 
+                  desc="Simulating games (fast)", 
                   unit="sim",
                   position=0,
                   leave=True,
                   ncols=80,
                   ascii=True):
-        home_runs_scored[i] = simulate_game(home_outcomes)
-        away_runs_scored[i] = simulate_game(away_outcomes)
+        home_runs_scored[i] = simulate_game(home_outcomes_clean, prob_cache)
+        away_runs_scored[i] = simulate_game(away_outcomes_clean, prob_cache)
     
+    # Calculate win percentages
     home_wins = np.sum(home_runs_scored > away_runs_scored)
     away_wins = np.sum(home_runs_scored < away_runs_scored)
     ties = np.sum(home_runs_scored == away_runs_scored)
+    
     home_win_percentage = home_wins / num_simulations * 100
     away_win_percentage = away_wins / num_simulations * 100
     tie_percentage = ties / num_simulations * 100
