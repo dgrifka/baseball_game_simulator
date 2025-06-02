@@ -377,21 +377,14 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
 def simulate_game_fast(outcomes_list, prob_cache):
     """
     Fast version of simulate_game using pre-computed probabilities.
-    
-    Args:
-        outcomes_list (list): List of batting outcomes (cleaned)
-        prob_cache (dict): Pre-computed probabilities for batted balls
-        
-    Returns:
-        int: Total runs scored in the simulated game
     """
     outs = 0
     runs = 0
     bases = [False, False, False]
     
-    # Use numpy for faster random selection
+    # Use numpy for faster random sampling WITHOUT replacement
     n_outcomes = len(outcomes_list)
-    indices = np.random.randint(0, n_outcomes, size=n_outcomes)
+    indices = np.random.permutation(n_outcomes)  # Shuffle indices
     
     for idx in indices:
         if outs == 3:
