@@ -363,14 +363,14 @@ def create_enhanced_cell_styles(table, df, team_color_map):
         
         # Base cell styling
         if row == 0:  # Header row
-            cell.set_height(0.08)
+            cell.set_height(0.06)  # Reduced from 0.08
             cell.set_text_props(weight='bold', fontsize=14)
             cell.set_facecolor('#2C3E50')
             cell.get_text().set_color('white')
             cell.set_edgecolor('#1A252F')
             cell.set_linewidth(2)
         else:  # Data rows
-            cell.set_height(0.075)
+            cell.set_height(0.055)  # Reduced from 0.075
             cell.set_text_props(fontsize=13)
             cell.set_edgecolor('#E0E0E0')
             cell.set_linewidth(0.5)
@@ -450,12 +450,12 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     team_color_map = dict(zip(df['Team'], df['team_color']))
     df = prepare_table_data(df)
     
-    # Create figure with adjusted proportions for 15 rows
-    fig = plt.figure(figsize=(18, 14), dpi=150)
+    # Create figure with wider, less tall proportions
+    fig = plt.figure(figsize=(20, 10), dpi=150)
     
-    # Add subplot with specific position to leave room for title
+    # Add subplot with more space at top for titles
     ax = fig.add_subplot(111)
-    ax.set_position([0.05, 0.05, 0.9, 0.80])  # [left, bottom, width, height]
+    ax.set_position([0.05, 0.08, 0.9, 0.72])  # [left, bottom, width, height] - reduced height to 72%
     ax.axis('off')
     
     # Create table
@@ -468,34 +468,34 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Apply enhanced styling
     create_enhanced_cell_styles(table, df, team_color_map)
     
-    # Scale table
+    # Scale table with adjusted scaling
     table.auto_set_font_size(False)
-    table.scale(1, 1.8)
+    table.scale(1.1, 1.5)  # Reduced height scaling from 2.0 to 1.5
     
-    # Enhanced title with better formatting
+    # Enhanced title with better spacing
     title_lines = [
         f"Top 15 Batted Balls by Estimated Total Bases",
         f"{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}",
         f"Win Probability: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%"
     ]
     
-    # Main title
-    plt.text(0.5, 0.97, title_lines[0], transform=fig.transFigure,
+    # Main title - moved down slightly
+    plt.text(0.5, 0.94, title_lines[0], transform=fig.transFigure,
              fontsize=22, fontweight='bold', ha='center', va='top')
     
     # Subtitle lines
-    plt.text(0.5, 0.93, title_lines[1], transform=fig.transFigure,
+    plt.text(0.5, 0.88, title_lines[1], transform=fig.transFigure,
              fontsize=16, ha='center', va='top', color='#333333')
     
-    plt.text(0.5, 0.89, title_lines[2], transform=fig.transFigure,
+    plt.text(0.5, 0.84, title_lines[2], transform=fig.transFigure,
              fontsize=14, ha='center', va='top', color='#666666')
     
-    # Attribution - moved to top left
-    plt.text(0.02, 0.98, 'Data: MLB', 
+    # Attribution - adjusted position to avoid overlap
+    plt.text(0.02, 0.96, 'Data: MLB', 
              transform=fig.transFigure, fontsize=12, 
              ha='left', va='top', color='#999999')
     
-    plt.text(0.02, 0.96, 'By: @mlb_simulator', 
+    plt.text(0.02, 0.93, 'By: @mlb_simulator', 
              transform=fig.transFigure, fontsize=12, 
              ha='left', va='top', color='#999999')
     
