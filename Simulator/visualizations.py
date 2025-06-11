@@ -407,7 +407,6 @@ def create_enhanced_cell_styles(table, df, team_color_map):
         bases_cell = table[(row, bases_col)]
         
         # Create gradient from light yellow to dark orange/red
-        import matplotlib.pyplot as plt
         norm = plt.Normalize(0, 4)
         cmap = plt.cm.YlOrRd
         color = cmap(norm(bases_value))
@@ -452,10 +451,14 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     df = prepare_table_data(df)
     
     # Create figure with adjusted proportions for 15 rows
-    fig, ax = plt.subplots(figsize=(18, 13), dpi=150)
+    fig = plt.figure(figsize=(18, 14), dpi=150)
+    
+    # Add subplot with specific position to leave room for title
+    ax = fig.add_subplot(111)
+    ax.set_position([0.05, 0.05, 0.9, 0.80])  # [left, bottom, width, height]
     ax.axis('off')
     
-    # Create table with better spacing - position lower to avoid title overlap
+    # Create table
     table = ax.table(cellText=df.values,
                     colLabels=df.columns,
                     loc='center',
@@ -465,15 +468,9 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Apply enhanced styling
     create_enhanced_cell_styles(table, df, team_color_map)
     
-    # Adjust table position to make room for title - move down more
+    # Scale table
     table.auto_set_font_size(False)
-    table.scale(1, 1.5)
-    
-    # Position table lower on the page
-    import matplotlib.transforms as transforms
-    pos = table.get_bbox().get_points()
-    new_pos = pos + [0, -0.08]  # Move table down
-    table.set_bbox(transforms.Bbox(new_pos))
+    table.scale(1, 1.8)
     
     # Enhanced title with better formatting
     title_lines = [
@@ -490,7 +487,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.text(0.5, 0.93, title_lines[1], transform=fig.transFigure,
              fontsize=16, ha='center', va='top', color='#333333')
     
-    plt.text(0.5, 0.90, title_lines[2], transform=fig.transFigure,
+    plt.text(0.5, 0.89, title_lines[2], transform=fig.transFigure,
              fontsize=14, ha='center', va='top', color='#666666')
     
     # Attribution - moved to top left
@@ -503,7 +500,6 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
              ha='left', va='top', color='#999999')
     
     # Save with high quality
-    plt.tight_layout()
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'
     plt.savefig(os.path.join(images_dir, filename), 
