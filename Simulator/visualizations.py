@@ -497,7 +497,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
              transform=fig.transFigure, fontsize=12, 
              ha='left', va='top', color='#999999')
     
-    plt.text(0.02, 0.95, 'By: @mlb_simulator', 
+    plt.text(0.075, 0.92, 'By: @mlb_simulator', 
              transform=fig.transFigure, fontsize=12, 
              ha='left', va='top', color='#999999')
     
