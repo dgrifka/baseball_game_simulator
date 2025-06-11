@@ -438,6 +438,7 @@ def create_enhanced_cell_styles(table, df, team_color_map):
         elif xba_value >= 0.300:
             xba_cell.get_text().set_color('#1565C0')
 
+
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score,
                                away_win_percentage, home_win_percentage, formatted_date, images_dir):
     """Creates enhanced table visualization of estimated bases statistics."""
@@ -480,21 +481,25 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
         f"Win Probability: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%"
     ]
     
-    # Main title - moved up from 0.94 to 0.90
-    plt.text(0.5, 0.90, title_lines[0], transform=fig.transFigure,
+    # Main title - moved higher to 0.94
+    plt.text(0.5, 0.94, title_lines[0], transform=fig.transFigure,
              fontsize=22, fontweight='bold', ha='center', va='top')
     
-    # Subtitle lines - moved up
-    plt.text(0.5, 0.84, title_lines[1], transform=fig.transFigure,
+    # Subtitle lines - moved higher
+    plt.text(0.5, 0.88, title_lines[1], transform=fig.transFigure,
              fontsize=16, ha='center', va='top', color='#333333')
     
-    plt.text(0.5, 0.80, title_lines[2], transform=fig.transFigure,
+    plt.text(0.5, 0.84, title_lines[2], transform=fig.transFigure,
              fontsize=14, ha='center', va='top', color='#666666')
     
-    # Attribution - moved to bottom left corner to avoid any overlap
-    plt.text(0.02, 0.02, 'Data: MLB\nBy: @mlb_simulator', 
+    # Attribution - back to top left corner
+    plt.text(0.02, 0.98, 'Data: MLB', 
              transform=fig.transFigure, fontsize=12, 
-             ha='left', va='bottom', color='#999999')
+             ha='left', va='top', color='#999999')
+    
+    plt.text(0.02, 0.95, 'By: @mlb_simulator', 
+             transform=fig.transFigure, fontsize=12, 
+             ha='left', va='top', color='#999999')
     
     # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
