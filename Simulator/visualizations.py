@@ -301,103 +301,207 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.close()
 
 
+def prepare_table_data(df):
+    """Prepare and format data for the table display."""
+    df = df.copy()
+    
+    # Add rank column
+    df.insert(0, 'Rank', range(1, len(df) + 1))
+    
+    # Format player names - keep on single line for cleaner look
+    df['Player'] = df['Player'].apply(lambda x: x.split()[0][0] + '. ' + ' '.join(x.split()[1:]))
+    
+    # Format Result column
+    df['Result'] = df['Result'].str.replace('_', ' ').str.title()
+    
+    # Create xBA (expected batting average) from hit probabilities
+    df['xBA'] = ((df['Single Prob'].str.rstrip('%').astype(float) + 
+                  df['Double Prob'].str.rstrip('%').astype(float) + 
+                  df['Triple Prob'].str.rstrip('%').astype(float) + 
+                  df['Hr Prob'].str.rstrip('%').astype(float)) / 100).round(3)
+    df['xBA'] = df['xBA'].apply(lambda x: f'.{str(int(x*1000)).zfill(3)}')
+    
+    # Simplify probability columns - keep only HR probability as it's most impactful
+    df['HR%'] = df['Hr Prob']
+    
+    # Select and reorder columns for clarity
+    columns_to_keep = ['Rank', 'Team', 'Player', 'Launch Speed', 'Launch Angle', 
+                       'Result', 'Estimated Bases', 'xBA', 'HR%']
+    df = df[columns_to_keep]
+    
+    # Format launch angle to include degree symbol
+    df['Launch Angle'] = df['Launch Angle'].astype(str) + '°'
+    
+    # Format launch speed
+    df['Launch Speed'] = df['Launch Speed'].astype(str) + ' mph'
+    
+    # Round estimated bases to 2 decimals
+    df['Estimated Bases'] = df['Estimated Bases'].round(2)
+    
+    return df
+
+def create_enhanced_cell_styles(table, df, team_color_map):
+    """Apply enhanced styling to table cells."""
+    
+    # Column indices
+    rank_col = 0
+    team_col = 1
+    player_col = 2
+    bases_col = df.columns.get_loc('Estimated Bases')
+    result_col = df.columns.get_loc('Result')
+    xba_col = df.columns.get_loc('xBA')
+    hr_col = df.columns.get_loc('HR%')
+    
+    # Helper function for color brightness
+    def is_dark_color(color):
+        from matplotlib.colors import to_rgb
+        r, g, b = to_rgb(color)
+        return (r * 0.299 + g * 0.587 + b * 0.114) < 0.5
+    
+    # Style all cells
+    for (row, col), cell in table.get_celld().items():
+        
+        # Base cell styling
+        if row == 0:  # Header row
+            cell.set_height(0.06)  # Reduced from 0.08
+            cell.set_text_props(weight='bold', fontsize=14)
+            cell.set_facecolor('#2C3E50')
+            cell.get_text().set_color('white')
+            cell.set_edgecolor('#1A252F')
+            cell.set_linewidth(2)
+        else:  # Data rows
+            cell.set_height(0.055)  # Reduced from 0.075
+            cell.set_text_props(fontsize=13)
+            cell.set_edgecolor('#E0E0E0')
+            cell.set_linewidth(0.5)
+            
+            # Alternating row colors for better readability
+            if row % 2 == 0:
+                cell.set_facecolor('#F8F9FA')
+            else:
+                cell.set_facecolor('#FFFFFF')
+    
+    # Apply special formatting
+    for row in range(1, len(df) + 1):
+        
+        # Rank column - bold and centered
+        rank_cell = table[(row, rank_col)]
+        rank_cell.get_text().set_weight('bold')
+        rank_cell.get_text().set_fontsize(14)
+        
+        # Team colors
+        team = df.iloc[row-1]['Team']
+        team_cell = table[(row, team_col)]
+        color = team_color_map[team]
+        team_cell.set_facecolor(color)
+        if is_dark_color(color):
+            team_cell.get_text().set_color('white')
+        team_cell.get_text().set_weight('bold')
+        
+        # Player names - slightly larger
+        player_cell = table[(row, player_col)]
+        player_cell.get_text().set_fontsize(13.5)
+        
+        # Estimated bases - gradient coloring
+        bases_value = df.iloc[row-1]['Estimated Bases']
+        bases_cell = table[(row, bases_col)]
+        
+        # Create gradient from light yellow to dark orange/red
+        norm = plt.Normalize(0, 4)
+        cmap = plt.cm.YlOrRd
+        color = cmap(norm(bases_value))
+        bases_cell.set_facecolor(color)
+        bases_cell.get_text().set_weight('bold')
+        bases_cell.get_text().set_fontsize(14)
+        if bases_value > 2.5:
+            bases_cell.get_text().set_color('white')
+        
+        # Result column - color coding
+        result = df.iloc[row-1]['Result']
+        result_cell = table[(row, result_col)]
+        if result == 'Out':
+            result_cell.set_facecolor('#FFE5E5')
+            result_cell.get_text().set_color('#D32F2F')
+        elif result == 'Home Run':
+            result_cell.set_facecolor('#E8F5E9')
+            result_cell.get_text().set_color('#2E7D32')
+        elif result in ['Single', 'Double', 'Triple']:
+            result_cell.set_facecolor('#E3F2FD')
+            result_cell.get_text().set_color('#1565C0')
+        
+        # xBA column - highlight high values
+        xba_value = float(df.iloc[row-1]['xBA'])
+        xba_cell = table[(row, xba_col)]
+        if xba_value >= 0.500:
+            xba_cell.get_text().set_weight('bold')
+            xba_cell.get_text().set_color('#2E7D32')
+        elif xba_value >= 0.300:
+            xba_cell.get_text().set_color('#1565C0')
+
+
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score,
                                away_win_percentage, home_win_percentage, formatted_date, images_dir):
     """Creates enhanced table visualization of estimated bases statistics."""
     
-    plt.style.use('seaborn-v0_8')
-    fig, ax = plt.subplots(figsize=(16, 9), dpi=150)
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.close('all')
+    
+    # Prepare data - take top 15 instead of top 10
+    df = df.copy().head(15)
+    team_color_map = dict(zip(df['Team'], df['team_color']))
+    df = prepare_table_data(df)
+    
+    # Create figure with wider, less tall proportions
+    fig = plt.figure(figsize=(20, 10), dpi=150)
+    
+    # Add subplot with more space at top for titles
+    # Reduced height from 0.72 to 0.65 and moved down from 0.08 to 0.05
+    ax = fig.add_subplot(111)
+    ax.set_position([0.05, 0.05, 0.9, 0.65])  # [left, bottom, width, height]
     ax.axis('off')
     
-    # Preprocess DataFrame
-    df = df.copy()
-    df['Player'] = df['Player'].str.replace(' ', '\n', n=1)
-    df['Result'] = df['Result'].str.replace('_', ' ')
-    
-    # Color mappings
-    team_color_map = dict(zip(df['Team'], df['team_color']))
-    df = df.drop('team_color', axis=1)
-    
-    # Format column headers with line breaks
-    df.columns = df.columns.str.replace(' ', '\n')
-    
-    # Create table with adjusted dimensions
-    col_width = 1.0 / len(df.columns)
+    # Create table
     table = ax.table(cellText=df.values,
                     colLabels=df.columns,
                     loc='center',
                     cellLoc='center',
-                    colWidths=[col_width] * len(df.columns))
+                    colWidths=[0.06, 0.08, 0.15, 0.12, 0.12, 0.10, 0.14, 0.08, 0.08])
     
-    # Enhanced cell formatting
-    for (row, col), cell in table.get_celld().items():
-        cell.set_height(0.085)  # Slightly reduced height
-        
-        # Header formatting
-        if row == 0:
-            cell.set_text_props(weight='bold', fontsize=11)
-            cell.set_facecolor('#F0F0F0')
-        else:
-            cell.set_text_props(fontsize=10)
-            
-        # Add subtle borders
-        cell.set_edgecolor('#CCCCCC')
-        cell.set_linewidth(0.5)
+    # Apply enhanced styling
+    create_enhanced_cell_styles(table, df, team_color_map)
     
-    # Helper function for color brightness
-    def is_dark_color(color):
-        r, g, b = to_rgb(color)
-        return (r * 0.299 + g * 0.587 + b * 0.114) < 0.5
+    # Scale table with adjusted scaling
+    table.auto_set_font_size(False)
+    table.scale(1.1, 1.5)  # Reduced height scaling from 2.0 to 1.5
     
-    # Column indices
-    team_col = df.columns.get_loc('Team')
-    bases_col = df.columns.get_loc('Estimated\nBases')
-    result_col = df.columns.get_loc('Result')
+    # Enhanced title with better spacing - moved all text elements up
+    title_lines = [
+        f"Top 15 Batted Balls by Estimated Total Bases",
+        f"{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}",
+        f"Win Probability: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%"
+    ]
     
-    # Apply team colors
-    for row in range(1, len(df) + 1):
-        team = df.iloc[row-1]['Team']
-        cell = table[(row, team_col)]
-        color = team_color_map[team]
-        cell.set_facecolor(color)
-        if is_dark_color(color):
-            cell.get_text().set_color('white')
+    # Main title - moved higher to 0.94
+    plt.text(0.5, 0.94, title_lines[0], transform=fig.transFigure,
+             fontsize=22, fontweight='bold', ha='center', va='top')
     
-    # Enhanced bases heatmap
-    values = df['Estimated\nBases'].values
-    norm = plt.Normalize(min(values), max(values))
-    cmap = plt.cm.YlOrRd
+    # Subtitle lines - moved higher
+    plt.text(0.5, 0.88, title_lines[1], transform=fig.transFigure,
+             fontsize=16, ha='center', va='top', color='#333333')
     
-    for row in range(1, len(df) + 1):
-        cell = table[(row, bases_col)]
-        color = list(cmap(norm(values[row-1])))
-        color[3] = 0.7  # Adjust transparency
-        cell.set_facecolor(color)
-        if norm(values[row-1]) > 0.6:
-            cell.get_text().set_color('white')
+    plt.text(0.5, 0.84, title_lines[2], transform=fig.transFigure,
+             fontsize=14, ha='center', va='top', color='#666666')
     
-    # Highlight results
-    for row in range(1, len(df) + 1):
-        if df.iloc[row-1]['Result'] == 'Out':
-            cell = table[(row, result_col)]
-            cell.set_facecolor('#FFB6C1')
-            cell.set_alpha(0.3)
+    # Attribution - back to top left corner
+    plt.text(0.1, 0.92, 'Data: MLB', 
+             transform=fig.transFigure, fontsize=13, 
+             ha='left', va='top', color='#999999')
     
-    # Enhanced title and metadata
-    title = (f'Top 10 Estimated Bases\n'
-            f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
-            f'Deserve-to-Win %: {away_team} {away_win_percentage:.0f}% - '
-            f'{home_team} {home_win_percentage:.0f}%')
-    
-    plt.title(title, fontsize=14, loc='left', pad=9, fontweight='bold')
-    
-    # Right-aligned metadata
-    plt.text(0.99, 1.015, 'Data: MLB    By: @mlb_simulator', 
-             transform=ax.transAxes, fontsize=12, 
-             ha='right', va='top')
+    plt.text(0.1, 0.9, 'By: @mlb_simulator', 
+             transform=fig.transFigure, fontsize=13, 
+             ha='left', va='top', color='#999999')
     
     # Save with high quality
-    plt.tight_layout()
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'
     plt.savefig(os.path.join(images_dir, filename), 

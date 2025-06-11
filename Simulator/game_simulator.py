@@ -169,7 +169,7 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
     total_team_outcomes.columns = total_team_outcomes.columns.str.replace('_', ' ').str.title()
     total_team_outcomes = total_team_outcomes.rename(columns={'Original Event Type': 'Result', 'Full Name': 'Player'})
     total_team_outcomes['team_color'] = total_team_outcomes['Team'].map({team: colors[0] for team, colors in team_colors.items()})
-    return total_team_outcomes.sort_values(by='Estimated Bases', ascending=False).head(10)
+    return total_team_outcomes.sort_values(by='Estimated Bases', ascending=False).head(15)
 
 def attempt_steal(bases):
     """
