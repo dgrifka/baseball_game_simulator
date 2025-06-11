@@ -493,12 +493,12 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
              fontsize=14, ha='center', va='top', color='#666666')
     
     # Attribution - back to top left corner
-    plt.text(0.02, 0.98, 'Data: MLB', 
-             transform=fig.transFigure, fontsize=12, 
+    plt.text(0.1, 0.92, 'Data: MLB', 
+             transform=fig.transFigure, fontsize=13, 
              ha='left', va='top', color='#999999')
     
-    plt.text(0.075, 0.92, 'By: @mlb_simulator', 
-             transform=fig.transFigure, fontsize=12, 
+    plt.text(0.1, 0.9, 'By: @mlb_simulator', 
+             transform=fig.transFigure, fontsize=13, 
              ha='left', va='top', color='#999999')
     
     # Save with high quality
