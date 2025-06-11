@@ -301,7 +301,6 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.close()
 
 
-
 def prepare_table_data(df):
     """Prepare and format data for the table display."""
     df = df.copy()
