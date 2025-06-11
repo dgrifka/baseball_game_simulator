@@ -300,6 +300,8 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
     plt.close()
 
+
+
 def prepare_table_data(df):
     """Prepare and format data for the table display."""
     df = df.copy()
@@ -437,15 +439,6 @@ def create_enhanced_cell_styles(table, df, team_color_map):
             xba_cell.get_text().set_color('#2E7D32')
         elif xba_value >= 0.300:
             xba_cell.get_text().set_color('#1565C0')
-        
-        # HR% column - highlight high percentages
-        hr_pct = int(df.iloc[row-1]['HR%'].rstrip('%'))
-        hr_cell = table[(row, hr_col)]
-        if hr_pct >= 50:
-            hr_cell.get_text().set_weight('bold')
-            hr_cell.get_text().set_color('#D32F2F')
-        elif hr_pct >= 25:
-            hr_cell.get_text().set_color('#F57C00')
 
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score,
                                away_win_percentage, home_win_percentage, formatted_date, images_dir):
@@ -454,16 +447,16 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.close('all')
     
-    # Prepare data
-    df = df.copy()
+    # Prepare data - take top 15 instead of top 10
+    df = df.copy().head(15)
     team_color_map = dict(zip(df['Team'], df['team_color']))
     df = prepare_table_data(df)
     
-    # Create figure with better proportions
-    fig, ax = plt.subplots(figsize=(18, 11), dpi=150)
+    # Create figure with adjusted proportions for 15 rows
+    fig, ax = plt.subplots(figsize=(18, 13), dpi=150)
     ax.axis('off')
     
-    # Create table with better spacing
+    # Create table with better spacing - position lower to avoid title overlap
     table = ax.table(cellText=df.values,
                     colLabels=df.columns,
                     loc='center',
@@ -473,13 +466,19 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Apply enhanced styling
     create_enhanced_cell_styles(table, df, team_color_map)
     
-    # Adjust table position to make room for title
+    # Adjust table position to make room for title - move down more
     table.auto_set_font_size(False)
-    table.scale(1, 1.8)
+    table.scale(1, 1.5)
+    
+    # Position table lower on the page
+    import matplotlib.transforms as transforms
+    pos = table.get_bbox().get_points()
+    new_pos = pos + [0, -0.08]  # Move table down
+    table.set_bbox(transforms.Bbox(new_pos))
     
     # Enhanced title with better formatting
     title_lines = [
-        f"Top 10 Batted Balls by Estimated Total Bases",
+        f"Top 15 Batted Balls by Estimated Total Bases",
         f"{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}",
         f"Win Probability: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%"
     ]
@@ -495,16 +494,14 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.text(0.5, 0.90, title_lines[2], transform=fig.transFigure,
              fontsize=14, ha='center', va='top', color='#666666')
     
-    # Add legend for xBA and HR%
-    legend_text = "xBA = Expected Batting Average  •  HR% = Home Run Probability"
-    plt.text(0.5, 0.08, legend_text, transform=fig.transFigure,
-             fontsize=12, ha='center', va='bottom', color='#666666',
-             style='italic')
-    
-    # Attribution
-    plt.text(0.98, 0.02, 'Data: MLB  •  By: @mlb_simulator', 
+    # Attribution - moved to top left
+    plt.text(0.02, 0.98, 'Data: MLB', 
              transform=fig.transFigure, fontsize=12, 
-             ha='right', va='bottom', color='#999999')
+             ha='left', va='top', color='#999999')
+    
+    plt.text(0.02, 0.96, 'By: @mlb_simulator', 
+             transform=fig.transFigure, fontsize=12, 
+             ha='left', va='top', color='#999999')
     
     # Save with high quality
     plt.tight_layout()
