@@ -158,8 +158,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         
         if logo_url:
             for x, y in zip(data['ev'], data['la']):
-                img = getImage(logo_url, zoom=0.5 if team == 'home' else 0.465,
-                             alpha=0.825 if team == 'home' else 0.795)
+                img = getImage(logo_url, zoom=0.65 if team == 'home' else 0.635,
+                             alpha=0.8 if team == 'home' else 0.785)
                 if img:
                     ab = AnnotationBbox(img, (x, y), frameon=False)
                     plt.gca().add_artist(ab)
