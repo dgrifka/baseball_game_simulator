@@ -121,8 +121,12 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         outcomes[team]['ev'] = [temp_ev[i] for i in filtered_indices]
         outcomes[team]['la'] = [temp_la[i] for i in filtered_indices]
     
-    # Create figure with optimized layout
-    fig, ax = plt.subplots(figsize=(12, 8), dpi=150, constrained_layout=True)
+    # Create figure with space for title
+    fig = plt.figure(figsize=(12, 8), dpi=150)
+    
+    # Add subplot with more space at top for titles (similar to table function)
+    ax = fig.add_subplot(111)
+    ax.set_position([0.05, 0.05, 0.9, 0.75])  # [left, bottom, width, height]
     
     # Set background color for cleaner look
     ax.set_facecolor('#FAFAFA')
@@ -169,16 +173,16 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Sort by exit velocity (reverse order so faster hits are drawn first)
     all_points.sort(key=lambda p: p[0], reverse=True)
     
-    # Plot team logos with improved layering
+    # Plot team logos with larger size and more alpha
     for x, y, team, team_name in all_points:
         logo_url = get_team_logo(team_name, mlb_team_logos)
         if logo_url:
-            # Adjust logo size based on exit velocity for visual depth
-            size_factor = 0.5 if team == 'home' else 0.465
+            # Increased size and alpha for better visibility
+            size_factor = 0.6 if team == 'home' else 0.575
             size_adjust = 1 + (x - 80) / 200  # Subtle size variation
             
             img = getImage(logo_url, zoom=size_factor * size_adjust,
-                         alpha=0.85 if team == 'home' else 0.82)
+                         alpha=0.95 if team == 'home' else 0.92)
             if img:
                 ab = AnnotationBbox(img, (x, y), frameon=False, zorder=100)
                 ax.add_artist(ab)
@@ -190,43 +194,73 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Zero line with better styling
     ax.axhline(y=0, color='#333333', alpha=0.8, linewidth=1.2, linestyle='--', zorder=50)
     
-    # Walks/HBP/SB section with improved box styling
-    walks_box = Rectangle((0.02, 0.82), 0.22, 0.16, transform=ax.transAxes,
-                         facecolor='white', edgecolor='#CCCCCC', alpha=0.9,
-                         linewidth=1, zorder=200)
-    ax.add_patch(walks_box)
+    # Non-batted ball events section with improved layout
+    # Create two columns for better organization
+    col1_x = 0.03
+    col2_x = 0.13
+    header_y = 0.95
     
-    ax.text(0.03, 0.95, 'Walks/HBP/SB', transform=ax.transAxes, 
-            fontsize=16, fontweight='bold', verticalalignment='top', zorder=201)
-    ax.text(0.03, 0.90, f'{away_team}: {outcomes["away"]["walks"] + outcomes["away"]["stolen_base"]}', 
-            transform=ax.transAxes, fontsize=14, verticalalignment='top', zorder=201)
-    ax.text(0.03, 0.85, f'{home_team}: {outcomes["home"]["walks"] + outcomes["home"]["stolen_base"]}', 
-            transform=ax.transAxes, fontsize=14, verticalalignment='top', zorder=201)
+    # Headers
+    ax.text(col1_x, header_y, 'BB/HBP', transform=ax.transAxes, 
+            fontsize=14, fontweight='bold', verticalalignment='top', color='#2C3E50')
+    ax.text(col2_x, header_y, 'SB/CS', transform=ax.transAxes, 
+            fontsize=14, fontweight='bold', verticalalignment='top', color='#2C3E50')
     
-    # Enhanced metadata with subtle background
-    metadata_text = 'Data: MLB\nBy: @mlb_simulator'
-    ax.text(0.02, 0.02, metadata_text, transform=ax.transAxes, 
+    # Team data with visual separation
+    team_y_start = 0.90
+    
+    # Away team
+    ax.text(col1_x, team_y_start, f'{away_team}:', transform=ax.transAxes, 
+            fontsize=12, fontweight='600', verticalalignment='top', color='#444444')
+    ax.text(col1_x + 0.04, team_y_start, f'{outcomes["away"]["walks"]}', transform=ax.transAxes, 
+            fontsize=13, verticalalignment='top', color='#666666')
+    ax.text(col2_x, team_y_start, f'{outcomes["away"]["stolen_base"]}', transform=ax.transAxes, 
+            fontsize=13, verticalalignment='top', color='#666666')
+    
+    # Home team
+    ax.text(col1_x, team_y_start - 0.04, f'{home_team}:', transform=ax.transAxes, 
+            fontsize=12, fontweight='600', verticalalignment='top', color='#444444')
+    ax.text(col1_x + 0.04, team_y_start - 0.04, f'{outcomes["home"]["walks"]}', transform=ax.transAxes, 
+            fontsize=13, verticalalignment='top', color='#666666')
+    ax.text(col2_x, team_y_start - 0.04, f'{outcomes["home"]["stolen_base"]}', transform=ax.transAxes, 
+            fontsize=13, verticalalignment='top', color='#666666')
+    
+    # Add subtle separator line
+    ax.plot([col1_x - 0.01, col2_x + 0.04], [header_y - 0.02, header_y - 0.02], 
+            transform=ax.transAxes, color='#CCCCCC', linewidth=1, alpha=0.5)
+    
+    # Enhanced metadata (moved to match table style)
+    ax.text(0.02, 0.02, 'Data: MLB\nBy: @mlb_simulator', transform=ax.transAxes, 
             fontsize=11, color='#666666', ha='left', va='bottom',
             bbox=dict(boxstyle="round,pad=0.3", facecolor='white', 
                      edgecolor='none', alpha=0.7))
     
-    # Improved labels and title
+    # Improved labels
     ax.set_xlabel('Exit Velocity (mph)', fontsize=16, labelpad=10, color='#333333')
     ax.set_ylabel('Launch Angle', fontsize=16, labelpad=10, color='#333333')
     
-    # Title with better line spacing
-    title_lines = [
-        'Batted Ball Exit Velo / Launch Angle by Team',
-        f'Actual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}  ({formatted_date})',
-        f'Deserve-to-Win: {away_team} {percentages["away"]}%, {home_team} {percentages["home"]}%, Tie {percentages["tie"]}%'
-    ]
+    # Title styling similar to estimated bases table
+    # Main title
+    plt.text(0.5, 0.94, 'Batted Ball Exit Velo / Launch Angle by Team', 
+             transform=fig.transFigure, fontsize=22, fontweight='bold', 
+             ha='center', va='top')
     
-    ax.text(0, 1.12, title_lines[0], transform=ax.transAxes, fontsize=18, 
-            fontweight='bold', va='bottom')
-    ax.text(0, 1.06, title_lines[1], transform=ax.transAxes, fontsize=14, 
-            va='bottom', color='#444444')
-    ax.text(0, 1.01, title_lines[2], transform=ax.transAxes, fontsize=14, 
-            va='bottom', color='#444444')
+    # First subtitle
+    plt.text(0.5, 0.88, f'{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}', 
+             transform=fig.transFigure, fontsize=16, ha='center', va='top', color='#333333')
+    
+    # Second subtitle
+    plt.text(0.5, 0.84, f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} {percentages["home"]}%, Tie {percentages["tie"]}%', 
+             transform=fig.transFigure, fontsize=14, ha='center', va='top', color='#666666')
+    
+    # Attribution in top left (matching table style)
+    plt.text(0.1, 0.92, 'Data: MLB', 
+             transform=fig.transFigure, fontsize=17, 
+             ha='left', va='top', color='#999999')
+    
+    plt.text(0.1, 0.895, 'By: @mlb_simulator', 
+             transform=fig.transFigure, fontsize=17, 
+             ha='left', va='top', color='#999999')
     
     # Enhanced tick formatting
     ax.tick_params(axis='both', which='major', labelsize=13, length=6, width=1, 
