@@ -211,6 +211,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=350)
     plt.close(fig)
 
+
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
              formatted_date, images_dir="images"):
@@ -237,74 +238,37 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
                 for team, mode in modes.items()}
     
     # Create figure with improved resolution
-    fig, ax = plt.subplots(figsize=(12, 8), dpi=150)
+    plt.figure(figsize=(12, 8), dpi=150)
     
     # Set up bins and colors
     max_runs = max(max(home_runs_scored), max(away_runs_scored))
-    bins = np.arange(max_runs + 2) - 0.5  # Center bins on integers
+    bins = range(max_runs + 2)
     
     # Custom colors with better contrast
     home_color = team_colors[home_team][0]
     away_color = team_colors[away_team][0]
     
-    # Calculate histogram data first to get heights
-    away_counts, _ = np.histogram(away_runs_scored, bins=bins)
-    home_counts, _ = np.histogram(home_runs_scored, bins=bins)
-    
-    # Create x positions with slight offset for side-by-side bars
-    x = np.arange(max_runs + 1)
-    width = 0.4  # Width of bars
-    
-    # Create bars with enhanced styling
-    away_bars = ax.bar(x - width/2, away_counts, width, 
-                       alpha=0.85, label=away_team,
-                       color=away_color, edgecolor='white',
-                       linewidth=2.5, zorder=3)
-    
-    home_bars = ax.bar(x + width/2, home_counts, width,
-                       alpha=0.85, label=home_team,
-                       color=home_color, edgecolor='white',
-                       linewidth=2.5, zorder=3)
-    
-    # Add subtle bar value labels for bars with significant counts
-    def add_value_labels(bars, counts):
-        for bar, count in zip(bars, counts):
-            if count > num_simulations * 0.01:  # Only show if >1% of simulations
-                height = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2., height + max(away_counts.max(), home_counts.max()) * 0.01,
-                       f'{int(count)}', ha='center', va='bottom', fontsize=10, 
-                       color='#333333', fontweight='bold')
-    
-    add_value_labels(away_bars, away_counts)
-    add_value_labels(home_bars, home_counts)
-    
-    # Add mean lines with subtle styling
-    away_mean = np.mean(away_runs_scored)
-    home_mean = np.mean(home_runs_scored)
-    
-    ax.axvline(away_mean, color=away_color, linestyle='--', linewidth=2, alpha=0.5, 
-               label=f'{away_team} avg: {away_mean:.1f}')
-    ax.axvline(home_mean, color=home_color, linestyle='--', linewidth=2, alpha=0.5,
-               label=f'{home_team} avg: {home_mean:.1f}')
-    
-    # Enhanced grid styling
-    ax.grid(True, axis='y', alpha=0.3, linestyle='-', linewidth=0.5)
-    ax.set_axisbelow(True)
-    
+    # Create histograms with enhanced styling
+    for runs, team, color, pattern in [
+        (home_runs_scored, home_team, home_color, '//'),
+        (away_runs_scored, away_team, away_color, '\\')
+    ]:
+        plt.hist(runs, bins=bins, alpha=0.75, label=team,
+                color=color, edgecolor='black',
+                linewidth=1.2, hatch=pattern)
+
     # Enhanced axis formatting
-    ax.set_xticks(x)
-    ax.set_xticklabels(x, fontsize=12)
+    ax = plt.gca()
+    ax.set_xticks(np.arange(max_runs + 1) + 0.5)
+    ax.set_xticklabels(range(max_runs + 1), fontsize=12)
     
-    # Set integer y-axis ticks with better spacing
-    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True, nbins=8))
+    # Set integer y-axis ticks
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     plt.yticks(fontsize=12)
     
-    # Add subtle background shading
-    ax.set_facecolor('#FAFAFA')
-    
-    # Improved labels with better spacing
-    plt.xlabel('Runs Scored', fontsize=14, labelpad=10, fontweight='bold')
-    plt.ylabel('Frequency', fontsize=14, labelpad=10, fontweight='bold')
+    # Improved labels
+    plt.xlabel('Runs Scored', fontsize=14, labelpad=10)
+    plt.ylabel('Frequency', fontsize=14, labelpad=10)
     
     # Enhanced title with better spacing
     title = (f'Distribution of Runs Scored ({num_simulations:,} Simulations)\n'
@@ -314,53 +278,26 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
             f'Most Likely Outcome: {away_team} {mode_strs["away"]} - {home_team} '
             f'{mode_strs["home"]}')
     
-    plt.title(title, fontsize=16, loc='left', pad=20, fontweight='bold')
+    plt.title(title, fontsize=16, loc='left', pad=15, fontweight='bold')
     
-    # Add a subtle box around the title
-    title_text = ax.text(0, 1.15, title, transform=ax.transAxes,
-                         fontsize=16, fontweight='bold', 
-                         bbox=dict(boxstyle='round,pad=0.8', facecolor='white', 
-                                  edgecolor='#CCCCCC', linewidth=1.5))
-    title_text.remove()  # Remove duplicate title
-    
-    # Watermark with better positioning
-    plt.text(0.01, -0.11, 'Data: MLB', transform=ax.transAxes,
+    # Larger watermark
+    plt.text(0.01, -0.09, 'Data: MLB', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='left', va='bottom')
-    plt.text(0.01, -0.14, 'By: @mlb_simulator', transform=ax.transAxes,
+    plt.text(0.01, -0.12, 'By: @mlb_simulator', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='left', va='bottom')
     
-    # Enhanced legend with better styling
-    legend = ax.legend(fontsize=12, frameon=True, framealpha=0.95,
-                      edgecolor='#CCCCCC', fancybox=True, 
-                      loc='upper right', shadow=True, 
-                      borderpad=1, columnspacing=1.5,
-                      handlelength=2, handleheight=1.5)
-    legend.get_frame().set_linewidth(1.5)
+    # Enhanced legend in top right
+    plt.legend(fontsize=12, frameon=True, framealpha=0.9,
+              edgecolor='black', fancybox=True, loc='upper right')
     
-    # Remove top and right spines for cleaner look
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_linewidth(1.5)
-    ax.spines['bottom'].set_linewidth(1.5)
-    ax.spines['left'].set_color('#CCCCCC')
-    ax.spines['bottom'].set_color('#CCCCCC')
-    
-    # Set y-axis limits with some padding
-    max_height = max(away_counts.max(), home_counts.max())
-    ax.set_ylim(0, max_height * 1.15)
-    
-    # Add subtle shadow effect to bars
-    for bar in away_bars:
-        bar.set_linewidth(1.5)
-        bar.set_edgecolor('darkgray')
-    for bar in home_bars:
-        bar.set_linewidth(1.5)
-        bar.set_edgecolor('darkgray')
+    # Clean up spines
+    for spine in ['top', 'right']:
+        plt.gca().spines[spine].set_visible(False)
     
     # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_rd.png'
-    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300, facecolor='white')
+    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
     plt.close()
 
 def prepare_table_data(df):
