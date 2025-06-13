@@ -43,7 +43,7 @@ def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
         print(f"Logo not found for {team_name}")
     return logo_url
 
-def getImage(path, zoom=0.45, size=(50, 50), alpha=0.625, image_cache={}):
+def getImage(path, zoom=0.5, size=(50, 50), alpha=0.6, image_cache={}):
     """
     Processes team logo image with caching of raw image data.
     
@@ -88,7 +88,6 @@ def getImage(path, zoom=0.45, size=(50, 50), alpha=0.625, image_cache={}):
         print(f"Error loading image from {path}: {str(e)}")
         return None
         
-
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, 
                 home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, 
                 tie_percentage, mlb_team_logos, formatted_date, images_dir="images"):
@@ -159,8 +158,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         
         if logo_url:
             for x, y in zip(data['ev'], data['la']):
-                img = getImage(logo_url, zoom=0.5 if team == 'home' else 0.465,
-                             alpha=0.825 if team == 'home' else 0.795)
+                img = getImage(logo_url, zoom=0.65 if team == 'home' else 0.635,
+                             alpha=0.8 if team == 'home' else 0.785)
                 if img:
                     ab = AnnotationBbox(img, (x, y), frameon=False)
                     plt.gca().add_artist(ab)
@@ -209,9 +208,10 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
     # plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
     # plt.savefig(os.path.join(images_dir, filename), dpi=300)
-    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
+    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=350)
     plt.close(fig)
-                    
+
+
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
              formatted_date, images_dir="images"):
@@ -299,7 +299,6 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_rd.png'
     plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
     plt.close()
-
 
 def prepare_table_data(df):
     """Prepare and format data for the table display."""
@@ -494,11 +493,11 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     
     # Attribution - back to top left corner
     plt.text(0.1, 0.92, 'Data: MLB', 
-             transform=fig.transFigure, fontsize=13, 
+             transform=fig.transFigure, fontsize=17, 
              ha='left', va='top', color='#999999')
     
-    plt.text(0.1, 0.9, 'By: @mlb_simulator', 
-             transform=fig.transFigure, fontsize=13, 
+    plt.text(0.1, 0.895, 'By: @mlb_simulator', 
+             transform=fig.transFigure, fontsize=17, 
              ha='left', va='top', color='#999999')
     
     # Save with high quality
