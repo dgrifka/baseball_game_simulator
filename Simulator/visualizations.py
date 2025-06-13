@@ -43,7 +43,7 @@ def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
         print(f"Logo not found for {team_name}")
     return logo_url
 
-def getImage(path, zoom=0.45, size=(50, 50), alpha=0.625, image_cache={}):
+def getImage(path, zoom=0.5, size=(50, 50), alpha=0.6, image_cache={}):
     """
     Processes team logo image with caching of raw image data.
     
@@ -111,7 +111,11 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
                 'stolen_base': away_outcomes.count('stolen_base')}
     }
     
-    # Filter data points within axis limits for cleaner visualization
+    # for team, team_outcomes in [('home', home_outcomes), ('away', away_outcomes)]:
+    #     outcomes[team]['ev'] = [o[0] for o in team_outcomes if isinstance(o, list)]
+    #     outcomes[team]['la'] = [o[1] for o in team_outcomes if isinstance(o, list)]
+
+    # At the beginning of your function, filter out data points below your x-axis limit:
     for team, team_outcomes in [('home', home_outcomes), ('away', away_outcomes)]:
         temp_ev = [o[0] for o in team_outcomes if isinstance(o, list)]
         temp_la = [o[1] for o in team_outcomes if isinstance(o, list)]
@@ -119,180 +123,94 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         filtered_indices = [i for i, ev in enumerate(temp_ev) if 55 <= ev <= 120]
         outcomes[team]['ev'] = [temp_ev[i] for i in filtered_indices]
         outcomes[team]['la'] = [temp_la[i] for i in filtered_indices]
-    
-    # Create larger figure
-    fig = plt.figure(figsize=(16, 10), dpi=150)
-    
-    # Add subplot with more space between titles and plot
-    ax = fig.add_subplot(111)
-    ax.set_position([0.06, 0.08, 0.88, 0.68])  # [left, bottom, width, height] - lowered and made wider
-    
-    # Set background color for cleaner look
-    ax.set_facecolor('#FAFAFA')
-    fig.patch.set_facecolor('white')
+        
+    # Create figure with higher DPI for sharper rendering. Add constrained_layout instead of tight bbox_inches
+    fig = plt.figure(figsize=(12, 8), dpi=150, constrained_layout=True)
     
     # Load and process contour data with improved interpolation
     contour_data = pd.read_csv('Data/contour_data.csv').dropna()
     x, y, z = contour_data['x'].values, contour_data['y'].values, contour_data['z'].values
     
-    # Higher resolution grid for smoother contours
-    xi = np.linspace(x.min(), x.max(), 250)
-    yi = np.linspace(y.min(), y.max(), 250)
+    xi = np.linspace(x.min(), x.max(), 200)  # Increased resolution
+    yi = np.linspace(y.min(), y.max(), 200)
     X, Y = np.meshgrid(xi, yi)
     Z = griddata((x, y), z, (X, Y), method='cubic', fill_value=0)
     
-    # Improved grayscale colormap with better contrast
-    colors_list = ["#FFFFFF", "#F0F0F0", "#D8D8D8", "#BEBEBE", "#A8A8A8", "#909090", "#707070", "#505050"]
+    # Grayscale colormap
+    colors_list = ["white", "#E6E6E6", "#CCCCCC", "#B3B3B3", "#999999", "#808080", "#666666", "#4A4A4A"]
     levels = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]
     cmap = colors.LinearSegmentedColormap.from_list("custom", colors_list, N=256)
     
-    # Smooth the contour data for cleaner appearance
-    from scipy.ndimage import gaussian_filter
-    Z_smooth = gaussian_filter(np.clip(Z, 0.5, 4), sigma=1.5)
-    
     # Plot contours with improved aesthetics
-    contour = plt.contourf(X, Y, Z_smooth, levels=levels, cmap=cmap, alpha=0.85, antialiased=True)
-    contour_lines = plt.contour(X, Y, Z_smooth, levels=levels, colors='#808080', 
-                                linewidths=0.4, alpha=0.4, antialiased=True)
+    Z = np.clip(Z, 0.5, 4)
+    contour = plt.contourf(X, Y, Z, levels=levels, cmap=cmap, alpha=0.8)
+    plt.contour(X, Y, Z, levels=levels, colors='gray', linewidths=0.3, alpha=0.3)
     
-    # Enhanced colorbar with better positioning
-    cbar = plt.colorbar(contour, label='Average Total Bases', pad=0.02, aspect=15)
-    cbar.ax.tick_params(labelsize=12, length=4, width=1)
-    cbar.set_label('Average Total Bases', size=14, labelpad=12)
-    cbar.outline.set_linewidth(0.5)
-    cbar.outline.set_edgecolor('#CCCCCC')
+    # Enhanced colorbar
+    cbar = plt.colorbar(contour, label='Average Total Bases')
+    cbar.ax.tick_params(labelsize=12)
+    cbar.set_label('Average Total Bases', size=14, labelpad=15)
     
-    # Sort data points by exit velocity to layer logos better (slower hits on top)
-    all_points = []
+    # Plot team data with improved visibility
     for team, data in outcomes.items():
         team_name = home_team if team == 'home' else away_team
-        for x, y in zip(data['ev'], data['la']):
-            all_points.append((x, y, team, team_name))
-    
-    # Sort by exit velocity (reverse order so faster hits are drawn first)
-    all_points.sort(key=lambda p: p[0], reverse=True)
-    
-    # Plot team logos with larger size and more alpha
-    for x, y, team, team_name in all_points:
         logo_url = get_team_logo(team_name, mlb_team_logos)
+        
         if logo_url:
-            # Increased size and alpha for better visibility
-            size_factor = 0.6 if team == 'home' else 0.575
-            size_adjust = 1 + (x - 80) / 200  # Subtle size variation
-            
-            img = getImage(logo_url, zoom=size_factor * size_adjust,
-                         alpha=0.95 if team == 'home' else 0.92)
-            if img:
-                ab = AnnotationBbox(img, (x, y), frameon=False, zorder=100)
-                ax.add_artist(ab)
+            for x, y in zip(data['ev'], data['la']):
+                img = getImage(logo_url, zoom=0.5 if team == 'home' else 0.465,
+                             alpha=0.825 if team == 'home' else 0.795)
+                if img:
+                    ab = AnnotationBbox(img, (x, y), frameon=False)
+                    plt.gca().add_artist(ab)
     
-    # Enhanced grid styling
-    ax.grid(True, alpha=0.15, linestyle='-', linewidth=0.5, color='#CCCCCC')
-    ax.set_axisbelow(True)
+    # Enhanced formatting
+    plt.axhline(y=0, color='black', alpha=0.6, linewidth=1.0, linestyle='--')
     
-    # Zero line with better styling
-    ax.axhline(y=0, color='#333333', alpha=0.8, linewidth=1.2, linestyle='--', zorder=50)
+    # Walks/HBP/SB section with improved typography
+    plt.text(0.05, 0.95, 'Walks/HBP/SB', transform=plt.gca().transAxes, 
+             fontsize=16, fontweight='bold', verticalalignment='top')
+    plt.text(0.05, 0.90, f'{away_team}: {outcomes["away"]["walks"] + outcomes["away"]["stolen_base"]}', 
+             transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
+    plt.text(0.05, 0.85, f'{home_team}: {outcomes["home"]["walks"] + outcomes["home"]["stolen_base"]}', 
+             transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
     
-    # Non-batted ball events section with better visibility
-    # Create a semi-transparent background for better readability
-    from matplotlib.patches import Rectangle
-    bg_rect = Rectangle((0.01, 0.82), 0.20, 0.16, transform=ax.transAxes,
-                       facecolor='white', edgecolor='none', alpha=0.85, zorder=190)
-    ax.add_patch(bg_rect)
+    # Enhanced metadata with larger font
+    plt.text(0.02, 0.02, 'Data: MLB\nBy: @mlb_simulator', transform=plt.gca().transAxes, 
+             fontsize=12, color='gray', ha='left', va='bottom')
     
-    # Headers with better positioning
-    col1_x = 0.02
-    col2_x = 0.11
-    header_y = 0.96
+    # Improved labels and title
+    plt.xlabel('Exit Velocity (mph)', fontsize=16, labelpad=12)
+    plt.ylabel('Launch Angle', fontsize=16, labelpad=12)
     
-    ax.text(col1_x, header_y, 'BB/HBP', transform=ax.transAxes, 
-            fontsize=15, fontweight='bold', verticalalignment='top', 
-            color='#2C3E50', zorder=200)
-    ax.text(col2_x, header_y, 'SB/CS', transform=ax.transAxes, 
-            fontsize=15, fontweight='bold', verticalalignment='top', 
-            color='#2C3E50', zorder=200)
+    title = f'Batted Ball Exit Velo / Launch Angle by Team\n' \
+            f'Actual Score:     {away_team} {str(away_score)} - {home_team} {str(home_score)}  ({formatted_date})\n' \
+            f'Deserve-to-Win: {away_team} {percentages["away"]}%, {home_team} ' \
+            f'{percentages["home"]}%, Tie {percentages["tie"]}%'
     
-    # Add subtle separator line
-    ax.plot([col1_x - 0.005, col2_x + 0.05], [header_y - 0.02, header_y - 0.02], 
-            transform=ax.transAxes, color='#BBBBBB', linewidth=1.5, alpha=0.8, zorder=195)
-    
-    # Team data with improved visibility
-    team_y_start = 0.91
-    line_spacing = 0.05
-    
-    # Away team
-    ax.text(col1_x, team_y_start, f'{away_team}:', transform=ax.transAxes, 
-            fontsize=13, fontweight='600', verticalalignment='top', 
-            color='#333333', zorder=200)
-    ax.text(col1_x + 0.055, team_y_start, f'{outcomes["away"]["walks"]}', transform=ax.transAxes, 
-            fontsize=14, verticalalignment='top', color='#555555', zorder=200)
-    ax.text(col2_x + 0.02, team_y_start, f'{outcomes["away"]["stolen_base"]}', transform=ax.transAxes, 
-            fontsize=14, verticalalignment='top', color='#555555', zorder=200)
-    
-    # Home team
-    ax.text(col1_x, team_y_start - line_spacing, f'{home_team}:', transform=ax.transAxes, 
-            fontsize=13, fontweight='600', verticalalignment='top', 
-            color='#333333', zorder=200)
-    ax.text(col1_x + 0.055, team_y_start - line_spacing, f'{outcomes["home"]["walks"]}', transform=ax.transAxes, 
-            fontsize=14, verticalalignment='top', color='#555555', zorder=200)
-    ax.text(col2_x + 0.02, team_y_start - line_spacing, f'{outcomes["home"]["stolen_base"]}', transform=ax.transAxes, 
-            fontsize=14, verticalalignment='top', color='#555555', zorder=200)
-    
-    # Improved labels
-    ax.set_xlabel('Exit Velocity (mph)', fontsize=18, labelpad=12, color='#333333')
-    ax.set_ylabel('Launch Angle', fontsize=18, labelpad=12, color='#333333')
-    
-    # Title styling similar to estimated bases table with more spacing
-    # Main title
-    plt.text(0.5, 0.93, 'Batted Ball Exit Velo / Launch Angle by Team', 
-             transform=fig.transFigure, fontsize=24, fontweight='bold', 
-             ha='center', va='top')
-    
-    # First subtitle
-    plt.text(0.5, 0.87, f'{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}', 
-             transform=fig.transFigure, fontsize=18, ha='center', va='top', color='#333333')
-    
-    # Second subtitle
-    plt.text(0.5, 0.82, f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} {percentages["home"]}%, Tie {percentages["tie"]}%', 
-             transform=fig.transFigure, fontsize=16, ha='center', va='top', color='#666666')
-    
-    # Attribution in top left (matching table style)
-    plt.text(0.08, 0.91, 'Data: MLB', 
-             transform=fig.transFigure, fontsize=18, 
-             ha='left', va='top', color='#999999')
-    
-    plt.text(0.08, 0.885, 'By: @mlb_simulator', 
-             transform=fig.transFigure, fontsize=18, 
-             ha='left', va='top', color='#999999')
+    plt.title(title, fontsize=16, loc='left', pad=15, fontweight='bold')
     
     # Enhanced tick formatting
-    ax.tick_params(axis='both', which='major', labelsize=14, length=6, width=1, 
-                   colors='#333333', pad=8)
-    ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d°'))
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.gca().yaxis.set_major_formatter(ticker.FormatStrFormatter('%d°'))
     
-    # Clean up spines with better styling
-    for spine in ax.spines.values():
-        spine.set_edgecolor('#CCCCCC')
-        spine.set_linewidth(1)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+    # Clean up spines
+    for spine in ['top', 'right']:
+        plt.gca().spines[spine].set_visible(False)
     
-    # Set axis limits with better padding
-    ax.set_xlim(52, 122)
-    ax.set_ylim(-75, 75)
-    
-    # Add subtle axis shading for depth
-    ax.axvspan(52, 55, alpha=0.03, color='gray', zorder=0)
-    ax.axvspan(120, 122, alpha=0.03, color='gray', zorder=0)
-    ax.axhspan(-75, -70, alpha=0.03, color='gray', zorder=0)
-    ax.axhspan(70, 75, alpha=0.03, color='gray', zorder=0)
+    # Set axis limits with padding
+    plt.xlim(55, 120)
+    plt.ylim(-70, 70)
     
     # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
-    plt.savefig(os.path.join(images_dir, filename), 
-                facecolor='white', edgecolor='none', dpi=300, bbox_inches='tight')
+    # plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
+    # plt.savefig(os.path.join(images_dir, filename), dpi=300)
+    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=350)
     plt.close(fig)
+                    
                     
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
