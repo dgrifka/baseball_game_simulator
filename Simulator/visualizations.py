@@ -88,7 +88,6 @@ def getImage(path, zoom=0.45, size=(50, 50), alpha=0.625, image_cache={}):
         print(f"Error loading image from {path}: {str(e)}")
         return None
         
-
 def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_estimated_total_bases, 
                 home_team, away_team, home_score, away_score, home_win_percentage, away_win_percentage, 
                 tie_percentage, mlb_team_logos, formatted_date, images_dir="images"):
@@ -121,12 +120,12 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         outcomes[team]['ev'] = [temp_ev[i] for i in filtered_indices]
         outcomes[team]['la'] = [temp_la[i] for i in filtered_indices]
     
-    # Create figure with space for title
-    fig = plt.figure(figsize=(12, 8), dpi=150)
+    # Create larger figure
+    fig = plt.figure(figsize=(16, 10), dpi=150)
     
-    # Add subplot with more space at top for titles (similar to table function)
+    # Add subplot with more space between titles and plot
     ax = fig.add_subplot(111)
-    ax.set_position([0.05, 0.05, 0.9, 0.75])  # [left, bottom, width, height]
+    ax.set_position([0.06, 0.08, 0.88, 0.68])  # [left, bottom, width, height] - lowered and made wider
     
     # Set background color for cleaner look
     ax.set_facecolor('#FAFAFA')
@@ -194,76 +193,80 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Zero line with better styling
     ax.axhline(y=0, color='#333333', alpha=0.8, linewidth=1.2, linestyle='--', zorder=50)
     
-    # Non-batted ball events section with improved layout
-    # Create two columns for better organization
-    col1_x = 0.03
-    col2_x = 0.13
-    header_y = 0.95
+    # Non-batted ball events section with better visibility
+    # Create a semi-transparent background for better readability
+    from matplotlib.patches import Rectangle
+    bg_rect = Rectangle((0.01, 0.82), 0.20, 0.16, transform=ax.transAxes,
+                       facecolor='white', edgecolor='none', alpha=0.85, zorder=190)
+    ax.add_patch(bg_rect)
     
-    # Headers
+    # Headers with better positioning
+    col1_x = 0.02
+    col2_x = 0.11
+    header_y = 0.96
+    
     ax.text(col1_x, header_y, 'BB/HBP', transform=ax.transAxes, 
-            fontsize=14, fontweight='bold', verticalalignment='top', color='#2C3E50')
+            fontsize=15, fontweight='bold', verticalalignment='top', 
+            color='#2C3E50', zorder=200)
     ax.text(col2_x, header_y, 'SB/CS', transform=ax.transAxes, 
-            fontsize=14, fontweight='bold', verticalalignment='top', color='#2C3E50')
+            fontsize=15, fontweight='bold', verticalalignment='top', 
+            color='#2C3E50', zorder=200)
     
-    # Team data with visual separation
-    team_y_start = 0.90
+    # Add subtle separator line
+    ax.plot([col1_x - 0.005, col2_x + 0.05], [header_y - 0.02, header_y - 0.02], 
+            transform=ax.transAxes, color='#BBBBBB', linewidth=1.5, alpha=0.8, zorder=195)
+    
+    # Team data with improved visibility
+    team_y_start = 0.91
+    line_spacing = 0.05
     
     # Away team
     ax.text(col1_x, team_y_start, f'{away_team}:', transform=ax.transAxes, 
-            fontsize=12, fontweight='600', verticalalignment='top', color='#444444')
-    ax.text(col1_x + 0.04, team_y_start, f'{outcomes["away"]["walks"]}', transform=ax.transAxes, 
-            fontsize=13, verticalalignment='top', color='#666666')
-    ax.text(col2_x, team_y_start, f'{outcomes["away"]["stolen_base"]}', transform=ax.transAxes, 
-            fontsize=13, verticalalignment='top', color='#666666')
+            fontsize=13, fontweight='600', verticalalignment='top', 
+            color='#333333', zorder=200)
+    ax.text(col1_x + 0.055, team_y_start, f'{outcomes["away"]["walks"]}', transform=ax.transAxes, 
+            fontsize=14, verticalalignment='top', color='#555555', zorder=200)
+    ax.text(col2_x + 0.02, team_y_start, f'{outcomes["away"]["stolen_base"]}', transform=ax.transAxes, 
+            fontsize=14, verticalalignment='top', color='#555555', zorder=200)
     
     # Home team
-    ax.text(col1_x, team_y_start - 0.04, f'{home_team}:', transform=ax.transAxes, 
-            fontsize=12, fontweight='600', verticalalignment='top', color='#444444')
-    ax.text(col1_x + 0.04, team_y_start - 0.04, f'{outcomes["home"]["walks"]}', transform=ax.transAxes, 
-            fontsize=13, verticalalignment='top', color='#666666')
-    ax.text(col2_x, team_y_start - 0.04, f'{outcomes["home"]["stolen_base"]}', transform=ax.transAxes, 
-            fontsize=13, verticalalignment='top', color='#666666')
-    
-    # Add subtle separator line
-    ax.plot([col1_x - 0.01, col2_x + 0.04], [header_y - 0.02, header_y - 0.02], 
-            transform=ax.transAxes, color='#CCCCCC', linewidth=1, alpha=0.5)
-    
-    # Enhanced metadata (moved to match table style)
-    ax.text(0.02, 0.02, 'Data: MLB\nBy: @mlb_simulator', transform=ax.transAxes, 
-            fontsize=11, color='#666666', ha='left', va='bottom',
-            bbox=dict(boxstyle="round,pad=0.3", facecolor='white', 
-                     edgecolor='none', alpha=0.7))
+    ax.text(col1_x, team_y_start - line_spacing, f'{home_team}:', transform=ax.transAxes, 
+            fontsize=13, fontweight='600', verticalalignment='top', 
+            color='#333333', zorder=200)
+    ax.text(col1_x + 0.055, team_y_start - line_spacing, f'{outcomes["home"]["walks"]}', transform=ax.transAxes, 
+            fontsize=14, verticalalignment='top', color='#555555', zorder=200)
+    ax.text(col2_x + 0.02, team_y_start - line_spacing, f'{outcomes["home"]["stolen_base"]}', transform=ax.transAxes, 
+            fontsize=14, verticalalignment='top', color='#555555', zorder=200)
     
     # Improved labels
-    ax.set_xlabel('Exit Velocity (mph)', fontsize=16, labelpad=10, color='#333333')
-    ax.set_ylabel('Launch Angle', fontsize=16, labelpad=10, color='#333333')
+    ax.set_xlabel('Exit Velocity (mph)', fontsize=18, labelpad=12, color='#333333')
+    ax.set_ylabel('Launch Angle', fontsize=18, labelpad=12, color='#333333')
     
-    # Title styling similar to estimated bases table
+    # Title styling similar to estimated bases table with more spacing
     # Main title
-    plt.text(0.5, 0.94, 'Batted Ball Exit Velo / Launch Angle by Team', 
-             transform=fig.transFigure, fontsize=22, fontweight='bold', 
+    plt.text(0.5, 0.93, 'Batted Ball Exit Velo / Launch Angle by Team', 
+             transform=fig.transFigure, fontsize=24, fontweight='bold', 
              ha='center', va='top')
     
     # First subtitle
-    plt.text(0.5, 0.88, f'{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}', 
-             transform=fig.transFigure, fontsize=16, ha='center', va='top', color='#333333')
+    plt.text(0.5, 0.87, f'{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}', 
+             transform=fig.transFigure, fontsize=18, ha='center', va='top', color='#333333')
     
     # Second subtitle
-    plt.text(0.5, 0.84, f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} {percentages["home"]}%, Tie {percentages["tie"]}%', 
-             transform=fig.transFigure, fontsize=14, ha='center', va='top', color='#666666')
+    plt.text(0.5, 0.82, f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} {percentages["home"]}%, Tie {percentages["tie"]}%', 
+             transform=fig.transFigure, fontsize=16, ha='center', va='top', color='#666666')
     
     # Attribution in top left (matching table style)
-    plt.text(0.1, 0.92, 'Data: MLB', 
-             transform=fig.transFigure, fontsize=17, 
+    plt.text(0.08, 0.91, 'Data: MLB', 
+             transform=fig.transFigure, fontsize=18, 
              ha='left', va='top', color='#999999')
     
-    plt.text(0.1, 0.895, 'By: @mlb_simulator', 
-             transform=fig.transFigure, fontsize=17, 
+    plt.text(0.08, 0.885, 'By: @mlb_simulator', 
+             transform=fig.transFigure, fontsize=18, 
              ha='left', va='top', color='#999999')
     
     # Enhanced tick formatting
-    ax.tick_params(axis='both', which='major', labelsize=13, length=6, width=1, 
+    ax.tick_params(axis='both', which='major', labelsize=14, length=6, width=1, 
                    colors='#333333', pad=8)
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d°'))
     
