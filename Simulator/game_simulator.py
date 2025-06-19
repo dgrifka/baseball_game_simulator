@@ -9,6 +9,47 @@ from Simulator.constants import team_colors
 with open('Model/gb_classifier_pipeline.pkl', 'rb') as file:
     pipeline = pickle.load(file)
 
+def create_features_for_prediction(launch_speed, launch_angle, stadium):
+    """
+    Create all required features for the improved model prediction.
+    
+    Args:
+        launch_speed (float): Exit velocity in mph
+        launch_angle (float): Launch angle in degrees
+        stadium (str): Venue name
+        
+    Returns:
+        pd.DataFrame: DataFrame with all required features
+    """
+    # Convert angle to radians for distance calculation
+    angle_rad = np.radians(launch_angle)
+    
+    # Calculate distance proxy
+    distance_proxy = launch_speed * np.sin(2 * angle_rad)
+    
+    # Categorize launch angle
+    if launch_angle < 10:
+        launch_angle_category = 'ground_ball'
+    elif launch_angle < 25:
+        launch_angle_category = 'line_drive'
+    elif launch_angle < 50:
+        launch_angle_category = 'fly_ball'
+    else:
+        launch_angle_category = 'popup'
+    
+    # Barrel zone indicator
+    is_barrel = int((launch_speed >= 95) & (launch_angle >= 25) & (launch_angle <= 35))
+    
+    # Create DataFrame with all features
+    return pd.DataFrame({
+        'hitData_launchSpeed': [launch_speed],
+        'hitData_launchAngle': [launch_angle],
+        'distance_proxy': [distance_proxy],
+        'launch_angle_category': [launch_angle_category],
+        'is_barrel': [is_barrel],
+        'venue_name': [stadium]
+    })
+
 def outcomes(game_data, steals_and_pickoffs, home_or_away):
     """
     Extract batting outcomes and baserunning events from game data for either home or away team.
@@ -91,12 +132,11 @@ def calculate_total_bases(outcomes):
         else:
             launch_speed, launch_angle, stadium = outcome
             event_type = "in_play"
-            new_example = pd.DataFrame({
-                'hitData_launchSpeed': [launch_speed],
-                'hitData_launchAngle': [launch_angle],
-                'venue_name': [stadium]
-            })
+            
+            # Use the new feature creation function
+            new_example = create_features_for_prediction(launch_speed, launch_angle, stadium)
             probabilities = pipeline.predict_proba(new_example)[0]
+            
             bases = (
                 probabilities[1] * 1 +
                 probabilities[2] * 2 +
@@ -357,11 +397,8 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
             key = tuple(outcome)
             if key not in prob_cache:
                 launch_speed, launch_angle, stadium = outcome
-                new_example = pd.DataFrame({
-                    'hitData_launchSpeed': [launch_speed],
-                    'hitData_launchAngle': [launch_angle],
-                    'venue_name': [stadium]
-                })
+                # Use the new feature creation function
+                new_example = create_features_for_prediction(launch_speed, launch_angle, stadium)
                 prob_cache[key] = pipeline.predict_proba(new_example)[0]
     
     # Initialize arrays for results
