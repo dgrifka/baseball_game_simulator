@@ -6,7 +6,7 @@ from tqdm import tqdm
 from Simulator.constants import team_colors
 
 # Load the pipeline
-with open('Model/gb_classifier_pipeline.pkl', 'rb') as file:
+with open('Model/gb_classifier_pipeline_improved.pkl', 'rb') as file:
     pipeline = pickle.load(file)
 
 def create_features_for_prediction(launch_speed, launch_angle, stadium):
