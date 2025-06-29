@@ -300,41 +300,42 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
     plt.close()
 
-def prepare_table_data(df):
-    """Prepare and format data for the table display."""
+def prepare_table_data_enhanced(df, mode='game'):
+    """Prepare and format data for the table display with support for day mode."""
     df = df.copy()
     
     # Add rank column
     df.insert(0, 'Rank', range(1, len(df) + 1))
     
-    # Format player names - keep on single line for cleaner look
+    # Format player names
     df['Player'] = df['Player'].apply(lambda x: x.split()[0][0] + '. ' + ' '.join(x.split()[1:]))
     
     # Format Result column
     df['Result'] = df['Result'].str.replace('_', ' ').str.title()
     
-    # Create xBA (expected batting average) from hit probabilities
+    # Create xBA
     df['xBA'] = ((df['Single Prob'].str.rstrip('%').astype(float) + 
                   df['Double Prob'].str.rstrip('%').astype(float) + 
                   df['Triple Prob'].str.rstrip('%').astype(float) + 
                   df['Hr Prob'].str.rstrip('%').astype(float)) / 100).round(3)
     df['xBA'] = df['xBA'].apply(lambda x: f'.{str(int(x*1000)).zfill(3)}')
     
-    # Simplify probability columns - keep only HR probability as it's most impactful
+    # Simplify probability columns
     df['HR%'] = df['Hr Prob']
     
-    # Select and reorder columns for clarity
-    columns_to_keep = ['Rank', 'Team', 'Player', 'Launch Speed', 'Launch Angle', 
-                       'Result', 'Estimated Bases', 'xBA', 'HR%']
+    # Select columns based on mode
+    if mode == 'day' and 'Game Matchup' in df.columns:
+        columns_to_keep = ['Rank', 'Team', 'Player', 'Launch Speed', 'Launch Angle', 
+                          'Result', 'Estimated Bases', 'xBA', 'HR%', 'Game Matchup']
+    else:
+        columns_to_keep = ['Rank', 'Team', 'Player', 'Launch Speed', 'Launch Angle', 
+                          'Result', 'Estimated Bases', 'xBA', 'HR%']
+    
     df = df[columns_to_keep]
     
-    # Format launch angle to include degree symbol
+    # Format columns
     df['Launch Angle'] = df['Launch Angle'].astype(str) + '°'
-    
-    # Format launch speed
     df['Launch Speed'] = df['Launch Speed'].astype(str) + ' mph'
-    
-    # Round estimated bases to 2 decimals
     df['Estimated Bases'] = df['Estimated Bases'].round(2)
     
     return df
@@ -438,8 +439,9 @@ def create_enhanced_cell_styles(table, df, team_color_map):
             xba_cell.get_text().set_color('#1565C0')
 
 
-def create_estimated_bases_table(df, away_team, home_team, away_score, home_score,
-                               away_win_percentage, home_win_percentage, formatted_date, images_dir):
+def create_estimated_bases_table(df, away_team=None, home_team=None, away_score=None, home_score=None,
+                               away_win_percentage=None, home_win_percentage=None, formatted_date=None, 
+                               images_dir="images", mode='game', date_string=None):
     """Creates enhanced table visualization of estimated bases statistics."""
     
     plt.style.use('seaborn-v0_8-whitegrid')
@@ -447,11 +449,51 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     
     # Prepare data - take top 15 instead of top 10
     df = df.copy().head(15)
-    team_color_map = dict(zip(df['Team'], df['team_color']))
-    df = prepare_table_data(df)
+    # Handle team colors - some teams might not be in the constant
+    team_color_map = {}
+    for team in df['Team'].unique():
+        if team in team_colors:
+            team_color_map[team] = team_colors[team][0]
+        else:
+            # Default color for teams not in the map
+            team_color_map[team] = '#333333'
     
-    # Create figure with wider, less tall proportions
-    fig = plt.figure(figsize=(20, 10), dpi=150)
+    if 'team_color' in df.columns:
+        team_color_map.update(dict(zip(df['Team'], df['team_color'])))
+
+    # Use the enhanced data preparation
+    df = prepare_table_data_enhanced(df, mode)
+    
+    # Adjust figure size based on mode
+    if mode == 'day' and 'Game Matchup' in df.columns:
+        fig = plt.figure(figsize=(22, 10), dpi=150)
+    else:
+        fig = plt.figure(figsize=(20, 10), dpi=150)
+    
+    # Adjust column widths based on mode
+    if mode == 'day' and 'Game Matchup' in df.columns:
+        colwidths = [0.05, 0.07, 0.13, 0.10, 0.10, 0.09, 0.12, 0.07, 0.07, 0.15]
+    else:
+        colwidths = [0.06, 0.08, 0.15, 0.12, 0.12, 0.10, 0.14, 0.08, 0.08]
+    
+    # Create appropriate title based on mode
+    if mode == 'game':
+        # Existing game mode title logic
+        title_lines = [
+            f"Top 15 Batted Balls by Estimated Total Bases",
+            f"{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}",
+            f"Win Probability: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%"
+        ]
+        filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'
+    else:  # day mode
+        date_display = date_string if date_string else "Daily Analysis"
+        title_lines = [
+            f"Top 15 Batted Balls by Estimated Total Bases",
+            f"{date_display}"
+        ]
+        # Clean filename for day mode
+        date_clean = date_string.replace('/', '-').replace(' ', '_').replace(',', '') if date_string else "daily"
+        filename = f'daily_estimated_bases_{date_clean}.png'
     
     # Add subplot with more space at top for titles
     # Reduced height from 0.72 to 0.65 and moved down from 0.08 to 0.05
