@@ -32,6 +32,16 @@ for path in model_paths:
 if pipeline is None:
     raise FileNotFoundError("Could not find the model file gb_classifier_pipeline_improved.pkl in any of the expected locations")
 
+# Test the pipeline with a simple prediction
+try:
+    test_features = create_features_for_prediction(100, 25, "Yankee Stadium")
+    test_probs = pipeline.predict_proba(test_features)[0]
+    print(f"Model test - Classes: {pipeline.classes_}")
+    print(f"Model test - Test probabilities: {test_probs}")
+    print(f"Model test - Sum of probabilities: {sum(test_probs)}")
+except Exception as e:
+    print(f"Model test failed: {e}")
+
 def parse_date_range(date_input):
     """
     Parse date input to get start and end dates.
@@ -177,24 +187,50 @@ def process_game_batted_balls(game_id, game_info_df):
         estimated_bases_list = []
         
         for _, row in batted_balls.iterrows():
-            features = create_features_for_prediction(
-                row['hitData.launchSpeed'],
-                row['hitData.launchAngle'], 
-                row['venue.name']
-            )
-            
-            # Get probabilities
-            probs = pipeline.predict_proba(features)[0]
-            class_labels = pipeline.classes_
-            prob_dict = dict(zip(class_labels, probs))
-            
-            # Calculate estimated bases
-            estimated_bases = (
-                prob_dict.get('single', 0) * 1 + 
-                prob_dict.get('double', 0) * 2 + 
-                prob_dict.get('triple', 0) * 3 + 
-                prob_dict.get('home_run', 0) * 4
-            )
+            try:
+                # Validate input data
+                launch_speed = float(row['hitData.launchSpeed'])
+                launch_angle = float(row['hitData.launchAngle'])
+                venue = str(row['venue.name'])
+                
+                # Create features
+                features = create_features_for_prediction(launch_speed, launch_angle, venue)
+                
+                # Debug: print first few predictions
+                if len(estimated_bases_list) < 3:
+                    print(f"Debug - Launch Speed: {launch_speed}, Launch Angle: {launch_angle}, Venue: {venue}")
+                    print(f"Debug - Features shape: {features.shape}")
+                    print(f"Debug - Features columns: {list(features.columns)}")
+                
+                # Get probabilities
+                probs = pipeline.predict_proba(features)[0]
+                class_labels = pipeline.classes_
+                prob_dict = dict(zip(class_labels, probs))
+                
+                # Debug: print first few predictions
+                if len(estimated_bases_list) < 3:
+                    print(f"Debug - Classes: {class_labels}")
+                    print(f"Debug - Probabilities: {probs}")
+                    print(f"Debug - Prob dict: {prob_dict}")
+                
+                # Calculate estimated bases
+                estimated_bases = (
+                    prob_dict.get('single', 0) * 1 + 
+                    prob_dict.get('double', 0) * 2 + 
+                    prob_dict.get('triple', 0) * 3 + 
+                    prob_dict.get('home_run', 0) * 4
+                )
+                
+                # Debug: print first few calculations
+                if len(estimated_bases_list) < 3:
+                    print(f"Debug - Estimated bases: {estimated_bases}")
+                    
+            except Exception as e:
+                print(f"Error processing batted ball: {e}")
+                print(f"Launch Speed: {row['hitData.launchSpeed']}, Launch Angle: {row['hitData.launchAngle']}")
+                # Set default values for failed predictions
+                prob_dict = {'out': 1.0, 'single': 0, 'double': 0, 'triple': 0, 'home_run': 0}
+                estimated_bases = 0
             
             # Use short team names for consistency with team_colors
             team_short = home_team_short if not row['isTopInning'] else away_team_short
