@@ -205,13 +205,26 @@ def process_game_batted_balls(game_id, game_info_df):
                 # Get probabilities
                 probs = pipeline.predict_proba(features)[0]
                 class_labels = pipeline.classes_
-                prob_dict = dict(zip(class_labels, probs))
                 
                 # Debug: print first few predictions
                 if len(estimated_bases_list) < 3:
                     print(f"Debug - Classes: {class_labels}")
                     print(f"Debug - Probabilities: {probs}")
-                    print(f"Debug - Prob dict: {prob_dict}")
+                
+                # Map numeric classes to outcome names
+                # Based on typical baseball outcome encoding: 0=out, 1=single, 2=double, 3=triple, 4=home_run
+                class_mapping = {0: 'out', 1: 'single', 2: 'double', 3: 'triple', 4: 'home_run'}
+                prob_dict = {}
+                
+                for i, prob in enumerate(probs):
+                    if i < len(class_labels):
+                        class_num = class_labels[i]
+                        outcome_name = class_mapping.get(class_num, f'class_{class_num}')
+                        prob_dict[outcome_name] = prob
+                
+                # Debug: print mapped probabilities
+                if len(estimated_bases_list) < 3:
+                    print(f"Debug - Mapped prob dict: {prob_dict}")
                 
                 # Calculate estimated bases
                 estimated_bases = (
