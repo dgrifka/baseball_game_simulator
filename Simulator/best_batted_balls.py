@@ -388,25 +388,35 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, 
     else:
         df = df.head(15)
     
-    # Format the data similar to the original function
+    # Format the data using the same logic as visualizations.py prepare_table_data function
     if table_type == "bottom":
         df.insert(0, 'Rank', [f"W{i}" for i in range(1, len(df) + 1)])
     else:
         df.insert(0, 'Rank', range(1, len(df) + 1))
         
+    # Format player names - keep on single line for cleaner look
     df['Player'] = df['Player'].apply(lambda x: x.split()[0][0] + '. ' + ' '.join(x.split()[1:]))
+    
+    # Format Result column
     df['Result'] = df['Result'].str.replace('_', ' ').str.title()
     
-    # Create xBA
+    # Create xBA (expected batting average) from hit probabilities
     df['xBA'] = ((df['Single Prob'].str.rstrip('%').astype(float) + 
                   df['Double Prob'].str.rstrip('%').astype(float) + 
                   df['Triple Prob'].str.rstrip('%').astype(float) + 
                   df['Hr Prob'].str.rstrip('%').astype(float)) / 100).round(3)
     df['xBA'] = df['xBA'].apply(lambda x: f'.{str(int(x*1000)).zfill(3)}')
     
+    # Simplify probability columns - keep only HR probability as it's most impactful
     df['HR%'] = df['Hr Prob']
+    
+    # Format launch angle to include degree symbol
     df['Launch Angle'] = df['Launch Angle'].astype(str) + '°'
+    
+    # Format launch speed
     df['Launch Speed'] = df['Launch Speed'].astype(str) + ' mph'
+    
+    # Round estimated bases to 2 decimals
     df['Estimated Bases'] = df['Estimated Bases'].round(2)
     
     # Select columns
