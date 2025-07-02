@@ -196,20 +196,9 @@ def process_game_batted_balls(game_id, game_info_df):
                 # Create features
                 features = create_features_for_prediction(launch_speed, launch_angle, venue)
                 
-                # Debug: print first few predictions
-                if len(estimated_bases_list) < 3:
-                    print(f"Debug - Launch Speed: {launch_speed}, Launch Angle: {launch_angle}, Venue: {venue}")
-                    print(f"Debug - Features shape: {features.shape}")
-                    print(f"Debug - Features columns: {list(features.columns)}")
-                
                 # Get probabilities
                 probs = pipeline.predict_proba(features)[0]
                 class_labels = pipeline.classes_
-                
-                # Debug: print first few predictions
-                if len(estimated_bases_list) < 3:
-                    print(f"Debug - Classes: {class_labels}")
-                    print(f"Debug - Probabilities: {probs}")
                 
                 # Map numeric classes to outcome names
                 # Based on typical baseball outcome encoding: 0=out, 1=single, 2=double, 3=triple, 4=home_run
@@ -222,10 +211,6 @@ def process_game_batted_balls(game_id, game_info_df):
                         outcome_name = class_mapping.get(class_num, f'class_{class_num}')
                         prob_dict[outcome_name] = prob
                 
-                # Debug: print mapped probabilities
-                if len(estimated_bases_list) < 3:
-                    print(f"Debug - Mapped prob dict: {prob_dict}")
-                
                 # Calculate estimated bases
                 estimated_bases = (
                     prob_dict.get('single', 0) * 1 + 
@@ -233,10 +218,6 @@ def process_game_batted_balls(game_id, game_info_df):
                     prob_dict.get('triple', 0) * 3 + 
                     prob_dict.get('home_run', 0) * 4
                 )
-                
-                # Debug: print first few calculations
-                if len(estimated_bases_list) < 3:
-                    print(f"Debug - Estimated bases: {estimated_bases}")
                     
             except Exception as e:
                 print(f"Error processing batted ball: {e}")
@@ -335,28 +316,61 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
     
     top_balls['team_color'] = top_balls['Team'].map(team_color_dict)
     
-    # Create visualization
+    # Create visualizations
     if len(top_balls) >= 15:
         # Prepare title information
         date_str = start_date.strftime('%Y-%m-%d')
         if start_date.date() != end_date.date():
             date_str = f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
         
-        # Create a modified version of the table for all games
+        # Create Top 15 visualization
         create_all_games_estimated_bases_table(
             top_balls.head(15),
             date_str,
             len(games_list),
-            images_dir
+            images_dir,
+            table_type="top"
         )
+        
+        # Create Bottom 15 visualization if we have enough data
+        if len(combined_df) >= 30:
+            bottom_balls = combined_df.tail(15).copy()
+            # Add team colors for bottom balls too
+            bottom_team_color_dict = {}
+            for team_name in bottom_balls['Team'].unique():
+                if pd.notna(team_name):
+                    colors_key = get_team_colors_key(team_name)
+                    if colors_key and colors_key in team_colors:
+                        bottom_team_color_dict[team_name] = team_colors[colors_key][0]
+                    else:
+                        bottom_team_color_dict[team_name] = "#666666"
+                else:
+                    bottom_team_color_dict[team_name] = "#666666"
+            
+            bottom_balls['team_color'] = bottom_balls['Team'].map(bottom_team_color_dict)
+            
+            create_all_games_estimated_bases_table(
+                bottom_balls,
+                date_str,
+                len(games_list),
+                images_dir,
+                table_type="bottom"
+            )
     
     return top_balls
 
 
-def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir):
+def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, table_type="top"):
     """
-    Creates table visualization for best batted balls across all games.
+    Creates table visualization for best/worst batted balls across all games.
     Modified version of create_estimated_bases_table for multiple games.
+    
+    Args:
+        df: DataFrame with batted ball data
+        date_str: Date string for title
+        num_games: Number of games analyzed
+        images_dir: Directory to save images
+        table_type: "top" or "bottom" for the type of table
     """
     import matplotlib.pyplot as plt
     import os
@@ -368,8 +382,18 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir):
     df = df.copy()
     team_color_map = dict(zip(df['Team'], df['team_color']))
     
+    # For bottom table, we want the worst 15 (lowest estimated bases)
+    if table_type == "bottom":
+        df = df.sort_values('Estimated Bases', ascending=True).head(15)
+    else:
+        df = df.head(15)
+    
     # Format the data similar to the original function
-    df.insert(0, 'Rank', range(1, len(df) + 1))
+    if table_type == "bottom":
+        df.insert(0, 'Rank', [f"W{i}" for i in range(1, len(df) + 1)])
+    else:
+        df.insert(0, 'Rank', range(1, len(df) + 1))
+        
     df['Player'] = df['Player'].apply(lambda x: x.split()[0][0] + '. ' + ' '.join(x.split()[1:]))
     df['Result'] = df['Result'].str.replace('_', ' ').str.title()
     
@@ -451,10 +475,16 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir):
     table.scale(1.1, 1.5)
     
     # Title
-    title_lines = [
-        f"Top 15 Batted Balls by Estimated Total Bases",
-        f"All Games • {date_str} • {num_games} Total Games"
-    ]
+    if table_type == "bottom":
+        title_lines = [
+            f"Bottom 15 Batted Balls by Estimated Total Bases",
+            f"All Games • {date_str} • {num_games} Total Games"
+        ]
+    else:
+        title_lines = [
+            f"Top 15 Batted Balls by Estimated Total Bases",
+            f"All Games • {date_str} • {num_games} Total Games"
+        ]
     
     plt.text(0.5, 0.94, title_lines[0], transform=fig.transFigure,
              fontsize=22, fontweight='bold', ha='center', va='top')
@@ -473,7 +503,11 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir):
     
     # Save
     os.makedirs(images_dir, exist_ok=True)
-    filename = f'all_games_best_batted_balls_{date_str.replace(" ", "_")}.png'
+    if table_type == "bottom":
+        filename = f'all_games_worst_batted_balls_{date_str.replace(" ", "_")}.png'
+    else:
+        filename = f'all_games_best_batted_balls_{date_str.replace(" ", "_")}.png'
+        
     plt.savefig(os.path.join(images_dir, filename), 
                 bbox_inches='tight', dpi=300,
                 facecolor='white', edgecolor='none')
