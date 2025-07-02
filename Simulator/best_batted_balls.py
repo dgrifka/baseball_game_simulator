@@ -5,9 +5,31 @@ import pytz
 from tqdm import tqdm
 
 from Simulator.get_game_information import response_code, get_game_info, team_info
-from Simulator.game_simulator import create_features_for_prediction, pipeline, create_detailed_outcomes_df
+from Simulator.game_simulator import create_features_for_prediction, create_detailed_outcomes_df
 from Simulator.visualizations import create_estimated_bases_table
 from Simulator.constants import base_url, schedule_ver, venue_names, team_colors, mlb_team_logos
+
+# Load the pipeline - handle both local and Colab paths
+import pickle
+import os
+
+# Try multiple paths for the model
+model_paths = [
+    'Model/gb_classifier_pipeline_improved.pkl',
+    '/content/baseball_game_simulator/Model/gb_classifier_pipeline_improved.pkl',
+    'gb_classifier_pipeline_improved.pkl'
+]
+
+pipeline = None
+for path in model_paths:
+    if os.path.exists(path):
+        with open(path, 'rb') as file:
+            pipeline = pickle.load(file)
+        print(f"Model loaded from: {path}")
+        break
+
+if pipeline is None:
+    raise FileNotFoundError("Could not find the model file gb_classifier_pipeline_improved.pkl in any of the expected locations")
 
 
 def parse_date_range(date_input):
@@ -112,14 +134,13 @@ def fetch_games_by_date_range(start_date, end_date):
     return filtered_games_df, games_list
 
 
-def process_game_batted_balls(game_id, game_info_df, teams_df):
+def process_game_batted_balls(game_id, game_info_df):
     """
     Process a single game to extract batted ball information with estimated bases.
     
     Args:
         game_id: Game ID
         game_info_df: DataFrame with game information
-        teams_df: DataFrame with team information including teamName mapping
     
     Returns:
         pd.DataFrame: Batted balls with estimated bases and metadata
@@ -129,11 +150,7 @@ def process_game_batted_balls(game_id, game_info_df, teams_df):
         game_row = game_info_df[game_info_df['gamePk'] == game_id].iloc[0]
         
         # Get play-by-play data
-        result = get_game_info(game_id)
-        if result is None:
-            return pd.DataFrame()
-            
-        total_pbp_filtered, total_pbp, steals_and_pickoffs = result
+        total_pbp_filtered, total_pbp, steals_and_pickoffs = get_game_info(game_id)
         
         if total_pbp_filtered is None or total_pbp_filtered.empty:
             return pd.DataFrame()
@@ -149,13 +166,6 @@ def process_game_batted_balls(game_id, game_info_df, teams_df):
         
         if batted_balls.empty:
             return pd.DataFrame()
-        
-        # Get team short names from teams_df
-        home_team_id = game_row['teams.home.team.id']
-        away_team_id = game_row['teams.away.team.id']
-        
-        home_team_short = teams_df[teams_df['team.id'] == home_team_id]['teamName'].iloc[0] if len(teams_df[teams_df['team.id'] == home_team_id]) > 0 else game_row['teams.home.team.name']
-        away_team_short = teams_df[teams_df['team.id'] == away_team_id]['teamName'].iloc[0] if len(teams_df[teams_df['team.id'] == away_team_id]) > 0 else game_row['teams.away.team.name']
         
         # Calculate estimated bases for each batted ball
         estimated_bases_list = []
@@ -180,16 +190,12 @@ def process_game_batted_balls(game_id, game_info_df, teams_df):
                 prob_dict.get('home_run', 0) * 4
             )
             
-            # Get the correct team short name
-            team_short = home_team_short if not row['isTopInning'] else away_team_short
-            opponent_short = away_team_short if not row['isTopInning'] else home_team_short
-            
             estimated_bases_list.append({
                 'Player': row['batter.fullName'],
-                'Team': team_short,
-                'Opponent': opponent_short,
+                'Team': game_row['teams.home.team.name'] if not row['isTopInning'] else game_row['teams.away.team.name'],
+                'Opponent': game_row['teams.away.team.name'] if not row['isTopInning'] else game_row['teams.home.team.name'],
                 'Date': game_row['officialDate'],
-                'Game': f"{away_team_short} @ {home_team_short}",
+                'Game': f"{game_row['teams.away.team.name']} @ {game_row['teams.home.team.name']}",
                 'Launch Speed': row['hitData.launchSpeed'],
                 'Launch Angle': row['hitData.launchAngle'],
                 'Venue': row['venue.name'],
@@ -232,15 +238,12 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
         print("No games found in the specified date range")
         return pd.DataFrame()
     
-    # Get team info for name mapping
-    teams_df = team_info()
-    
     # Process all games
     all_batted_balls = []
     
     print(f"Processing {len(games_list)} games...")
     for game_id in tqdm(games_list):
-        game_balls = process_game_batted_balls(game_id, games_df, teams_df)
+        game_balls = process_game_batted_balls(game_id, games_df)
         if not game_balls.empty:
             all_batted_balls.append(game_balls)
     
@@ -257,21 +260,13 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
     # Get top N
     top_balls = combined_df.head(top_n).copy()
     
-    # Add team colors - map using the team short names
+    # Add team colors
+    teams_df = team_info()
     team_color_dict = {}
-    for team_name in top_balls['Team'].unique():
+    for _, team in teams_df.iterrows():
+        team_name = team['name']
         if team_name in team_colors:
             team_color_dict[team_name] = team_colors[team_name][0]
-        else:
-            # If not found, try to find a partial match
-            for key in team_colors:
-                if key in team_name or team_name in key:
-                    team_color_dict[team_name] = team_colors[key][0]
-                    break
-            else:
-                # Default color if not found
-                team_color_dict[team_name] = "#000000"
-                print(f"Warning: No color found for team '{team_name}'")
     
     top_balls['team_color'] = top_balls['Team'].map(team_color_dict)
     
