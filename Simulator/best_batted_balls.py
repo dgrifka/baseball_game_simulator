@@ -8,6 +8,7 @@ from Simulator.get_game_information import response_code, get_game_info, team_in
 from Simulator.game_simulator import create_features_for_prediction, create_detailed_outcomes_df
 from Simulator.visualizations import create_estimated_bases_table
 from Simulator.constants import base_url, schedule_ver, venue_names, team_colors, mlb_team_logos
+from Simulator.team_mapping import get_team_short_name, get_team_colors_key
 
 # Load the pipeline - handle both local and Colab paths
 import pickle
@@ -30,7 +31,6 @@ for path in model_paths:
 
 if pipeline is None:
     raise FileNotFoundError("Could not find the model file gb_classifier_pipeline_improved.pkl in any of the expected locations")
-
 
 def parse_date_range(date_input):
     """
@@ -167,6 +167,12 @@ def process_game_batted_balls(game_id, game_info_df):
         if batted_balls.empty:
             return pd.DataFrame()
         
+        # Get team short names for color mapping
+        home_team_full = game_row['teams.home.team.name']
+        away_team_full = game_row['teams.away.team.name']
+        home_team_short = get_team_short_name(home_team_full)
+        away_team_short = get_team_short_name(away_team_full)
+        
         # Calculate estimated bases for each batted ball
         estimated_bases_list = []
         
@@ -190,12 +196,16 @@ def process_game_batted_balls(game_id, game_info_df):
                 prob_dict.get('home_run', 0) * 4
             )
             
+            # Use short team names for consistency with team_colors
+            team_short = home_team_short if not row['isTopInning'] else away_team_short
+            opponent_short = away_team_short if not row['isTopInning'] else home_team_short
+            
             estimated_bases_list.append({
                 'Player': row['batter.fullName'],
-                'Team': game_row['teams.home.team.name'] if not row['isTopInning'] else game_row['teams.away.team.name'],
-                'Opponent': game_row['teams.away.team.name'] if not row['isTopInning'] else game_row['teams.home.team.name'],
+                'Team': team_short,
+                'Opponent': opponent_short,
                 'Date': game_row['officialDate'],
-                'Game': f"{game_row['teams.away.team.name']} @ {game_row['teams.home.team.name']}",
+                'Game': f"{away_team_short} @ {home_team_short}",
                 'Launch Speed': row['hitData.launchSpeed'],
                 'Launch Angle': row['hitData.launchAngle'],
                 'Venue': row['venue.name'],
@@ -260,13 +270,19 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
     # Get top N
     top_balls = combined_df.head(top_n).copy()
     
-    # Add team colors
-    teams_df = team_info()
+    # Add team colors using proper team name mapping
     team_color_dict = {}
-    for _, team in teams_df.iterrows():
-        team_name = team['name']
-        if team_name in team_colors:
-            team_color_dict[team_name] = team_colors[team_name][0]
+    for team_name in top_balls['Team'].unique():
+        if pd.notna(team_name):  # Check for NaN values
+            colors_key = get_team_colors_key(team_name)
+            if colors_key and colors_key in team_colors:
+                team_color_dict[team_name] = team_colors[colors_key][0]
+            else:
+                # Default color if mapping fails
+                team_color_dict[team_name] = "#666666"
+                print(f"Warning: No color found for team '{team_name}', using default color")
+        else:
+            team_color_dict[team_name] = "#666666"
     
     top_balls['team_color'] = top_balls['Team'].map(team_color_dict)
     
