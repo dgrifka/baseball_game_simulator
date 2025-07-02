@@ -437,7 +437,22 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, 
                     cellLoc='center',
                     colWidths=[0.05, 0.07, 0.12, 0.10, 0.10, 0.08, 0.12, 0.07, 0.07, 0.22])
     
-    # Apply styling (similar to original but adapted for all games)
+    # Column indices (dynamic like visualizations.py)
+    rank_col = 0
+    team_col = 1
+    player_col = 2
+    bases_col = df.columns.get_loc('Estimated Bases')
+    result_col = df.columns.get_loc('Result')
+    xba_col = df.columns.get_loc('xBA')
+    hr_col = df.columns.get_loc('HR%')
+    
+    # Helper function for color brightness
+    def is_dark_color(color):
+        from matplotlib.colors import to_rgb
+        r, g, b = to_rgb(color)
+        return (r * 0.299 + g * 0.587 + b * 0.114) < 0.5
+    
+    # Apply styling (same as visualizations.py)
     for (row, col), cell in table.get_celld().items():
         if row == 0:  # Header
             cell.set_height(0.06)
@@ -456,30 +471,62 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, 
                 cell.set_facecolor('#F8F9FA')
             else:
                 cell.set_facecolor('#FFFFFF')
-            
-            # Team colors
-            if col == 1:  # Team column
-                team = df.iloc[row-1]['Team']
-                if team in team_color_map:
-                    cell.set_facecolor(team_color_map[team])
-                    # Check if dark color
-                    from matplotlib.colors import to_rgb
-                    r, g, b = to_rgb(team_color_map[team])
-                    if (r * 0.299 + g * 0.587 + b * 0.114) < 0.5:
-                        cell.get_text().set_color('white')
-                cell.get_text().set_weight('bold')
-            
-            # Estimated bases gradient
-            if col == 6:  # Estimated Bases column
-                bases_value = df.iloc[row-1]['Estimated Bases']
-                norm = plt.Normalize(0, 4)
-                cmap = plt.cm.YlOrRd
-                color = cmap(norm(bases_value))
-                cell.set_facecolor(color)
-                cell.get_text().set_weight('bold')
-                cell.get_text().set_fontsize(14)
-                if bases_value > 2.5:
-                    cell.get_text().set_color('white')
+    
+    # Apply special formatting for data rows
+    for row in range(1, len(df) + 1):
+        
+        # Rank column - bold and centered
+        rank_cell = table[(row, rank_col)]
+        rank_cell.get_text().set_weight('bold')
+        rank_cell.get_text().set_fontsize(14)
+        
+        # Team colors
+        team = df.iloc[row-1]['Team']
+        team_cell = table[(row, team_col)]
+        if team in team_color_map:
+            color = team_color_map[team]
+            team_cell.set_facecolor(color)
+            if is_dark_color(color):
+                team_cell.get_text().set_color('white')
+        team_cell.get_text().set_weight('bold')
+        
+        # Player names - slightly larger
+        player_cell = table[(row, player_col)]
+        player_cell.get_text().set_fontsize(13.5)
+        
+        # Estimated bases - gradient coloring
+        bases_value = df.iloc[row-1]['Estimated Bases']
+        bases_cell = table[(row, bases_col)]
+        norm = plt.Normalize(0, 4)
+        cmap = plt.cm.YlOrRd
+        color = cmap(norm(bases_value))
+        bases_cell.set_facecolor(color)
+        bases_cell.get_text().set_weight('bold')
+        bases_cell.get_text().set_fontsize(14)
+        if bases_value > 2.5:
+            bases_cell.get_text().set_color('white')
+        
+        # Result column - color coding
+        result = df.iloc[row-1]['Result']
+        result_cell = table[(row, result_col)]
+        if result == 'Out':
+            result_cell.set_facecolor('#FFE5E5')
+            result_cell.get_text().set_color('#D32F2F')
+        elif result == 'Home Run':
+            result_cell.set_facecolor('#E8F5E9')
+            result_cell.get_text().set_color('#2E7D32')
+        elif result in ['Single', 'Double', 'Triple']:
+            result_cell.set_facecolor('#E3F2FD')
+            result_cell.get_text().set_color('#1565C0')
+        
+        # xBA column - highlight high values
+        xba_value = float(df.iloc[row-1]['xBA'])
+        xba_cell = table[(row, xba_col)]
+        if xba_value >= 0.500:
+            xba_cell.get_text().set_weight('bold')
+            xba_cell.get_text().set_color('#2E7D32')
+        elif xba_value >= 0.300:
+            xba_cell.get_text().set_color('#1565C0')
     
     table.auto_set_font_size(False)
     table.scale(1.1, 1.5)
