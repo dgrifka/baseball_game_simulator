@@ -255,8 +255,6 @@ def process_game_batted_balls(game_id, game_info_df):
         return pd.DataFrame()
 
 
-# Replace your existing get_best_batted_balls_by_date function with this:
-
 def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
     """
     Get the best batted balls across all games for a given date or date range.
@@ -428,8 +426,6 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
     
     return top_balls
 
-
-# Replace your existing create_all_games_estimated_bases_table function with this:
 
 def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, table_type="top"):
     """
