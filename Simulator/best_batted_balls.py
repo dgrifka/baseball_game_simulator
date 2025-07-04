@@ -316,13 +316,13 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
     
     top_balls['team_color'] = top_balls['Team'].map(team_color_dict)
     
+    # Prepare date string for titles
+    date_str = start_date.strftime('%Y-%m-%d')
+    if start_date.date() != end_date.date():
+        date_str = f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
+    
     # Create visualizations
     if len(top_balls) >= 15:
-        # Prepare title information
-        date_str = start_date.strftime('%Y-%m-%d')
-        if start_date.date() != end_date.date():
-            date_str = f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
-        
         # Create Top 15 visualization
         create_all_games_estimated_bases_table(
             top_balls.head(15),
@@ -357,12 +357,68 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
                 table_type="bottom"
             )
     
+    # Create Luckiest Hits visualization
+    # Filter for hits (not outs) and sort by estimated bases ascending
+    hits_df = combined_df[combined_df['Result'] != 'Out'].copy()
+    if len(hits_df) >= 15:
+        luckiest_hits = hits_df.sort_values('Estimated Bases', ascending=True).head(15).copy()
+        
+        # Add team colors
+        lucky_team_color_dict = {}
+        for team_name in luckiest_hits['Team'].unique():
+            if pd.notna(team_name):
+                colors_key = get_team_colors_key(team_name)
+                if colors_key and colors_key in team_colors:
+                    lucky_team_color_dict[team_name] = team_colors[colors_key][0]
+                else:
+                    lucky_team_color_dict[team_name] = "#666666"
+            else:
+                lucky_team_color_dict[team_name] = "#666666"
+        
+        luckiest_hits['team_color'] = luckiest_hits['Team'].map(lucky_team_color_dict)
+        
+        create_all_games_estimated_bases_table(
+            luckiest_hits,
+            date_str,
+            len(games_list),
+            images_dir,
+            table_type="luckiest"
+        )
+    
+    # Create Unluckiest Outs visualization
+    # Filter for outs and sort by estimated bases descending
+    outs_df = combined_df[combined_df['Result'] == 'Out'].copy()
+    if len(outs_df) >= 15:
+        unluckiest_outs = outs_df.sort_values('Estimated Bases', ascending=False).head(15).copy()
+        
+        # Add team colors
+        unlucky_team_color_dict = {}
+        for team_name in unluckiest_outs['Team'].unique():
+            if pd.notna(team_name):
+                colors_key = get_team_colors_key(team_name)
+                if colors_key and colors_key in team_colors:
+                    unlucky_team_color_dict[team_name] = team_colors[colors_key][0]
+                else:
+                    unlucky_team_color_dict[team_name] = "#666666"
+            else:
+                unlucky_team_color_dict[team_name] = "#666666"
+        
+        unluckiest_outs['team_color'] = unluckiest_outs['Team'].map(unlucky_team_color_dict)
+        
+        create_all_games_estimated_bases_table(
+            unluckiest_outs,
+            date_str,
+            len(games_list),
+            images_dir,
+            table_type="unluckiest"
+        )
+    
     return top_balls
 
 
 def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, table_type="top"):
     """
-    Creates table visualization for best/worst batted balls across all games.
+    Creates table visualization for best/worst/luckiest/unluckiest batted balls across all games.
     Modified version of create_estimated_bases_table for multiple games.
     
     Args:
@@ -370,7 +426,7 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, 
         date_str: Date string for title
         num_games: Number of games analyzed
         images_dir: Directory to save images
-        table_type: "top" or "bottom" for the type of table
+        table_type: "top", "bottom", "luckiest", or "unluckiest" for the type of table
     """
     import matplotlib.pyplot as plt
     import os
@@ -386,11 +442,16 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, 
     if table_type == "bottom":
         df = df.sort_values('Estimated Bases', ascending=True).head(15)
     else:
+        # For all other types (top, luckiest, unluckiest), data is already sorted correctly
         df = df.head(15)
     
     # Format the data using the same logic as visualizations.py prepare_table_data function
     if table_type == "bottom":
         df.insert(0, 'Rank', [f"W{i}" for i in range(1, len(df) + 1)])
+    elif table_type == "luckiest":
+        df.insert(0, 'Rank', [f"L{i}" for i in range(1, len(df) + 1)])
+    elif table_type == "unluckiest":
+        df.insert(0, 'Rank', [f"U{i}" for i in range(1, len(df) + 1)])
     else:
         df.insert(0, 'Rank', range(1, len(df) + 1))
         
@@ -537,6 +598,16 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, 
             f"Bottom 15 Batted Balls by Estimated Total Bases",
             f"All Games • {date_str} • {num_games} Total Games"
         ]
+    elif table_type == "luckiest":
+        title_lines = [
+            f"15 Luckiest Hits (Lowest Expected Value)",
+            f"All Games • {date_str} • {num_games} Total Games"
+        ]
+    elif table_type == "unluckiest":
+        title_lines = [
+            f"15 Unluckiest Outs (Highest Expected Value)",
+            f"All Games • {date_str} • {num_games} Total Games"
+        ]
     else:
         title_lines = [
             f"Top 15 Batted Balls by Estimated Total Bases",
@@ -562,6 +633,10 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, 
     os.makedirs(images_dir, exist_ok=True)
     if table_type == "bottom":
         filename = f'all_games_worst_batted_balls_{date_str.replace(" ", "_")}.png'
+    elif table_type == "luckiest":
+        filename = f'all_games_luckiest_hits_{date_str.replace(" ", "_")}.png'
+    elif table_type == "unluckiest":
+        filename = f'all_games_unluckiest_outs_{date_str.replace(" ", "_")}.png'
     else:
         filename = f'all_games_best_batted_balls_{date_str.replace(" ", "_")}.png'
         
