@@ -611,12 +611,12 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, 
         ]
     elif table_type == "luckiest":
         title_lines = [
-            f"15 Luckiest Hits (Lowest Expected Value)",
+            f"15 Luckiest Hits",
             f"All Games • {date_str} • {num_games} Total Games"
         ]
     elif table_type == "unluckiest":
         title_lines = [
-            f"15 Unluckiest Outs (Highest Expected Value)",
+            f"15 Unluckiest Outs",
             f"All Games • {date_str} • {num_games} Total Games"
         ]
     else:
