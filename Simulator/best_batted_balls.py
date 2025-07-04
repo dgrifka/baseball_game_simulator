@@ -255,6 +255,8 @@ def process_game_batted_balls(game_id, game_info_df):
         return pd.DataFrame()
 
 
+# Replace your existing get_best_batted_balls_by_date function with this:
+
 def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
     """
     Get the best batted balls across all games for a given date or date range.
@@ -296,6 +298,9 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
     
     # Sort by estimated bases (descending)
     combined_df = combined_df.sort_values('Estimated Bases', ascending=False).reset_index(drop=True)
+    
+    # Debug: Show unique result types
+    print(f"Unique result types found: {sorted(combined_df['Result'].unique())}")
     
     # Get top N
     top_balls = combined_df.head(top_n).copy()
@@ -358,8 +363,10 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
             )
     
     # Create Luckiest Hits visualization
-    # Filter for hits (not outs) and sort by estimated bases ascending
-    hits_df = combined_df[combined_df['Result'] != 'Out'].copy()
+    # Define what constitutes a hit
+    hit_types = ['single', 'double', 'triple', 'home_run']
+    hits_df = combined_df[combined_df['Result'].isin(hit_types)].copy()
+    print(f"Found {len(hits_df)} hits out of {len(combined_df)} total batted balls")
     if len(hits_df) >= 15:
         luckiest_hits = hits_df.sort_values('Estimated Bases', ascending=True).head(15).copy()
         
@@ -384,10 +391,14 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
             images_dir,
             table_type="luckiest"
         )
+    else:
+        print(f"Not enough hits to create luckiest hits visualization (need 15, have {len(hits_df)})")
     
     # Create Unluckiest Outs visualization
-    # Filter for outs and sort by estimated bases descending
-    outs_df = combined_df[combined_df['Result'] == 'Out'].copy()
+    # Define what constitutes an out (any result that's not a hit)
+    hit_types = ['single', 'double', 'triple', 'home_run']
+    outs_df = combined_df[~combined_df['Result'].isin(hit_types)].copy()
+    print(f"Found {len(outs_df)} outs out of {len(combined_df)} total batted balls")
     if len(outs_df) >= 15:
         unluckiest_outs = outs_df.sort_values('Estimated Bases', ascending=False).head(15).copy()
         
@@ -412,9 +423,13 @@ def get_best_batted_balls_by_date(date_input, top_n=25, images_dir="images"):
             images_dir,
             table_type="unluckiest"
         )
+    else:
+        print(f"Not enough outs to create unluckiest outs visualization (need 15, have {len(outs_df)})")
     
     return top_balls
 
+
+# Replace your existing create_all_games_estimated_bases_table function with this:
 
 def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, table_type="top"):
     """
