@@ -19,7 +19,7 @@ This project simulates alternative outcomes of MLB games by resampling batted ba
 
 Regarding the model, I use a Gradient Boosting Classifier trained on 2023-24 MLB batted ball data, which is then wrapped in a scikit-learn pipeline. The model can correctly predict the outcome 77% of the time (w/test data), but more importantly, provides probabilities for all outcomes. For more info, check out Model/Base_Model.ipynb
 
-The main.ipynb will run the simulations and create visualizations about the run distributions and batted ball outcomes. I maintain a separate Colab file that saves and Tweets the images automatically. 
+The main.ipynb will run the simulations and create visualizations about the run distributions and batted ball outcomes. I maintain a separate Colab file that saves and Tweets the images automatically. Additionally, the best_batted_balls.py module can analyze multiple games to identify the luckiest hits and unluckiest outs based on expected outcomes. 
 
 This account was inspired by @MoneyPuckdotcom. The model and account are derived from data gathered from MLB Stats API.
 
@@ -57,6 +57,7 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 - Added steals and pickoffs to simulations
 - Cleaner and improved visuals
 - Games played at George M. Steinbrenner Field will be converted to Yankee Stadium in the model, since the dimensions are similar.
+- New best_batted_balls.py module for analyzing lucky/unlucky outcomes across multiple games
 
 ## Project Structure
 
@@ -72,7 +73,7 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 
 │   ├── Base_Model.ipynb # Colab file used to create and save model
 
-│   └── gb_classifier_pipeline.pkl # Model used to assign outcome probabilities
+│   └── gb_classifier_pipeline_improved.pkl # Model used to assign outcome probabilities
 
 ├── Research/
 
@@ -80,11 +81,15 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 
 ├── Simulator/
 
+│   ├── best_batted_balls.py # Analyzes lucky/unlucky outcomes across games
+
 │   ├── constants.py # Hard-coded values used in the simulator
 
 │   ├── game_simulator.py # Code used to simulate batted ball outcomes
 
 │   ├── get_game_information.py # Scrapes MLB Stats API for game info
+
+│   ├── team_mapping.py # Maps team names between different formats
 
 │   ├── utils.py # Misc helper code
 
