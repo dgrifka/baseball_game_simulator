@@ -101,7 +101,7 @@ Fielding errors are not accounted for, so a team can outperform or underperform 
 
 ## Contact
 
-Derek Grifka – dmgrifka@gmail.com - https://dgrifka.github.io/
+Derek Grifka - https://dgrifka.github.io/
 
 ## Model Testing (Expected Bases):
 
