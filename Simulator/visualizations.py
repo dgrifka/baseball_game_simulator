@@ -215,8 +215,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
              home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
              formatted_date, images_dir="images"):
-    print(home_team)
-    print(away_team)
+
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.close('all')
     
