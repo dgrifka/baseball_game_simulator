@@ -55,8 +55,8 @@ team_colors = {
     "Rangers": ("#C0111F", "293"),
     "Blue Jays": ("#134A8E", "294"),
     "Nationals": ("#AB0003", "295"),
-    "NL": ("#87CEEB", "blue"),
-    "AL": ("#FF7F50", "coral")
+    "National League All-Stars": ("#87CEEB", "blue"),
+    "American League All-Stars": ("#FF7F50", "coral")
 }
 
 # Dictionary of MLB teams and their corresponding ESPN logo URLs
