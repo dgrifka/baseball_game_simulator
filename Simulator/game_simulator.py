@@ -264,6 +264,7 @@ def advance_runner(bases, count=1, is_walk=False):
     Returns:
         int: Runs scored on this play
     """
+    import random
     runs = 0
     
     if is_walk:
@@ -292,16 +293,30 @@ def advance_runner(bases, count=1, is_walk=False):
         bases[2] = False
     
     else:  # Singles, doubles, triples
-        # Move existing runners
+        # Store original state to avoid conflicts
+        original_bases = bases.copy()
+        bases[0] = bases[1] = bases[2] = False
+        
+        # Process each runner with probabilistic advancements
         for i in range(2, -1, -1):  # Work backwards from 3rd to 1st
-            if bases[i]:
-                new_position = i + count
-                if new_position >= 3:  # Runner scores
+            if original_bases[i]:
+                # Calculate advancement with special cases
+                advancement = count
+                
+                # Special probabilistic advancements
+                if count == 1 and i == 1:  # Single with runner on 2nd
+                    advancement = 2 if random.random() < 0.5 else 1  # 50% scores
+                elif count == 1 and i == 0 and not original_bases[1]:  # Single with runner on 1st (only if 2nd empty)
+                    advancement = 2 if random.random() < 0.25 else 1  # 25% to 3rd
+                elif count == 2 and i == 0:  # Double with runner on 1st
+                    advancement = 3 if random.random() < 0.75 else 2  # 75% scores
+                
+                # Apply advancement
+                new_position = i + advancement
+                if new_position >= 3:
                     runs += 1
-                    bases[i] = False
-                else:  # Runner advances but doesn't score
+                else:
                     bases[new_position] = True
-                    bases[i] = False
         
         # Put batter on base
         if count == 1:
