@@ -308,7 +308,7 @@ def prepare_table_data(df):
     df.insert(0, 'Rank', range(1, len(df) + 1))
     
     # Format player names - keep on single line for cleaner look
-    df['Player'] = df['Player'].apply(lambda x: x.split()[0][0] + '. ' + ' '.join(x.split()[1:]))
+    # df['Player'] = df['Player'].apply(lambda x: x.split()[0][0] + '. ' + ' '.join(x.split()[1:]))
     
     # Format Result column
     df['Result'] = df['Result'].str.replace('_', ' ').str.title()
