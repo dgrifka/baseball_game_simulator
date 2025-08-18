@@ -354,6 +354,7 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Store team names before preparing data (for logo lookup)
     team_names = df['Team'].tolist()
     
+    # Prepare data - this now keeps full player names
     df = prepare_table_data(df)
     
     # Create figure with wider, less tall proportions
@@ -364,9 +365,9 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     ax.set_position([0.05, 0.05, 0.9, 0.65])  # [left, bottom, width, height]
     ax.axis('off')
     
-    # Adjust column widths - tighter Team column, wider Player column
+    # Adjust column widths - tighter Team column, wider Player column for full names
     # Total should still sum to approximately same as before
-    col_widths = [0.06, 0.07, 0.20, 0.11, 0.11, 0.10, 0.12, 0.08, 0.08]
+    col_widths = [0.05, 0.06, 0.22, 0.11, 0.11, 0.10, 0.12, 0.08, 0.08]
     
     # Create table
     table = ax.table(cellText=df.values,
@@ -474,17 +475,20 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
         rank_cell.get_text().set_weight('bold')
         rank_cell.get_text().set_fontsize(14)
         
-        # Team column - hide text and set very light background
+        # Team column - hide text and use alternating row background
         team = df.iloc[row-1]['Team']
         team_cell = table[(row, team_col)]
-        # Use white or very light background for better logo visibility
-        team_cell.set_facecolor('#FFFFFF')  # Pure white background
+        # Use alternating row colors to match other columns
+        if row % 2 == 0:
+            team_cell.set_facecolor('#F8F9FA')  # Light gray for even rows
+        else:
+            team_cell.set_facecolor('#FFFFFF')  # White for odd rows
         # Make text transparent/invisible since we'll add logo
         team_cell.get_text().set_alpha(0)
         
         # Player names - keep readable size for full names
         player_cell = table[(row, player_col)]
-        player_cell.get_text().set_fontsize(13)
+        player_cell.get_text().set_fontsize(12.5)  # Slightly smaller to fit full names
         
         # Estimated bases - gradient coloring
         bases_value = df.iloc[row-1]['Estimated Bases']
@@ -558,8 +562,8 @@ def add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df):
             
             if logo_url:
                 # Get the logo image with smaller size for better fit
-                logo_size = (32, 32)  # Reduced from 40x40 for better cell fit
-                img = getImage(logo_url, zoom=0.85, size=logo_size, alpha=1.0)  # Slightly reduced zoom
+                logo_size = (28, 28)  # Further reduced for better cell fit
+                img = getImage(logo_url, zoom=0.75, size=logo_size, alpha=1.0)  # Reduced zoom for smaller appearance
                 
                 if img:
                     # Create annotation box for the logo using axes coordinates
