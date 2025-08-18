@@ -469,11 +469,11 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
         rank_cell.get_text().set_weight('bold')
         rank_cell.get_text().set_fontsize(14)
         
-        # Team column - hide text and set background color
+        # Team column - hide text and set very light background
         team = df.iloc[row-1]['Team']
         team_cell = table[(row, team_col)]
-        color = team_color_map[team]
-        team_cell.set_facecolor(color)
+        # Use white or very light background for better logo visibility
+        team_cell.set_facecolor('#FFFFFF')  # Pure white background
         # Make text transparent/invisible since we'll add logo
         team_cell.get_text().set_alpha(0)
         
@@ -523,39 +523,45 @@ def add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df):
     
     team_col = 1  # Team column index
     
-    # Get the table's bounding box in axes coordinates
-    table_bbox = table.get_window_extent(ax.figure.canvas.get_renderer())
-    ax_bbox = ax.get_window_extent(ax.figure.canvas.get_renderer())
+    # Force a draw to ensure table is fully rendered
+    ax.figure.canvas.draw()
+    
+    # Get renderer
+    renderer = ax.figure.canvas.get_renderer()
     
     # Calculate positions for each team logo
     for row_idx, team_name in enumerate(team_names, start=1):
-        # Get the cell for this team
-        cell = table[(row_idx, team_col)]
-        
-        # Get cell position
-        cell_bbox = cell.get_window_extent(ax.figure.canvas.get_renderer())
-        
-        # Convert to axes coordinates
-        cell_center_x = (cell_bbox.x0 + cell_bbox.x1) / 2
-        cell_center_y = (cell_bbox.y0 + cell_bbox.y1) / 2
-        
-        # Transform to data coordinates
-        inv_transform = ax.transData.inverted()
-        data_x, data_y = inv_transform.transform([(cell_center_x, cell_center_y)])[0]
-        
-        # Get team logo URL
-        logo_url = get_team_logo(team_name, mlb_team_logos)
-        
-        if logo_url:
-            # Get the logo image with appropriate size
-            # Adjust size based on cell dimensions
-            logo_size = (35, 35)  # Smaller size for table cells
-            img = getImage(logo_url, zoom=0.8, size=logo_size, alpha=0.9)
+        try:
+            # Get the cell for this team
+            cell = table[(row_idx, team_col)]
             
-            if img:
-                # Create annotation box for the logo
-                ab = AnnotationBbox(img, (data_x, data_y), 
-                                  frameon=False, 
-                                  xycoords='data',
-                                  box_alignment=(0.5, 0.5))
-                ax.add_artist(ab)
+            # Get cell position in display coordinates
+            cell_bbox = cell.get_window_extent(renderer)
+            
+            # Calculate center of cell in display coordinates
+            cell_center_display = [
+                (cell_bbox.x0 + cell_bbox.x1) / 2,
+                (cell_bbox.y0 + cell_bbox.y1) / 2
+            ]
+            
+            # Transform to axes coordinates (0-1 range)
+            inv_transform = ax.transAxes.inverted()
+            cell_center_axes = inv_transform.transform([cell_center_display])[0]
+            
+            # Get team logo URL
+            logo_url = get_team_logo(team_name, mlb_team_logos)
+            
+            if logo_url:
+                # Get the logo image with appropriate size
+                logo_size = (40, 40)  # Slightly larger for better visibility
+                img = getImage(logo_url, zoom=0.9, size=logo_size, alpha=1.0)  # Full opacity
+                
+                if img:
+                    # Create annotation box for the logo using axes coordinates
+                    ab = AnnotationBbox(img, cell_center_axes,
+                                      frameon=False,
+                                      xycoords='axes fraction',
+                                      box_alignment=(0.5, 0.5))
+                    ax.add_artist(ab)
+        except Exception as e:
+            print(f"Error adding logo for {team_name} at row {row_idx}: {e}")
