@@ -364,8 +364,9 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     ax.set_position([0.05, 0.05, 0.9, 0.65])  # [left, bottom, width, height]
     ax.axis('off')
     
-    # Adjust column widths - make Team column slightly wider for logos
-    col_widths = [0.06, 0.10, 0.15, 0.12, 0.12, 0.10, 0.12, 0.08, 0.08]
+    # Adjust column widths - tighter Team column, wider Player column
+    # Total should still sum to approximately same as before
+    col_widths = [0.06, 0.07, 0.20, 0.11, 0.11, 0.10, 0.12, 0.08, 0.08]
     
     # Create table
     table = ax.table(cellText=df.values,
@@ -444,7 +445,11 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
         # Base cell styling
         if row == 0:  # Header row
             cell.set_height(0.06)
-            cell.set_text_props(weight='bold', fontsize=14)
+            # Adjust font size for Team header since column is narrower
+            if col == team_col:
+                cell.set_text_props(weight='bold', fontsize=13)
+            else:
+                cell.set_text_props(weight='bold', fontsize=14)
             cell.set_facecolor('#2C3E50')
             cell.get_text().set_color('white')
             cell.set_edgecolor('#1A252F')
@@ -477,9 +482,9 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
         # Make text transparent/invisible since we'll add logo
         team_cell.get_text().set_alpha(0)
         
-        # Player names - slightly larger
+        # Player names - keep readable size for full names
         player_cell = table[(row, player_col)]
-        player_cell.get_text().set_fontsize(13.5)
+        player_cell.get_text().set_fontsize(13)
         
         # Estimated bases - gradient coloring
         bases_value = df.iloc[row-1]['Estimated Bases']
@@ -552,9 +557,9 @@ def add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df):
             logo_url = get_team_logo(team_name, mlb_team_logos)
             
             if logo_url:
-                # Get the logo image with appropriate size
-                logo_size = (40, 40)  # Slightly larger for better visibility
-                img = getImage(logo_url, zoom=0.9, size=logo_size, alpha=1.0)  # Full opacity
+                # Get the logo image with smaller size for better fit
+                logo_size = (32, 32)  # Reduced from 40x40 for better cell fit
+                img = getImage(logo_url, zoom=0.85, size=logo_size, alpha=1.0)  # Slightly reduced zoom
                 
                 if img:
                     # Create annotation box for the logo using axes coordinates
