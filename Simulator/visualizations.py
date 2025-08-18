@@ -354,6 +354,10 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Store team names before modifying the dataframe
     team_names = df['Team'].tolist()
     
+    # Debug: Print team names to verify
+    print(f"Teams in table: {team_names}")
+    print(f"Number of rows: {len(team_names)}")
+    
     df = prepare_table_data(df)
     
     # Replace team names with empty string for logo placement
@@ -384,31 +388,62 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     # Add team logos after table is created and scaled
     team_col = 1  # Team column index
     
+    # Debug: Track logo loading
+    logos_loaded = 0
+    logos_failed = 0
+    
     for row in range(1, len(team_names) + 1):
         team_name = team_names[row-1]
+        print(f"Processing row {row}, team: {team_name}")
+        
         logo_url = get_team_logo(team_name, mlb_team_logos)
         
         if logo_url:
+            print(f"  Found logo URL for {team_name}: {logo_url[:50]}...")
+            
             # Get the cell position
             cell = table[(row, team_col)]
             cell_bbox = cell.get_bbox()
             
-            # Calculate center position of the cell in data coordinates
-            x_center = (cell_bbox.x0 + cell_bbox.x1) / 2
-            y_center = (cell_bbox.y0 + cell_bbox.y1) / 2
+            # Get the window extent and transform to figure coordinates
+            renderer = fig.canvas.get_renderer()
+            window_extent = cell.get_window_extent(renderer)
             
-            # Transform to data coordinates
-            inv = ax.transData.inverted()
-            x_data, y_data = inv.transform((x_center, y_center))
+            # Transform to axes coordinates
+            points = ax.transAxes.inverted().transform([
+                [window_extent.x0, window_extent.y0],
+                [window_extent.x1, window_extent.y1]
+            ])
+            
+            # Calculate center in axes coordinates
+            x_center = (points[0][0] + points[1][0]) / 2
+            y_center = (points[0][1] + points[1][1]) / 2
+            
+            print(f"  Cell center position: ({x_center:.3f}, {y_center:.3f})")
             
             # Get and add the logo image
-            img = getImage(logo_url, zoom=0.45, size=(40, 40), alpha=0.9)
-            if img:
-                ab = AnnotationBbox(img, (x_data, y_data), 
-                                  frameon=False, 
-                                  xycoords='data',
-                                  box_alignment=(0.5, 0.5))
-                ax.add_artist(ab)
+            try:
+                # Increase size and alpha for better visibility
+                img = getImage(logo_url, zoom=0.6, size=(50, 50), alpha=1.0)
+                if img:
+                    ab = AnnotationBbox(img, (x_center, y_center), 
+                                      frameon=False, 
+                                      xycoords=ax.transAxes,  # Use axes coordinates
+                                      box_alignment=(0.5, 0.5))
+                    ax.add_artist(ab)
+                    logos_loaded += 1
+                    print(f"  ✓ Logo added successfully for {team_name}")
+                else:
+                    logos_failed += 1
+                    print(f"  ✗ Failed to create image for {team_name}")
+            except Exception as e:
+                logos_failed += 1
+                print(f"  ✗ Error adding logo for {team_name}: {str(e)}")
+        else:
+            logos_failed += 1
+            print(f"  ✗ No logo URL found for {team_name}")
+    
+    print(f"\nLogo Summary: {logos_loaded} loaded, {logos_failed} failed")
     
     # Enhanced title with better spacing - moved all text elements up
     title_lines = [
@@ -495,19 +530,29 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map, team_names
         rank_cell.get_text().set_weight('bold')
         rank_cell.get_text().set_fontsize(14)
         
-        # Team colors (keep background color but no text since logo will be added)
+        # Team cell - VERY light background or white for logo visibility
         team = team_names[row-1]  # Use the stored team names
         team_cell = table[(row, team_col)]
+        
+        # Option 1: White background
+        # team_cell.set_facecolor('white')
+        
+        # Option 2: Very light tint of team color (5% opacity)
         color = team_color_map[team]
-        team_cell.set_facecolor(color)
-        # Make the cell slightly lighter to ensure logo visibility
-        from matplotlib.colors import to_rgb
-        import colorsys
-        r, g, b = to_rgb(color)
-        h, l, s = colorsys.rgb_to_hls(r, g, b)
-        l = min(0.7, l * 1.3)  # Lighten the color
-        r, g, b = colorsys.hls_to_rgb(h, l, s)
-        team_cell.set_facecolor((r, g, b))
+        from matplotlib.colors import to_rgba
+        rgba_color = to_rgba(color)
+        # Create very light version - 95% white, 5% team color
+        light_color = (
+            0.95 + rgba_color[0] * 0.05,
+            0.95 + rgba_color[1] * 0.05, 
+            0.95 + rgba_color[2] * 0.05,
+            1.0
+        )
+        team_cell.set_facecolor(light_color)
+        
+        # Add a subtle border in team color for visual connection
+        team_cell.set_edgecolor(color)
+        team_cell.set_linewidth(1.5)
         
         # Player names - slightly larger
         player_cell = table[(row, player_col)]
