@@ -308,7 +308,7 @@ def prepare_table_data(df):
     df.insert(0, 'Rank', range(1, len(df) + 1))
     
     # Format player names - keep on single line for cleaner look
-    df['Player'] = df['Player'].apply(lambda x: x.split()[0][0] + '. ' + ' '.join(x.split()[1:]))
+    # df['Player'] = df['Player'].apply(lambda x: x.split()[0][0] + '. ' + ' '.join(x.split()[1:]))
     
     # Format Result column
     df['Result'] = df['Result'].str.replace('_', ' ').str.title()
@@ -339,8 +339,91 @@ def prepare_table_data(df):
     
     return df
 
-def create_enhanced_cell_styles(table, df, team_color_map):
-    """Apply enhanced styling to table cells."""
+def create_estimated_bases_table(df, away_team, home_team, away_score, home_score,
+                               away_win_percentage, home_win_percentage, formatted_date, 
+                               mlb_team_logos, images_dir):
+    """Creates enhanced table visualization of estimated bases statistics with team logos."""
+    
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.close('all')
+    
+    # Prepare data - take top 15 instead of top 10
+    df = df.copy().head(15)
+    team_color_map = dict(zip(df['Team'], df['team_color']))
+    
+    # Store team names before preparing data (for logo lookup)
+    team_names = df['Team'].tolist()
+    
+    # Prepare data - this now keeps full player names
+    df = prepare_table_data(df)
+    
+    # Create figure with wider, less tall proportions
+    fig = plt.figure(figsize=(20, 10), dpi=150)
+    
+    # Add subplot with more space at top for titles
+    ax = fig.add_subplot(111)
+    ax.set_position([0.05, 0.05, 0.9, 0.65])  # [left, bottom, width, height]
+    ax.axis('off')
+    
+    # Adjust column widths - tighter Team column, wider Player column for full names
+    # Total should still sum to approximately same as before
+    col_widths = [0.05, 0.06, 0.22, 0.11, 0.11, 0.10, 0.12, 0.08, 0.08]
+    
+    # Create table
+    table = ax.table(cellText=df.values,
+                    colLabels=df.columns,
+                    loc='center',
+                    cellLoc='center',
+                    colWidths=col_widths)
+    
+    # Apply enhanced styling (modified to hide team text)
+    create_enhanced_cell_styles_with_logos(table, df, team_color_map)
+    
+    # Scale table with adjusted scaling
+    table.auto_set_font_size(False)
+    table.scale(1.1, 1.5)  # Reduced height scaling from 2.0 to 1.5
+    
+    # Add team logos after table is created and scaled
+    add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df)
+    
+    # Enhanced title with better spacing - moved all text elements up
+    title_lines = [
+        f"Top 15 Batted Balls by Estimated Total Bases",
+        f"{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}",
+        f"Win Probability: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%"
+    ]
+    
+    # Main title - moved higher to 0.94
+    plt.text(0.5, 0.94, title_lines[0], transform=fig.transFigure,
+             fontsize=22, fontweight='bold', ha='center', va='top')
+    
+    # Subtitle lines - moved higher
+    plt.text(0.5, 0.88, title_lines[1], transform=fig.transFigure,
+             fontsize=16, ha='center', va='top', color='#333333')
+    
+    plt.text(0.5, 0.84, title_lines[2], transform=fig.transFigure,
+             fontsize=14, ha='center', va='top', color='#666666')
+    
+    # Attribution - back to top left corner
+    plt.text(0.1, 0.92, 'Data: MLB', 
+             transform=fig.transFigure, fontsize=17, 
+             ha='left', va='top', color='#999999')
+    
+    plt.text(0.1, 0.895, 'By: @mlb_simulator', 
+             transform=fig.transFigure, fontsize=17, 
+             ha='left', va='top', color='#999999')
+    
+    # Save with high quality
+    os.makedirs(images_dir, exist_ok=True)
+    filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'
+    plt.savefig(os.path.join(images_dir, filename), 
+                bbox_inches='tight', dpi=300,
+                facecolor='white', edgecolor='none')
+    plt.close()
+
+
+def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
+    """Apply enhanced styling to table cells, hiding team text for logo placement."""
     
     # Column indices
     rank_col = 0
@@ -362,14 +445,18 @@ def create_enhanced_cell_styles(table, df, team_color_map):
         
         # Base cell styling
         if row == 0:  # Header row
-            cell.set_height(0.06)  # Reduced from 0.08
-            cell.set_text_props(weight='bold', fontsize=14)
+            cell.set_height(0.06)
+            # Adjust font size for Team header since column is narrower
+            if col == team_col:
+                cell.set_text_props(weight='bold', fontsize=13)
+            else:
+                cell.set_text_props(weight='bold', fontsize=14)
             cell.set_facecolor('#2C3E50')
             cell.get_text().set_color('white')
             cell.set_edgecolor('#1A252F')
             cell.set_linewidth(2)
         else:  # Data rows
-            cell.set_height(0.055)  # Reduced from 0.075
+            cell.set_height(0.055)
             cell.set_text_props(fontsize=13)
             cell.set_edgecolor('#E0E0E0')
             cell.set_linewidth(0.5)
@@ -388,18 +475,20 @@ def create_enhanced_cell_styles(table, df, team_color_map):
         rank_cell.get_text().set_weight('bold')
         rank_cell.get_text().set_fontsize(14)
         
-        # Team colors
+        # Team column - hide text and use alternating row background
         team = df.iloc[row-1]['Team']
         team_cell = table[(row, team_col)]
-        color = team_color_map[team]
-        team_cell.set_facecolor(color)
-        if is_dark_color(color):
-            team_cell.get_text().set_color('white')
-        team_cell.get_text().set_weight('bold')
+        # Use alternating row colors to match other columns
+        if row % 2 == 0:
+            team_cell.set_facecolor('#F8F9FA')  # Light gray for even rows
+        else:
+            team_cell.set_facecolor('#FFFFFF')  # White for odd rows
+        # Make text transparent/invisible since we'll add logo
+        team_cell.get_text().set_alpha(0)
         
-        # Player names - slightly larger
+        # Player names - keep readable size for full names
         player_cell = table[(row, player_col)]
-        player_cell.get_text().set_fontsize(13.5)
+        player_cell.get_text().set_fontsize(12.5)  # Slightly smaller to fit full names
         
         # Estimated bases - gradient coloring
         bases_value = df.iloc[row-1]['Estimated Bases']
@@ -438,72 +527,50 @@ def create_enhanced_cell_styles(table, df, team_color_map):
             xba_cell.get_text().set_color('#1565C0')
 
 
-def create_estimated_bases_table(df, away_team, home_team, away_score, home_score,
-                               away_win_percentage, home_win_percentage, formatted_date, images_dir):
-    """Creates enhanced table visualization of estimated bases statistics."""
+def add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df):
+    """Add team logos to the table at the appropriate cell positions."""
     
-    plt.style.use('seaborn-v0_8-whitegrid')
-    plt.close('all')
+    team_col = 1  # Team column index
     
-    # Prepare data - take top 15 instead of top 10
-    df = df.copy().head(15)
-    team_color_map = dict(zip(df['Team'], df['team_color']))
-    df = prepare_table_data(df)
+    # Force a draw to ensure table is fully rendered
+    ax.figure.canvas.draw()
     
-    # Create figure with wider, less tall proportions
-    fig = plt.figure(figsize=(20, 10), dpi=150)
+    # Get renderer
+    renderer = ax.figure.canvas.get_renderer()
     
-    # Add subplot with more space at top for titles
-    # Reduced height from 0.72 to 0.65 and moved down from 0.08 to 0.05
-    ax = fig.add_subplot(111)
-    ax.set_position([0.05, 0.05, 0.9, 0.65])  # [left, bottom, width, height]
-    ax.axis('off')
-    
-    # Create table
-    table = ax.table(cellText=df.values,
-                    colLabels=df.columns,
-                    loc='center',
-                    cellLoc='center',
-                    colWidths=[0.06, 0.08, 0.15, 0.12, 0.12, 0.10, 0.14, 0.08, 0.08])
-    
-    # Apply enhanced styling
-    create_enhanced_cell_styles(table, df, team_color_map)
-    
-    # Scale table with adjusted scaling
-    table.auto_set_font_size(False)
-    table.scale(1.1, 1.5)  # Reduced height scaling from 2.0 to 1.5
-    
-    # Enhanced title with better spacing - moved all text elements up
-    title_lines = [
-        f"Top 15 Batted Balls by Estimated Total Bases",
-        f"{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}",
-        f"Win Probability: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%"
-    ]
-    
-    # Main title - moved higher to 0.94
-    plt.text(0.5, 0.94, title_lines[0], transform=fig.transFigure,
-             fontsize=22, fontweight='bold', ha='center', va='top')
-    
-    # Subtitle lines - moved higher
-    plt.text(0.5, 0.88, title_lines[1], transform=fig.transFigure,
-             fontsize=16, ha='center', va='top', color='#333333')
-    
-    plt.text(0.5, 0.84, title_lines[2], transform=fig.transFigure,
-             fontsize=14, ha='center', va='top', color='#666666')
-    
-    # Attribution - back to top left corner
-    plt.text(0.1, 0.92, 'Data: MLB', 
-             transform=fig.transFigure, fontsize=17, 
-             ha='left', va='top', color='#999999')
-    
-    plt.text(0.1, 0.895, 'By: @mlb_simulator', 
-             transform=fig.transFigure, fontsize=17, 
-             ha='left', va='top', color='#999999')
-    
-    # Save with high quality
-    os.makedirs(images_dir, exist_ok=True)
-    filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'
-    plt.savefig(os.path.join(images_dir, filename), 
-                bbox_inches='tight', dpi=300,
-                facecolor='white', edgecolor='none')
-    plt.close()
+    # Calculate positions for each team logo
+    for row_idx, team_name in enumerate(team_names, start=1):
+        try:
+            # Get the cell for this team
+            cell = table[(row_idx, team_col)]
+            
+            # Get cell position in display coordinates
+            cell_bbox = cell.get_window_extent(renderer)
+            
+            # Calculate center of cell in display coordinates
+            cell_center_display = [
+                (cell_bbox.x0 + cell_bbox.x1) / 2,
+                (cell_bbox.y0 + cell_bbox.y1) / 2
+            ]
+            
+            # Transform to axes coordinates (0-1 range)
+            inv_transform = ax.transAxes.inverted()
+            cell_center_axes = inv_transform.transform([cell_center_display])[0]
+            
+            # Get team logo URL
+            logo_url = get_team_logo(team_name, mlb_team_logos)
+            
+            if logo_url:
+                # Get the logo image with smaller size for better fit
+                logo_size = (28, 28)  # Further reduced for better cell fit
+                img = getImage(logo_url, zoom=0.75, size=logo_size, alpha=1.0)  # Reduced zoom for smaller appearance
+                
+                if img:
+                    # Create annotation box for the logo using axes coordinates
+                    ab = AnnotationBbox(img, cell_center_axes,
+                                      frameon=False,
+                                      xycoords='axes fraction',
+                                      box_alignment=(0.5, 0.5))
+                    ax.add_artist(ab)
+        except Exception as e:
+            print(f"Error adding logo for {team_name} at row {row_idx}: {e}")
