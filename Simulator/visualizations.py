@@ -394,8 +394,8 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     ]
     
     # Main title - moved higher to 0.94
-    plt.text(0.5, 0.94, title_lines[0], transform=fig.transFigure,
-             fontsize=22, fontweight='bold', ha='center', va='top')
+    plt.text(0.5, 0.93, title_lines[0], transform=fig.transFigure,
+             fontsize=23, fontweight='bold', ha='center', va='top')
     
     # Subtitle lines - moved higher
     plt.text(0.5, 0.88, title_lines[1], transform=fig.transFigure,
@@ -405,12 +405,12 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
              fontsize=14, ha='center', va='top', color='#666666')
     
     # Attribution - back to top left corner
-    plt.text(0.1, 0.92, 'Data: MLB', 
-             transform=fig.transFigure, fontsize=17, 
+    plt.text(0.1, 0.915, 'Data: MLB', 
+             transform=fig.transFigure, fontsize=18, 
              ha='left', va='top', color='#999999')
     
-    plt.text(0.1, 0.895, 'By: @mlb_simulator', 
-             transform=fig.transFigure, fontsize=17, 
+    plt.text(0.1, 0.89, 'By: @mlb_simulator', 
+             transform=fig.transFigure, fontsize=18, 
              ha='left', va='top', color='#999999')
     
     # Save with high quality
@@ -448,16 +448,16 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
             cell.set_height(0.06)
             # Adjust font size for Team header since column is narrower
             if col == team_col:
-                cell.set_text_props(weight='bold', fontsize=13)
-            else:
                 cell.set_text_props(weight='bold', fontsize=14)
+            else:
+                cell.set_text_props(weight='bold', fontsize=15)
             cell.set_facecolor('#2C3E50')
             cell.get_text().set_color('white')
             cell.set_edgecolor('#1A252F')
             cell.set_linewidth(2)
         else:  # Data rows
             cell.set_height(0.055)
-            cell.set_text_props(fontsize=13)
+            cell.set_text_props(fontsize=14)
             cell.set_edgecolor('#E0E0E0')
             cell.set_linewidth(0.5)
             
@@ -488,7 +488,7 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
         
         # Player names - keep readable size for full names
         player_cell = table[(row, player_col)]
-        player_cell.get_text().set_fontsize(12.5)  # Slightly smaller to fit full names
+        player_cell.get_text().set_fontsize(13)  # Slightly smaller to fit full names
         
         # Estimated bases - gradient coloring
         bases_value = df.iloc[row-1]['Estimated Bases']
