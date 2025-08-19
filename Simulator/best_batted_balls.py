@@ -72,6 +72,74 @@ def parse_date_range(date_input):
     return start_date, end_date
 
 
+def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
+    """
+    Retrieves team logo URL with caching.
+    
+    Args:
+        team_name (str): MLB team name
+        mlb_team_logos (list): List of team logo URL dictionaries
+        logo_cache (dict): Cache for logo URLs
+        
+    Returns:
+        str: Logo URL or None if not found
+    """
+    if team_name in logo_cache:
+        return logo_cache[team_name]
+        
+    logo_url = next((team['logo_url'] for team in mlb_team_logos 
+                    if team['team'] == team_name), None)
+    if logo_url:
+        logo_cache[team_name] = logo_url
+    else:
+        print(f"Logo not found for {team_name}")
+    return logo_url
+
+def getImage(path, zoom=0.5, size=(50, 50), alpha=0.6, image_cache={}):
+    """
+    Processes team logo image with caching of raw image data.
+    
+    Args:
+        path (str): Image URL
+        zoom (float): Image zoom level
+        size (tuple): Target image size
+        alpha (float): Transparency level
+        image_cache (dict): Cache for processed image data
+        
+    Returns:
+        OffsetImage: Fresh OffsetImage instance for each call
+    """
+    try:
+        # Cache the processed image data, not the OffsetImage
+        if path not in image_cache:
+            img = Image.open(BytesIO(requests.get(path).content))
+            img = img.resize(size, Image.LANCZOS).convert("RGBA")
+            
+            # Enhance and crop
+            img = ImageEnhance.Sharpness(img).enhance(2.5)
+            data = np.array(img)
+            mask = data[:, :, 3] > 0
+            ymin, ymax = np.where(np.any(mask, axis=1))[0][[0, -1]]
+            xmin, xmax = np.where(np.any(mask, axis=0))[0][[0, -1]]
+            
+            # Create transparent background
+            new_img = Image.new('RGBA', size, (255, 255, 255, 0))
+            cropped = img.crop((xmin, ymin, xmax+1, ymax+1))
+            paste_pos = tuple((s - c) // 2 for s, c in zip(size, cropped.size))
+            new_img.paste(cropped, paste_pos, cropped)
+            
+            # Apply alpha and store the processed data
+            data = np.array(new_img)
+            data[:, :, 3] = (data[:, :, 3] * alpha).astype(np.uint8)
+            image_cache[path] = data
+        
+        # Create a fresh OffsetImage instance for each call
+        return OffsetImage(Image.fromarray(image_cache[path].copy()), zoom=zoom)
+    
+    except Exception as e:
+        print(f"Error loading image from {path}: {str(e)}")
+        return None
+
 def fetch_games_by_date_range(start_date, end_date):
     """
     Fetch all games within a specific date range.
