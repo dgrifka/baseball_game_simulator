@@ -812,7 +812,7 @@ def add_logos_to_all_games_table(ax, table, team_names, mlb_team_logos, df):
             if logo_url:
                 # Get the logo image with smaller size for better fit
                 logo_size = (28, 28)  # Same size as individual game table
-                img = getImage(logo_url, zoom=0.75, size=logo_size, alpha=1.0)
+                img = getImage(logo_url, zoom=0.825, size=logo_size, alpha=1.0)
                 
                 if img:
                     # Create annotation box for the logo using axes coordinates
