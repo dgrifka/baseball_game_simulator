@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import pytz
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from Simulator.get_game_information import response_code, get_game_info, team_info
 from Simulator.game_simulator import create_features_for_prediction, create_detailed_outcomes_df
