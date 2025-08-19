@@ -109,6 +109,13 @@ def getImage(path, zoom=0.5, size=(50, 50), alpha=0.6, image_cache={}):
     Returns:
         OffsetImage: Fresh OffsetImage instance for each call
     """
+    # Add the missing imports here
+    from PIL import Image, ImageEnhance
+    from matplotlib.offsetbox import OffsetImage
+    import requests
+    from io import BytesIO
+    import numpy as np
+    
     try:
         # Cache the processed image data, not the OffsetImage
         if path not in image_cache:
