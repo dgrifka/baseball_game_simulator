@@ -525,15 +525,15 @@ def create_all_games_estimated_bases_table(df, date_str, num_games, images_dir, 
     df = df.copy()
     team_color_map = dict(zip(df['Team'], df['team_color']))
     
-    # Store team names before data preparation (for logo lookup)
-    team_names = df['Team'].tolist()
-    
     # For bottom table, we want the worst 15 (lowest estimated bases)
     if table_type == "bottom":
         df = df.sort_values('Estimated Bases', ascending=True).head(15)
     else:
         # For all other types (top, luckiest, unluckiest), data is already sorted correctly
         df = df.head(15)
+    
+    # Store team names AFTER sorting (for logo lookup)
+    team_names = df['Team'].tolist()
     
     # Format the data - KEEP FULL PLAYER NAMES (no abbreviation)
     if table_type == "bottom":
@@ -811,8 +811,8 @@ def add_logos_to_all_games_table(ax, table, team_names, mlb_team_logos, df):
             
             if logo_url:
                 # Get the logo image with smaller size for better fit
-                logo_size = (32, 32)  # Same size as individual game table
-                img = getImage(logo_url, zoom=0.825, size=logo_size, alpha=1.0)
+                logo_size = (28, 28)  # Same size as individual game table
+                img = getImage(logo_url, zoom=0.75, size=logo_size, alpha=1.0)
                 
                 if img:
                     # Create annotation box for the logo using axes coordinates
@@ -823,3 +823,116 @@ def add_logos_to_all_games_table(ax, table, team_names, mlb_team_logos, df):
                     ax.add_artist(ab)
         except Exception as e:
             print(f"Error adding logo for {team_name} at row {row_idx}: {e}")
+            
+
+def apply_all_games_enhanced_styling(table, df, team_color_map):
+    """
+    Apply enhanced styling to all games table cells, matching individual game table style.
+    Hides team text for logo placement.
+    """
+    
+    # Column indices
+    rank_col = 0
+    team_col = 1
+    player_col = 2
+    bases_col = df.columns.get_loc('Estimated Bases')
+    result_col = df.columns.get_loc('Result')
+    xba_col = df.columns.get_loc('xBA')
+    hr_col = df.columns.get_loc('HR%')
+    game_col = df.columns.get_loc('Game')
+    
+    # Helper function for color brightness
+    def is_dark_color(color):
+        from matplotlib.colors import to_rgb
+        r, g, b = to_rgb(color)
+        return (r * 0.299 + g * 0.587 + b * 0.114) < 0.5
+    
+    # Style all cells
+    for (row, col), cell in table.get_celld().items():
+        
+        # Base cell styling
+        if row == 0:  # Header row
+            cell.set_height(0.06)
+            # Adjust font size for Team header since column is narrower
+            if col == team_col:
+                cell.set_text_props(weight='bold', fontsize=14)
+            else:
+                cell.set_text_props(weight='bold', fontsize=15)
+            cell.set_facecolor('#2C3E50')
+            cell.get_text().set_color('white')
+            cell.set_edgecolor('#1A252F')
+            cell.set_linewidth(2)
+        else:  # Data rows
+            cell.set_height(0.055)
+            cell.set_text_props(fontsize=14)
+            cell.set_edgecolor('#E0E0E0')
+            cell.set_linewidth(0.5)
+            
+            # Alternating row colors for better readability
+            if row % 2 == 0:
+                cell.set_facecolor('#F8F9FA')
+            else:
+                cell.set_facecolor('#FFFFFF')
+    
+    # Apply special formatting for data rows
+    for row in range(1, len(df) + 1):
+        
+        # Rank column - bold and centered
+        rank_cell = table[(row, rank_col)]
+        rank_cell.get_text().set_weight('bold')
+        rank_cell.get_text().set_fontsize(14)
+        
+        # Team column - hide text for logo placement
+        team_cell = table[(row, team_col)]
+        # Use alternating row colors to match other columns
+        if row % 2 == 0:
+            team_cell.set_facecolor('#F8F9FA')
+        else:
+            team_cell.set_facecolor('#FFFFFF')
+        # Make text transparent/invisible since we'll add logo
+        team_cell.get_text().set_alpha(0)
+        
+        # Player names - readable size for full names
+        player_cell = table[(row, player_col)]
+        player_cell.get_text().set_fontsize(13)  # Slightly smaller to fit full names
+        
+        # Game column - smaller font for space
+        game_cell = table[(row, game_col)]
+        game_cell.get_text().set_fontsize(12)
+        
+        # Estimated bases - gradient coloring
+        bases_value = df.iloc[row-1]['Estimated Bases']
+        bases_cell = table[(row, bases_col)]
+        
+        # Create gradient from light yellow to dark orange/red
+        norm = plt.Normalize(0, 4)
+        cmap = plt.cm.YlOrRd
+        color = cmap(norm(bases_value))
+        bases_cell.set_facecolor(color)
+        bases_cell.get_text().set_weight('bold')
+        bases_cell.get_text().set_fontsize(14)
+        if bases_value > 2.5:
+            bases_cell.get_text().set_color('white')
+        
+        # Result column - color coding
+        result = df.iloc[row-1]['Result']
+        result_cell = table[(row, result_col)]
+        if result == 'Out':
+            result_cell.set_facecolor('#FFE5E5')
+            result_cell.get_text().set_color('#D32F2F')
+        elif result == 'Home Run':
+            result_cell.set_facecolor('#E8F5E9')
+            result_cell.get_text().set_color('#2E7D32')
+        elif result in ['Single', 'Double', 'Triple']:
+            result_cell.set_facecolor('#E3F2FD')
+            result_cell.get_text().set_color('#1565C0')
+        
+        # xBA column - highlight high values
+        xba_value = float(df.iloc[row-1]['xBA'])
+        xba_cell = table[(row, xba_col)]
+        if xba_value >= 0.500:
+            xba_cell.get_text().set_weight('bold')
+            xba_cell.get_text().set_color('#2E7D32')
+        elif xba_value >= 0.300:
+            xba_cell.get_text().set_color('#1565C0')
+
