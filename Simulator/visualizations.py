@@ -532,7 +532,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                              tie_percentage, mlb_team_logos, formatted_date, images_dir="images"):
     """
     Creates a horizontal stacked bar chart showing individual player contributions to the game.
-    Each bar shows total estimated bases broken down by type (batted balls, walks, steals).
+    Each bar shows total estimated bases broken down by type (batted balls, walks).
     
     Args:
         home_outcomes: List of home team outcomes
@@ -576,16 +576,12 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                     player_contributions[player_key] = {
                         'batted_balls': 0,
                         'walks': 0,
-                        'steals': 0,
                         'total': 0
                     }
                 
                 # Categorize and add contribution
                 if outcome_data == 'walk':
                     player_contributions[player_key]['walks'] += 1
-                    player_contributions[player_key]['total'] += 1
-                elif outcome_data == 'stolen_base':
-                    player_contributions[player_key]['steals'] += 1
                     player_contributions[player_key]['total'] += 1
                 elif isinstance(outcome_data, list) and len(outcome_data) >= 3:
                     # Batted ball - calculate estimated bases
@@ -626,7 +622,6 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     player_labels = []
     batted_balls_values = []
     walks_values = []
-    steals_values = []
     team_colors_list = []
     
     for (player_name, team_name), contributions in top_players:
@@ -640,7 +635,6 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         
         batted_balls_values.append(contributions['batted_balls'])
         walks_values.append(contributions['walks'])
-        steals_values.append(contributions['steals'])
         
         # Get team color
         team_color = team_colors.get(team_name, ['#666666'])[0]
@@ -654,11 +648,6 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                     color='#2E7D32', edgecolor='black', linewidth=0.5)
     bars2 = ax.barh(y_positions, walks_values, left=batted_balls_values,
                     label='Walks', color='#1976D2', edgecolor='black', linewidth=0.5)
-    
-    # Calculate left position for steals
-    left_for_steals = [bb + w for bb, w in zip(batted_balls_values, walks_values)]
-    bars3 = ax.barh(y_positions, steals_values, left=left_for_steals,
-                    label='Stolen Bases', color='#F57C00', edgecolor='black', linewidth=0.5)
     
     # Add team logos to the left of player names
     for idx, ((player_name, team_name), _) in enumerate(top_players):
@@ -675,7 +664,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                 print(f"Error adding logo for {team_name}: {e}")
     
     # Add value labels on bars (only if value > 0.5)
-    for idx, (bb, w, s) in enumerate(zip(batted_balls_values, walks_values, steals_values)):
+    for idx, (bb, w) in enumerate(zip(batted_balls_values, walks_values)):
         # Batted balls label
         if bb > 0.5:
             ax.text(bb/2, idx, f'{bb:.1f}', ha='center', va='center', 
@@ -686,13 +675,8 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
             ax.text(bb + w/2, idx, f'{w:.0f}', ha='center', va='center',
                    fontsize=10, color='white', fontweight='bold')
         
-        # Steals label  
-        if s > 0.5:
-            ax.text(bb + w + s/2, idx, f'{s:.0f}', ha='center', va='center',
-                   fontsize=10, color='white', fontweight='bold')
-        
         # Total at end of bar
-        total = bb + w + s
+        total = bb + w
         ax.text(total + 0.2, idx, f'{total:.1f}', ha='left', va='center',
                fontsize=11, color='black', fontweight='bold')
     
@@ -731,7 +715,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
            fontsize=12, color='gray', ha='left', va='bottom')
     
     # Set x-axis limit with some padding
-    max_value = max([sum(x) for x in zip(batted_balls_values, walks_values, steals_values)])
+    max_value = max([sum(x) for x in zip(batted_balls_values, walks_values)])
     ax.set_xlim(0, max_value * 1.15)
     
     # Save figure
