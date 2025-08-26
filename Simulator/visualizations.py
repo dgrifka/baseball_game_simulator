@@ -527,6 +527,223 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
             xba_cell.get_text().set_color('#1565C0')
 
 
+def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team, 
+                             home_score, away_score, home_win_percentage, away_win_percentage, 
+                             tie_percentage, mlb_team_logos, formatted_date, images_dir="images"):
+    """
+    Creates a horizontal stacked bar chart showing individual player contributions to the game.
+    Each bar shows total estimated bases broken down by type (batted balls, walks, steals).
+    
+    Args:
+        home_outcomes: List of home team outcomes
+        away_outcomes: List of away team outcomes  
+        home_team: Home team name
+        away_team: Away team name
+        home_score: Home team actual score
+        away_score: Away team actual score
+        home_win_percentage: Home team deserve-to-win percentage
+        away_win_percentage: Away team deserve-to-win percentage
+        tie_percentage: Tie percentage
+        mlb_team_logos: List of team logo URLs
+        formatted_date: Formatted date string
+        images_dir: Directory to save images
+    """
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.close('all')
+    
+    percentages = {
+        'away': f"{away_win_percentage:.0f}",
+        'home': f"{home_win_percentage:.0f}",
+        'tie': f"{tie_percentage:.0f}"
+    }
+    
+    # Process outcomes to aggregate by player
+    player_contributions = {}
+    
+    # Process each team's outcomes
+    for team, outcomes, team_name in [(home_team, home_outcomes, home_team), 
+                                       (away_team, away_outcomes, away_team)]:
+        for outcome in outcomes:
+            # Handle tuple format (outcome_data, event_type, player_name)
+            if isinstance(outcome, tuple) and len(outcome) >= 3:
+                outcome_data, event_type, player_name = outcome[0], outcome[1], outcome[2]
+                
+                # Create unique player key with team
+                player_key = (player_name, team_name)
+                
+                # Initialize player data if not exists
+                if player_key not in player_contributions:
+                    player_contributions[player_key] = {
+                        'batted_balls': 0,
+                        'walks': 0,
+                        'steals': 0,
+                        'total': 0
+                    }
+                
+                # Categorize and add contribution
+                if outcome_data == 'walk':
+                    player_contributions[player_key]['walks'] += 1
+                    player_contributions[player_key]['total'] += 1
+                elif outcome_data == 'stolen_base':
+                    player_contributions[player_key]['steals'] += 1
+                    player_contributions[player_key]['total'] += 1
+                elif isinstance(outcome_data, list) and len(outcome_data) >= 3:
+                    # Batted ball - calculate estimated bases
+                    import pickle
+                    from Simulator.game_simulator import create_features_for_prediction
+                    
+                    # Load pipeline if not already loaded
+                    try:
+                        with open('Model/gb_classifier_pipeline_improved.pkl', 'rb') as file:
+                            pipeline = pickle.load(file)
+                        
+                        launch_speed, launch_angle, stadium = outcome_data
+                        features = create_features_for_prediction(launch_speed, launch_angle, stadium)
+                        probs = pipeline.predict_proba(features)[0]
+                        
+                        # Calculate estimated bases (assuming classes: 0=out, 1=single, 2=double, 3=triple, 4=hr)
+                        estimated_bases = (probs[1] * 1 + probs[2] * 2 + probs[3] * 3 + probs[4] * 4)
+                        
+                        player_contributions[player_key]['batted_balls'] += estimated_bases
+                        player_contributions[player_key]['total'] += estimated_bases
+                    except Exception as e:
+                        print(f"Error calculating estimated bases: {e}")
+    
+    # Sort players by total contribution
+    sorted_players = sorted(player_contributions.items(), key=lambda x: x[1]['total'], reverse=True)
+    
+    # Take top 20 players (or all if less than 20)
+    top_players = sorted_players[:20]
+    
+    if not top_players:
+        print("No player contributions found")
+        return
+    
+    # Create figure with high DPI for sharp rendering
+    fig, ax = plt.subplots(figsize=(14, 10), dpi=150, constrained_layout=True)
+    
+    # Prepare data for plotting
+    player_labels = []
+    batted_balls_values = []
+    walks_values = []
+    steals_values = []
+    team_colors_list = []
+    
+    for (player_name, team_name), contributions in top_players:
+        # Format player label (shortened first name + last name)
+        name_parts = player_name.split()
+        if len(name_parts) >= 2:
+            formatted_name = f"{name_parts[0][0]}. {' '.join(name_parts[1:])}"
+        else:
+            formatted_name = player_name
+        player_labels.append(formatted_name)
+        
+        batted_balls_values.append(contributions['batted_balls'])
+        walks_values.append(contributions['walks'])
+        steals_values.append(contributions['steals'])
+        
+        # Get team color
+        team_color = team_colors.get(team_name, ['#666666'])[0]
+        team_colors_list.append(team_color)
+    
+    # Create horizontal bars
+    y_positions = np.arange(len(player_labels))
+    
+    # Plot stacked bars with distinct colors
+    bars1 = ax.barh(y_positions, batted_balls_values, label='Batted Balls', 
+                    color='#2E7D32', edgecolor='black', linewidth=0.5)
+    bars2 = ax.barh(y_positions, walks_values, left=batted_balls_values,
+                    label='Walks', color='#1976D2', edgecolor='black', linewidth=0.5)
+    
+    # Calculate left position for steals
+    left_for_steals = [bb + w for bb, w in zip(batted_balls_values, walks_values)]
+    bars3 = ax.barh(y_positions, steals_values, left=left_for_steals,
+                    label='Stolen Bases', color='#F57C00', edgecolor='black', linewidth=0.5)
+    
+    # Add team logos to the left of player names
+    for idx, ((player_name, team_name), _) in enumerate(top_players):
+        logo_url = get_team_logo(team_name, mlb_team_logos)
+        if logo_url:
+            try:
+                img = getImage(logo_url, zoom=0.4, size=(30, 30), alpha=1.0)
+                if img:
+                    # Position logo to the left of the bar
+                    ab = AnnotationBbox(img, (-0.8, idx), frameon=False, 
+                                      xycoords=('data', 'data'), box_alignment=(1, 0.5))
+                    ax.add_artist(ab)
+            except Exception as e:
+                print(f"Error adding logo for {team_name}: {e}")
+    
+    # Add value labels on bars (only if value > 0.5)
+    for idx, (bb, w, s) in enumerate(zip(batted_balls_values, walks_values, steals_values)):
+        # Batted balls label
+        if bb > 0.5:
+            ax.text(bb/2, idx, f'{bb:.1f}', ha='center', va='center', 
+                   fontsize=10, color='white', fontweight='bold')
+        
+        # Walks label
+        if w > 0.5:
+            ax.text(bb + w/2, idx, f'{w:.0f}', ha='center', va='center',
+                   fontsize=10, color='white', fontweight='bold')
+        
+        # Steals label  
+        if s > 0.5:
+            ax.text(bb + w + s/2, idx, f'{s:.0f}', ha='center', va='center',
+                   fontsize=10, color='white', fontweight='bold')
+        
+        # Total at end of bar
+        total = bb + w + s
+        ax.text(total + 0.2, idx, f'{total:.1f}', ha='left', va='center',
+               fontsize=11, color='black', fontweight='bold')
+    
+    # Customize plot
+    ax.set_yticks(y_positions)
+    ax.set_yticklabels(player_labels, fontsize=12)
+    ax.invert_yaxis()  # Highest values at top
+    
+    # Set labels and title
+    ax.set_xlabel('Estimated Total Bases', fontsize=14, labelpad=10)
+    ax.set_ylabel('Player', fontsize=14, labelpad=40)  # Extra padding for logos
+    
+    # Title with game information
+    title = f'Player Contributions by Estimated Total Bases\n' \
+            f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n' \
+            f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} ' \
+            f'{percentages["home"]}%, Tie {percentages["tie"]}%'
+    
+    ax.set_title(title, fontsize=16, loc='left', pad=15, fontweight='bold')
+    
+    # Add legend
+    ax.legend(loc='lower right', fontsize=11, frameon=True, 
+             framealpha=0.9, edgecolor='black')
+    
+    # Clean up spines
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    # Add grid for better readability
+    ax.grid(axis='x', alpha=0.3, linestyle='--')
+    
+    # Add watermark
+    ax.text(0.01, -0.09, 'Data: MLB', transform=ax.transAxes,
+           fontsize=12, color='gray', ha='left', va='bottom')
+    ax.text(0.01, -0.12, 'By: @mlb_simulator', transform=ax.transAxes,
+           fontsize=12, color='gray', ha='left', va='bottom')
+    
+    # Set x-axis limit with some padding
+    max_value = max([sum(x) for x in zip(batted_balls_values, walks_values, steals_values)])
+    ax.set_xlim(0, max_value * 1.15)
+    
+    # Save figure
+    os.makedirs(images_dir, exist_ok=True)
+    filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{percentages["away"]}-{percentages["home"]}_player_contributions.png'
+    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300,
+                facecolor='white', edgecolor='none')
+    plt.close()
+    
+    print(f"Player contribution chart saved to {os.path.join(images_dir, filename)}")
+
+
 def add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df):
     """Add team logos to the table at the appropriate cell positions."""
     
