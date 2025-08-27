@@ -653,7 +653,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     for idx, ((player_name, team_name), _) in enumerate(top_players):
         # Add player name to the left of where logo will be (right-aligned)
         formatted_name = player_labels[idx]
-        ax.text(-0.2, idx, formatted_name, ha='right', va='center', 
+        ax.text(-0.27, idx, formatted_name, ha='right', va='center', 
                 fontsize=12, color='black')
         
         # Add team logo closer to the axis
@@ -683,7 +683,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         
         # Total at end of bar
         total = bb + w
-        ax.text(total + 0.15, idx, f'{total:.1f}', ha='left', va='center',
+        ax.text(total + 0.125, idx, f'{total:.1f}', ha='left', va='center',
                fontsize=12, color='black', fontweight='bold')
     
     # Customize plot
