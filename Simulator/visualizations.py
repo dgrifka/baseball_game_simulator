@@ -653,7 +653,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     for idx, ((player_name, team_name), _) in enumerate(top_players):
         # Add player name to the left of where logo will be (right-aligned)
         formatted_name = player_labels[idx]
-        ax.text(-0.25, idx, formatted_name, ha='right', va='center', 
+        ax.text(-0.15, idx, formatted_name, ha='right', va='center', 
                 fontsize=12, color='black')
         
         # Add team logo closer to the axis
@@ -663,7 +663,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                 img = getImage(logo_url, zoom=0.4, size=(30, 30), alpha=1.0)
                 if img:
                     # Position logo right at the axis edge
-                    ab = AnnotationBbox(img, (-0.1, idx), frameon=False, 
+                    ab = AnnotationBbox(img, (-0.075, idx), frameon=False, 
                                       xycoords=('data', 'data'), box_alignment=(1, 0.5))
                     ax.add_artist(ab)
             except Exception as e:
@@ -715,9 +715,9 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     ax.grid(axis='x', alpha=0.3, linestyle='--')
     
     # MOVED watermark to top right
-    ax.text(0.97, 1.01, 'Data: MLB', transform=ax.transAxes,
+    ax.text(0.93, 1.1, 'Data: MLB', transform=ax.transAxes,
            fontsize=13, color='gray', ha='right', va='top')
-    ax.text(0.97, 0.98, 'By: @mlb_simulator', transform=ax.transAxes,
+    ax.text(0.93, 1.08, 'By: @mlb_simulator', transform=ax.transAxes,
            fontsize=13, color='gray', ha='right', va='top')
     
     # Set x-axis limit with some padding
