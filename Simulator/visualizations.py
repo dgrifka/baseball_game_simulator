@@ -653,7 +653,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     for idx, ((player_name, team_name), _) in enumerate(top_players):
         # Add player name to the left of where logo will be (right-aligned)
         formatted_name = player_labels[idx]
-        ax.text(-0.15, idx, formatted_name, ha='right', va='center', 
+        ax.text(-0.2, idx, formatted_name, ha='right', va='center', 
                 fontsize=12, color='black')
         
         # Add team logo closer to the axis
@@ -683,8 +683,8 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         
         # Total at end of bar
         total = bb + w
-        ax.text(total + 0.2, idx, f'{total:.1f}', ha='left', va='center',
-               fontsize=11, color='black', fontweight='bold')
+        ax.text(total + 0.15, idx, f'{total:.1f}', ha='left', va='center',
+               fontsize=12, color='black', fontweight='bold')
     
     # Customize plot
     ax.set_yticks(y_positions)
@@ -715,9 +715,9 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     ax.grid(axis='x', alpha=0.3, linestyle='--')
     
     # MOVED watermark to top right
-    ax.text(0.93, 1.1, 'Data: MLB', transform=ax.transAxes,
+    ax.text(0.91, 1.07, 'Data: MLB', transform=ax.transAxes,
            fontsize=13, color='gray', ha='right', va='top')
-    ax.text(0.93, 1.08, 'By: @mlb_simulator', transform=ax.transAxes,
+    ax.text(0.91, 1.05, 'By: @mlb_simulator', transform=ax.transAxes,
            fontsize=13, color='gray', ha='right', va='top')
     
     # Set x-axis limit with some padding
