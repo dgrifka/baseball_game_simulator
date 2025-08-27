@@ -649,15 +649,21 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     bars2 = ax.barh(y_positions, walks_values, left=batted_balls_values,
                     label='Walks', color='#1976D2', edgecolor='black', linewidth=0.5)
     
-    # Add team logos closer to the axis (right next to it)
+    # Add team logos right at the axis edge and player names to the left
     for idx, ((player_name, team_name), _) in enumerate(top_players):
+        # Add player name to the left of where logo will be (right-aligned)
+        formatted_name = player_labels[idx]
+        ax.text(-0.5, idx, formatted_name, ha='right', va='center', 
+                fontsize=12, color='black')
+        
+        # Add team logo closer to the axis
         logo_url = get_team_logo(team_name, mlb_team_logos)
         if logo_url:
             try:
                 img = getImage(logo_url, zoom=0.4, size=(30, 30), alpha=1.0)
                 if img:
-                    # Position logo very close to the axis (at x=-0.3 instead of -0.8)
-                    ab = AnnotationBbox(img, (-0.3, idx), frameon=False, 
+                    # Position logo right at the axis edge
+                    ab = AnnotationBbox(img, (-0.15, idx), frameon=False, 
                                       xycoords=('data', 'data'), box_alignment=(1, 0.5))
                     ax.add_artist(ab)
             except Exception as e:
@@ -682,7 +688,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     
     # Customize plot
     ax.set_yticks(y_positions)
-    ax.set_yticklabels(player_labels, fontsize=12)
+    ax.set_yticklabels([])  # Remove y-axis labels since we're adding them manually
     ax.invert_yaxis()  # Highest values at top
     
     # Set labels - REMOVED the ylabel for "Player"
@@ -724,6 +730,8 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300,
                 facecolor='white', edgecolor='none')
     plt.close()
+    
+    print(f"Player contribution chart saved to {os.path.join(images_dir, filename)}")
 
 def add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df):
     """Add team logos to the table at the appropriate cell positions."""
