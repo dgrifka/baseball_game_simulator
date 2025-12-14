@@ -94,3 +94,50 @@ mlb_team_logos = [
        {"team": "American League All-Stars", "logo_url": "https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/scoreboard/al.png&h=500&w=500"},
        {"team": "National League All-Stars", "logo_url": "https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/scoreboard/nl.png&h=500&w=500"}
 ]
+
+# =============================================================================
+# VENUE ID MAPPING
+# =============================================================================
+# Maps venue names to venue IDs for the batted ball model.
+# venue_id is more stable than venue_name (names can change year to year).
+
+VENUE_NAME_TO_ID = {
+    'Oriole Park at Camden Yards': '2',
+    'Fenway Park': '3',
+    'Yankee Stadium': '3313',
+    'Tropicana Field': '12',
+    'Rogers Centre': '14',
+    'Chase Field': '15',
+    'Coors Field': '19',
+    'Dodger Stadium': '22',
+    'Kauffman Stadium': '7',
+    'Angel Stadium': '1',
+    'Oakland Coliseum': '10',
+    'Petco Park': '2680',
+    'Oracle Park': '2395',
+    'T-Mobile Park': '680',
+    'Globe Life Field': '5325',
+    'Minute Maid Park': '2392',
+    'Target Field': '3312',
+    'Guaranteed Rate Field': '4',
+    'Comerica Park': '2394',
+    'Progressive Field': '5',
+    'PNC Park': '31',
+    'Great American Ball Park': '2602',
+    'Busch Stadium': '2889',
+    'Wrigley Field': '17',
+    'American Family Field': '32',
+    'Citi Field': '3289',
+    'Citizens Bank Park': '2681',
+    'Nationals Park': '3309',
+    'Truist Park': '4705',
+    'loanDepot park': '4169',
+    # Temporary/alternate venues (map to similar parks)
+    'George M. Steinbrenner Field': '3313',  # → Yankee Stadium
+    'Sutter Health Park': '10',               # → Oakland Coliseum
+    'Daikin Park': '2392',                    # → Minute Maid Park
+    'Rate Field': '4',                        # → Guaranteed Rate Field
+}
+
+# Default venue ID for unknown stadiums
+DEFAULT_VENUE_ID = '22'
