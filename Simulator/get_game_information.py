@@ -1,3 +1,8 @@
+"""
+MLB game information retrieval from Stats API.
+Fetches schedules, game details, and play-by-play data.
+"""
+
 import requests
 import pandas as pd
 import json
@@ -5,7 +10,11 @@ from pandas import json_normalize
 import pytz
 import datetime
 
-from Simulator.constants import base_url, league, season, endpoint, team_ver, schedule_ver, game_ver, venue_names
+from Simulator.constants import (
+    base_url, league, season, endpoint, 
+    team_ver, schedule_ver, game_ver, venue_names,
+    VENUE_NAME_TO_ID, DEFAULT_VENUE_ID
+)
 
 def response_code(base_url, ver, endpoint):
     """
@@ -74,18 +83,21 @@ def fetch_games(days_ago, all_columns=False):
     ].reset_index(drop=True))
     
     # Handle stadium name mapping
-    filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(
-        'George M. Steinbrenner Field', 'Yankee Stadium')
-    filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(
-        'Sutter Health Park', 'Oakland Coliseum')
-    filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(
-        'Daikin Park', 'Minute Maid Park')
-    filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(
-        'Rate Field', 'Guaranteed Rate Field')
+    stadium_mapping = {
+        'George M. Steinbrenner Field': 'Yankee Stadium',
+        'Sutter Health Park': 'Oakland Coliseum',
+        'Daikin Park': 'Minute Maid Park',
+        'Rate Field': 'Guaranteed Rate Field'
+    }
+    filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(stadium_mapping)
+    
+    # Add venue_id column using the mapping
+    filtered_games_df['venue.id'] = filtered_games_df['venue.name'].map(VENUE_NAME_TO_ID)
+    filtered_games_df['venue.id'] = filtered_games_df['venue.id'].fillna(DEFAULT_VENUE_ID)
     
     if not all_columns:
         filtered_games_df = filtered_games_df[[
-            "gamePk", "officialDate", "venue.name", 
+            "gamePk", "officialDate", "venue.name", "venue.id",
             "teams.away.team.id", "teams.away.team.name", "teams.away.score",
             "teams.home.team.id", "teams.home.team.name", "teams.home.score",
             "teams.home.isWinner"
@@ -216,9 +228,16 @@ def get_game_info(game_id, all_columns=False):
         cols_needed = [
             "gamePk", "batter.fullName", "playId", "ab_num", "eventType", 
             "description", "outs", "isOut", "isTopInning", "inning",
-            "hitData.launchSpeed", "hitData.launchAngle"
+            "hitData.launchSpeed", "hitData.launchAngle",
+            # New columns for spray angle model
+            "hitData.coordinates.coordX", "hitData.coordinates.coordY",
+            "batSide.code"
         ]
-        total_pbp_filtered = total_pbp_filtered[cols_needed]
-        non_batted_balls = non_batted_balls[cols_needed]
+        # Only keep columns that exist (some may be missing in edge cases)
+        cols_available = [c for c in cols_needed if c in total_pbp_filtered.columns]
+        total_pbp_filtered = total_pbp_filtered[cols_available]
+        
+        cols_available_nb = [c for c in cols_needed if c in non_batted_balls.columns]
+        non_batted_balls = non_batted_balls[cols_available_nb]
     
     return total_pbp_filtered, total_pbp, steals_and_pickoffs

@@ -1,0 +1,54 @@
+{
+  "model_name": "MLB Batted Ball Outcome Classifier",
+  "model_type": "GradientBoostingClassifier",
+  "created_date": "2025-12-14",
+  "training_samples": 203041,
+  "test_samples": 50761,
+  "seasons": [
+    2024,
+    2025
+  ],
+  "accuracy": 0.8204,
+  "log_loss": 0.4506,
+  "features": {
+    "numeric": [
+      "hitData_launchSpeed",
+      "hitData_launchAngle",
+      "distance_proxy",
+      "spray_angle_adj",
+      "spray_angle_abs",
+      "is_barrel",
+      "is_pulled",
+      "is_opposite",
+      "pulled_hard",
+      "oppo_hard",
+      "spray_ev_interaction",
+      "pulled_ground_ball",
+      "oppo_line_drive"
+    ],
+    "categorical": [
+      "launch_angle_category",
+      "spray_direction",
+      "venue_id"
+    ]
+  },
+  "classes": {
+    "0": "out",
+    "1": "single",
+    "2": "double",
+    "3": "triple",
+    "4": "home_run"
+  },
+  "hyperparameters": {
+    "n_estimators": 100,
+    "max_depth": 6,
+    "learning_rate": 0.15,
+    "min_samples_split": 50,
+    "min_samples_leaf": 20
+  },
+  "notes": [
+    "Spray angle adjusted for batter handedness (negative = pull side)",
+    "Steinbrenner Field (Rays 2025) mapped to Yankee Stadium venue_id",
+    "venue_id used instead of venue_name for stability"
+  ]
+}

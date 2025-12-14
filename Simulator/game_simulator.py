@@ -1,54 +1,93 @@
+"""
+MLB game simulation engine.
+Simulates batted ball outcomes using a gradient boosting model trained on Statcast data.
+"""
+
 import random
-import pickle
+import joblib
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from Simulator.constants import team_colors
 
-# Load the pipeline
-with open('Model/gb_classifier_pipeline_improved.pkl', 'rb') as file:
-    pipeline = pickle.load(file)
+from Simulator.constants import team_colors, VENUE_NAME_TO_ID, DEFAULT_VENUE_ID
+from Model.feature_engineering import (
+    create_features_for_prediction,
+    create_features_for_prediction_fallback
+)
 
-def create_features_for_prediction(launch_speed, launch_angle, stadium):
+# =============================================================================
+# LOAD MODEL
+# =============================================================================
+
+# Load the trained pipeline
+pipeline = joblib.load('Model/batted_ball_model.pkl')
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def get_venue_id(venue_name):
     """
-    Create all required features for the improved model prediction.
+    Convert venue name to venue ID for model prediction.
+    
+    Args:
+        venue_name (str): Stadium name
+    
+    Returns:
+        str: Venue ID as string
+    """
+    return VENUE_NAME_TO_ID.get(venue_name, DEFAULT_VENUE_ID)
+
+
+def prepare_batted_ball_features(launch_speed, launch_angle, venue_name, 
+                                  coord_x=None, coord_y=None, bat_side=None):
+    """
+    Prepare features for model prediction, handling missing spray data gracefully.
     
     Args:
         launch_speed (float): Exit velocity in mph
         launch_angle (float): Launch angle in degrees
-        stadium (str): Venue name
-        
+        venue_name (str): Stadium name
+        coord_x (float, optional): Hit coordinates X
+        coord_y (float, optional): Hit coordinates Y
+        bat_side (str, optional): 'L' or 'R' for batter handedness
+    
     Returns:
-        pd.DataFrame: DataFrame with all required features
+        pd.DataFrame: Features ready for model prediction
     """
-    # Convert angle to radians for distance calculation
-    angle_rad = np.radians(launch_angle)
+    venue_id = get_venue_id(venue_name)
     
-    # Calculate distance proxy
-    distance_proxy = launch_speed * np.sin(2 * angle_rad)
+    # Check if we have spray angle data
+    has_spray_data = (
+        coord_x is not None and 
+        coord_y is not None and 
+        bat_side is not None and
+        not pd.isna(coord_x) and 
+        not pd.isna(coord_y)
+    )
     
-    # Categorize launch angle
-    if launch_angle < 10:
-        launch_angle_category = 'ground_ball'
-    elif launch_angle < 25:
-        launch_angle_category = 'line_drive'
-    elif launch_angle < 50:
-        launch_angle_category = 'fly_ball'
+    if has_spray_data:
+        return create_features_for_prediction(
+            launch_speed=launch_speed,
+            launch_angle=launch_angle,
+            coord_x=coord_x,
+            coord_y=coord_y,
+            bat_side=bat_side,
+            venue_id=venue_id
+        )
     else:
-        launch_angle_category = 'popup'
-    
-    # Barrel zone indicator
-    is_barrel = int((launch_speed >= 95) & (launch_angle >= 25) & (launch_angle <= 35))
-    
-    # Create DataFrame with all features
-    return pd.DataFrame({
-        'hitData_launchSpeed': [launch_speed],
-        'hitData_launchAngle': [launch_angle],
-        'distance_proxy': [distance_proxy],
-        'launch_angle_category': [launch_angle_category],
-        'is_barrel': [is_barrel],
-        'venue_name': [stadium]
-    })
+        # Fallback: use neutral spray angle
+        return create_features_for_prediction_fallback(
+            launch_speed=launch_speed,
+            launch_angle=launch_angle,
+            venue_id=venue_id
+        )
+
+
+# =============================================================================
+# OUTCOME EXTRACTION
+# =============================================================================
 
 def outcomes(game_data, steals_and_pickoffs, home_or_away):
     """
@@ -62,7 +101,7 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
     Returns:
         list: Tuples of (outcome_data, event_type, player_name) where outcome_data is either
               a string ('strikeout'/'walk'/'stolen_base'/'pickoff') or 
-              list [launch_speed, launch_angle, venue]
+              dict with batted ball data
     """
     home_or_away_team = game_data.copy()
     if home_or_away == 'home':
@@ -72,43 +111,52 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
         home_or_away_team = home_or_away_team[home_or_away_team['isTopInning'] == True]
         baserunning_events = steals_and_pickoffs[steals_and_pickoffs['isTopInning'] == True]
     
-    outcomes = []
+    outcomes_list = []
     
     # Process batting outcomes
     automatic_outs = home_or_away_team[(home_or_away_team['eventType'] == 'out') & 
                                      (home_or_away_team['hitData.launchSpeed'].isnull())]
     for _, row in automatic_outs.iterrows():
-        outcomes.append(("strikeout", row['eventType'], row['batter.fullName']))
+        outcomes_list.append(("strikeout", row['eventType'], row['batter.fullName']))
         
     walks = home_or_away_team[home_or_away_team['eventType'] == 'walk']
     for _, row in walks.iterrows():
-        outcomes.append(("walk", row['eventType'], row['batter.fullName']))
+        outcomes_list.append(("walk", row['eventType'], row['batter.fullName']))
         
     put_in_play = home_or_away_team[~home_or_away_team['hitData.launchSpeed'].isnull()].reset_index(drop=True)
     for _, row in put_in_play.iterrows():
-        outcomes.append(([row['hitData.launchSpeed'], row['hitData.launchAngle'], row['venue.name']], 
-                       row['eventType'], row['batter.fullName']))
+        # Create dict with all batted ball data (including spray angle fields)
+        batted_ball_data = {
+            'launch_speed': row['hitData.launchSpeed'],
+            'launch_angle': row['hitData.launchAngle'],
+            'venue_name': row['venue.name'],
+            'coord_x': row.get('hitData.coordinates.coordX'),
+            'coord_y': row.get('hitData.coordinates.coordY'),
+            'bat_side': row.get('batSide.code')  # Flattened column name
+        }
+        outcomes_list.append((batted_ball_data, row['eventType'], row['batter.fullName']))
     
     # Process baserunning events
     if not baserunning_events.empty:
         for _, row in baserunning_events.iterrows():
-            outcomes.append((row['play'], row['play'], row['batter.fullName']))
+            outcomes_list.append((row['play'], row['play'], row['batter.fullName']))
     
-    # Sort outcomes by their original order
-    return outcomes
+    return outcomes_list
 
-def calculate_total_bases(outcomes):
+
+def calculate_total_bases(outcomes_list):
     """
     Calculate expected bases and outcome probabilities for each batting/baserunning event.
     
     Args:
-        outcomes (list): List of outcome tuples from outcomes()
+        outcomes_list (list): List of outcome tuples from outcomes()
         
     Returns:
         pd.DataFrame: Detailed stats including launch data, probabilities, and estimated bases
     """
     result_list = []
-    for outcome, original_event_type, full_name in outcomes:
+    
+    for outcome, original_event_type, full_name in outcomes_list:
         if outcome == "strikeout":
             bases = 0
             event_type = "strikeout"
@@ -129,13 +177,41 @@ def calculate_total_bases(outcomes):
             event_type = "pickoff"
             probabilities = [1, 0, 0, 0, 0]
             launch_speed, launch_angle, stadium = None, None, None
+        elif isinstance(outcome, dict):
+            # Batted ball with full data
+            launch_speed = outcome['launch_speed']
+            launch_angle = outcome['launch_angle']
+            stadium = outcome['venue_name']
+            event_type = "in_play"
+            
+            # Create features and predict
+            features = prepare_batted_ball_features(
+                launch_speed=launch_speed,
+                launch_angle=launch_angle,
+                venue_name=stadium,
+                coord_x=outcome.get('coord_x'),
+                coord_y=outcome.get('coord_y'),
+                bat_side=outcome.get('bat_side')
+            )
+            probabilities = pipeline.predict_proba(features)[0]
+            
+            bases = (
+                probabilities[1] * 1 +
+                probabilities[2] * 2 +
+                probabilities[3] * 3 +
+                probabilities[4] * 4
+            )
         else:
+            # Legacy format: list [launch_speed, launch_angle, venue]
             launch_speed, launch_angle, stadium = outcome
             event_type = "in_play"
             
-            # Use the new feature creation function
-            new_example = create_features_for_prediction(launch_speed, launch_angle, stadium)
-            probabilities = pipeline.predict_proba(new_example)[0]
+            features = prepare_batted_ball_features(
+                launch_speed=launch_speed,
+                launch_angle=launch_angle,
+                venue_name=stadium
+            )
+            probabilities = pipeline.predict_proba(features)[0]
             
             bases = (
                 probabilities[1] * 1 +
@@ -161,12 +237,14 @@ def calculate_total_bases(outcomes):
     
     return pd.DataFrame(result_list)
 
+
 def create_detailed_outcomes_df(game_data, steals_and_pickoffs, home_or_away):
     """
     Create a detailed DataFrame of batting outcomes for specified team.
     
     Args:
         game_data (pd.DataFrame): Original game data
+        steals_and_pickoffs (pd.DataFrame): Steals and pickoffs data
         home_or_away (str): 'home' or 'away' team selection
         
     Returns:
@@ -178,6 +256,7 @@ def create_detailed_outcomes_df(game_data, steals_and_pickoffs, home_or_away):
     detailed_df = detailed_df[~detailed_df['event_type'].isin(['stolen_base', 'pickoff'])]
     detailed_df = detailed_df.dropna().reset_index(drop=True)
     return detailed_df
+
 
 def outcome_rankings(home_detailed_df, away_detailed_df):
     """
@@ -206,33 +285,40 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
                        "out_prob", "single_prob", "double_prob", "triple_prob", "hr_prob"]
     total_team_outcomes = total_team_outcomes[selected_columns]
     total_team_outcomes['original_event_type'] = total_team_outcomes['original_event_type'].str.title()
-    total_team_outcomes.columns = total_team_outcomes.columns.str.replace('_', ' ').str.title()
-    total_team_outcomes = total_team_outcomes.rename(columns={'Original Event Type': 'Result', 'Full Name': 'Player'})
-    total_team_outcomes['team_color'] = total_team_outcomes['Team'].map({team: colors[0] for team, colors in team_colors.items()})
-    return total_team_outcomes.sort_values(by='Estimated Bases', ascending=False).head(15)
+    total_team_outcomes = total_team_outcomes.rename(columns={
+        "launch_speed": "EV", "launch_angle": "LA", "original_event_type": "Result", 
+        "out_prob": "Out%", "single_prob": "1B%", "double_prob": "2B%", 
+        "triple_prob": "3B%", "hr_prob": "HR%", "estimated_bases": "xBases", "team": "Team"
+    })
+    total_team_outcomes.columns = [col.title() for col in total_team_outcomes.columns]
+    return total_team_outcomes.sort_values(by='Xbases', ascending=False).head(10).reset_index(drop=True)
+
+
+# =============================================================================
+# BASERUNNING
+# =============================================================================
 
 def attempt_steal(bases):
     """
-    Attempt to steal with the lead runner.
+    Attempt steal of next base for lead runner.
     
     Args:
         bases (list): Current base occupancy [1st, 2nd, 3rd]
         
     Returns:
-        int: Runs scored (1 if stealing home successfully, 0 otherwise)
+        int: Runs scored (1 if runner on 3rd steals home, else 0)
     """
-    if bases[2]:  # Runner on third attempts to steal home
+    if bases[2]:  # Steal home (rare)
         bases[2] = False
         return 1
-    elif bases[1]:  # Runner on second advances to third
+    elif bases[1]:  # Steal third
         bases[2] = True
         bases[1] = False
-        return 0
-    elif bases[0]:  # Runner on first advances to second
+    elif bases[0]:  # Steal second
         bases[1] = True
         bases[0] = False
-        return 0
     return 0
+
 
 def attempt_pickoff(bases):
     """
@@ -252,6 +338,7 @@ def attempt_pickoff(bases):
         bases[0] = False
     return 1
 
+
 def advance_runner(bases, count=1, is_walk=False):
     """
     Calculate runs scored and update base runners after a hit/walk.
@@ -264,11 +351,9 @@ def advance_runner(bases, count=1, is_walk=False):
     Returns:
         int: Runs scored on this play
     """
-    import random
     runs = 0
     
     if is_walk:
-        # Walk logic stays the same
         if bases[2] and bases[1] and bases[0]:
             runs += 1
             bases[2] = bases[1]
@@ -284,34 +369,28 @@ def advance_runner(bases, count=1, is_walk=False):
         else:
             bases[0] = True
     
-    elif count == 4:  # Home run - special case
-        # Count all runners on base plus the batter
+    elif count == 4:  # Home run
         runs = sum(bases) + 1
-        # Clear all bases
         bases[0] = False
         bases[1] = False
         bases[2] = False
     
     else:  # Singles, doubles, triples
-        # Store original state to avoid conflicts
         original_bases = bases.copy()
         bases[0] = bases[1] = bases[2] = False
         
-        # Process each runner with probabilistic advancements
         for i in range(2, -1, -1):  # Work backwards from 3rd to 1st
             if original_bases[i]:
-                # Calculate advancement with special cases
                 advancement = count
                 
-                # Special probabilistic advancements
+                # Probabilistic advancements
                 if count == 1 and i == 1:  # Single with runner on 2nd
-                    advancement = 2 if random.random() < 0.5 else 1  # 50% scores
-                elif count == 1 and i == 0 and not original_bases[1]:  # Single with runner on 1st (only if 2nd empty)
-                    advancement = 2 if random.random() < 0.25 else 1  # 25% to 3rd
+                    advancement = 2 if random.random() < 0.5 else 1
+                elif count == 1 and i == 0 and not original_bases[1]:
+                    advancement = 2 if random.random() < 0.25 else 1
                 elif count == 2 and i == 0:  # Double with runner on 1st
-                    advancement = 3 if random.random() < 0.75 else 2  # 75% scores
+                    advancement = 3 if random.random() < 0.75 else 2
                 
-                # Apply advancement
                 new_position = i + advancement
                 if new_position >= 3:
                     runs += 1
@@ -328,17 +407,28 @@ def advance_runner(bases, count=1, is_walk=False):
     
     return runs
 
+
+# =============================================================================
+# SIMULATION ENGINE
+# =============================================================================
+
 def simulate_game(outcomes_list, prob_cache):
     """
-    Simulate one game's worth of plate appearances and calculate runs scored using pre-computed probabilities.
+    Simulate one game using pre-computed probabilities.
+    
+    Args:
+        outcomes_list (list): List of outcome data
+        prob_cache (dict): Pre-computed probabilities keyed by outcome
+    
+    Returns:
+        int: Runs scored in simulated game
     """
     outs = 0
     runs = 0
     bases = [False, False, False]
     
-    # Use numpy for faster random sampling WITHOUT replacement
     n_outcomes = len(outcomes_list)
-    indices = np.random.permutation(n_outcomes)  # Shuffle indices
+    indices = np.random.permutation(n_outcomes)
     
     for idx in indices:
         if outs == 3:
@@ -357,9 +447,17 @@ def simulate_game(outcomes_list, prob_cache):
         elif outcome == "pickoff":
             if any(bases):
                 outs += attempt_pickoff(bases)
-        elif isinstance(outcome, list) and len(outcome) == 3:
-            # Use pre-computed probabilities
-            probabilities = prob_cache[tuple(outcome)]
+        elif isinstance(outcome, (dict, tuple)):
+            # Get cache key
+            if isinstance(outcome, dict):
+                cache_key = (outcome['launch_speed'], outcome['launch_angle'], outcome['venue_name'])
+            else:
+                cache_key = outcome
+            
+            probabilities = prob_cache.get(cache_key)
+            if probabilities is None:
+                continue
+                
             random_value = random.random()
             
             if random_value < probabilities[0]:
@@ -375,19 +473,20 @@ def simulate_game(outcomes_list, prob_cache):
     
     return runs
 
+
 def simulator(num_simulations, home_outcomes, away_outcomes):
     """
-    Simulator with pre-computed probabilities.
+    Run multiple game simulations with pre-computed probabilities.
     
     Args:
         num_simulations (int): Number of games to simulate
-        home_outcomes (list): List of possible home team batting outcomes
-        away_outcomes (list): List of possible away team batting outcomes
+        home_outcomes (list): List of home team batting outcomes
+        away_outcomes (list): List of away team batting outcomes
         
     Returns:
         tuple: (home_runs_array, away_runs_array, home_win_pct, away_win_pct, tie_pct)
     """
-    # Clean up outcomes format (handle tuples from original format)
+    # Clean up outcomes format
     home_outcomes_clean = []
     away_outcomes_clean = []
     
@@ -408,13 +507,29 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     all_outcomes = home_outcomes_clean + away_outcomes_clean
     
     for outcome in all_outcomes:
-        if isinstance(outcome, list) and len(outcome) == 3:
-            key = tuple(outcome)
-            if key not in prob_cache:
+        if isinstance(outcome, dict):
+            cache_key = (outcome['launch_speed'], outcome['launch_angle'], outcome['venue_name'])
+            if cache_key not in prob_cache:
+                features = prepare_batted_ball_features(
+                    launch_speed=outcome['launch_speed'],
+                    launch_angle=outcome['launch_angle'],
+                    venue_name=outcome['venue_name'],
+                    coord_x=outcome.get('coord_x'),
+                    coord_y=outcome.get('coord_y'),
+                    bat_side=outcome.get('bat_side')
+                )
+                prob_cache[cache_key] = pipeline.predict_proba(features)[0]
+        elif isinstance(outcome, list) and len(outcome) == 3:
+            # Legacy format
+            cache_key = tuple(outcome)
+            if cache_key not in prob_cache:
                 launch_speed, launch_angle, stadium = outcome
-                # Use the new feature creation function
-                new_example = create_features_for_prediction(launch_speed, launch_angle, stadium)
-                prob_cache[key] = pipeline.predict_proba(new_example)[0]
+                features = prepare_batted_ball_features(
+                    launch_speed=launch_speed,
+                    launch_angle=launch_angle,
+                    venue_name=stadium
+                )
+                prob_cache[cache_key] = pipeline.predict_proba(features)[0]
     
     # Initialize arrays for results
     home_runs_scored = np.zeros(num_simulations, dtype=int)
@@ -422,7 +537,7 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     
     # Run simulations with progress bar
     for i in tqdm(range(num_simulations), 
-                  desc="Simulating games (fast)", 
+                  desc="Simulating games", 
                   unit="sim",
                   position=0,
                   leave=True,
