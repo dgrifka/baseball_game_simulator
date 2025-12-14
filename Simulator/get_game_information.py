@@ -231,7 +231,7 @@ def get_game_info(game_id, all_columns=False):
             "hitData.launchSpeed", "hitData.launchAngle",
             # New columns for spray angle model
             "hitData.coordinates.coordX", "hitData.coordinates.coordY",
-            "matchup.batSide.code"
+            "batSide.code"  # From matchup data (flattened without 'matchup.' prefix)
         ]
         # Only keep columns that exist (some may be missing in edge cases)
         cols_available = [c for c in cols_needed if c in total_pbp_filtered.columns]

@@ -132,7 +132,7 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
             'venue_name': row['venue.name'],
             'coord_x': row.get('hitData.coordinates.coordX'),
             'coord_y': row.get('hitData.coordinates.coordY'),
-            'bat_side': row.get('matchup.batSide.code')
+            'bat_side': row.get('batSide.code')  # Flattened column name
         }
         outcomes_list.append((batted_ball_data, row['eventType'], row['batter.fullName']))
     
