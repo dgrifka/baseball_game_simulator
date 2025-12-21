@@ -307,24 +307,20 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.close()
 
 def prepare_table_data(df):
-    """Prepare and format data for the table display."""
+    """Prepare and format data for table visualization."""
     df = df.copy()
-    
-    # Rename columns to expected format
-    column_mapping = {
-        'Ev': 'Launch Speed',
-        'La': 'Launch Angle',
-        'Xbases': 'Estimated Bases',
-        '1B%': 'Single Prob',
-        '2B%': 'Double Prob',
-        '3B%': 'Triple Prob',
-        'Hr%': 'Hr Prob',
-        'Out%': 'Out Prob'
-    }
-    df = df.rename(columns=column_mapping)
     
     # Add rank column
     df.insert(0, 'Rank', range(1, len(df) + 1))
+    
+    # Calculate spray direction if coordinates are available
+    if 'coord_x' in df.columns and 'coord_y' in df.columns and 'bat_side' in df.columns:
+        df['Spray'] = df.apply(
+            lambda row: get_spray_direction(row['coord_x'], row['coord_y'], row['bat_side']), 
+            axis=1
+        )
+    else:
+        df['Spray'] = '-'
     
     # Format Result column
     df['Result'] = df['Result'].str.replace('_', ' ').str.title()
@@ -339,9 +335,9 @@ def prepare_table_data(df):
     # Simplify probability columns - keep only HR probability as it's most impactful
     df['HR%'] = df['Hr Prob']
     
-    # Select and reorder columns for clarity
+    # Select and reorder columns for clarity (added Spray column)
     columns_to_keep = ['Rank', 'Team', 'Player', 'Launch Speed', 'Launch Angle', 
-                       'Result', 'Estimated Bases', 'xBA', 'HR%']
+                       'Spray', 'Result', 'Estimated Bases', 'xBA', 'HR%']
     df = df[columns_to_keep]
     
     # Format launch angle to include degree symbol
@@ -390,9 +386,8 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     ax.set_position([0.05, 0.05, 0.9, 0.65])  # [left, bottom, width, height]
     ax.axis('off')
     
-    # Adjust column widths - tighter Team column, wider Player column for full names
-    # Total should still sum to approximately same as before
-    col_widths = [0.05, 0.06, 0.22, 0.11, 0.11, 0.10, 0.12, 0.08, 0.08]
+    # Column widths: Rank, Team, Player, Launch Speed, Launch Angle, Spray, Result, Est Bases, xBA, HR%
+    col_widths = [0.05, 0.06, 0.18, 0.10, 0.10, 0.07, 0.08, 0.12, 0.07, 0.07]
     
     # Create table
     table = ax.table(cellText=df.values,
@@ -796,6 +791,38 @@ HOME_PLATE_X = 125.42
 HOME_PLATE_Y = 199.02
 
 
+def get_spray_direction(coord_x, coord_y, bat_side):
+    """
+    Calculate spray direction category for display in tables.
+    
+    Returns:
+        str: 'Pull', 'Center', 'Oppo', or '-' if data unavailable
+    """
+    # Check for missing data
+    if coord_x is None or coord_y is None or bat_side is None:
+        return '-'
+    if pd.isna(coord_x) or pd.isna(coord_y) or pd.isna(bat_side):
+        return '-'
+    
+    # Calculate raw spray angle
+    delta_x = coord_x - HOME_PLATE_X
+    delta_y = HOME_PLATE_Y - coord_y
+    angle_rad = np.arctan2(delta_x, delta_y)
+    spray_angle = np.degrees(angle_rad)
+    
+    # Adjust for handedness (flip for lefties so pull is always negative)
+    if bat_side == 'L':
+        spray_angle = -spray_angle
+    
+    # Categorize
+    if spray_angle < -15:
+        return 'Pull'
+    elif spray_angle > 15:
+        return 'Oppo'
+    else:
+        return 'Center'
+
+
 def calculate_spray_angle(coord_x, coord_y):
     """
     Calculate spray angle from Statcast coordinates.
@@ -1107,6 +1134,10 @@ def spray_chart(home_outcomes, away_outcomes,
     # Attribution (centered under title)
     fig.text(0.5, 0.86, 'Data: MLB  |  @mlb_simulator', 
              fontsize=9, color='gray', ha='center', va='top')
+    
+    # Disclaimer about estimated dimensions
+    fig.text(0.5, 0.01, '* Ballpark dimensions estimated using LF/CF/RF fence distances', 
+             fontsize=8, color='gray', ha='center', va='bottom', style='italic')
     
     # Legend (bottom center)
     legend_items = [
