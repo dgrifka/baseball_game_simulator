@@ -291,7 +291,7 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
         "triple_prob": "3B%", "hr_prob": "HR%", "estimated_bases": "xBases", "team": "Team"
     })
     total_team_outcomes.columns = [col.title() for col in total_team_outcomes.columns]
-    return total_team_outcomes.sort_values(by='Xbases', ascending=False).head(10).reset_index(drop=True)
+    return total_team_outcomes.sort_values(by='Xbases', ascending=False).head(15).reset_index(drop=True)
 
 
 # =============================================================================
