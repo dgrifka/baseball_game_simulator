@@ -835,10 +835,54 @@ def calculate_spray_angle(coord_x, coord_y):
     angle_rad = np.arctan2(delta_x, delta_y)
     return np.degrees(angle_rad)
 
+def calculate_landing_distance(launch_speed, launch_angle):
+    """
+    Estimate where a batted ball lands using projectile physics.
+    
+    Uses projectile motion with empirically-tuned drag factors.
+    For ground balls (negative launch angle), estimates roll distance.
+    
+    Args:
+        launch_speed: Exit velocity in mph
+        launch_angle: Launch angle in degrees
+    
+    Returns:
+        float: Estimated landing distance in feet
+    """
+    v_fps = launch_speed * 1.467  # mph to ft/s
+    theta_rad = np.radians(launch_angle)
+    g = 32.174  # ft/s²
+    
+    # Ground balls (land immediately, then roll)
+    if launch_angle <= 0:
+        roll_distance = 30 + (launch_speed - 50) * 1.2
+        return np.clip(roll_distance, 20, 150)
+    
+    # Projectile motion base distance
+    base_distance = (v_fps ** 2 * np.sin(2 * theta_rad)) / g
+    
+    # Drag factors tuned to match expected distances
+    if launch_angle <= 10:
+        drag_factor = 0.78  # Low liners
+    elif launch_angle <= 20:
+        drag_factor = 0.72  # Line drives
+    elif launch_angle <= 30:
+        drag_factor = 0.64  # Optimal fly balls
+    elif launch_angle <= 40:
+        drag_factor = 0.54  # Fly balls
+    elif launch_angle <= 50:
+        drag_factor = 0.45  # High fly balls
+    else:
+        drag_factor = 0.33  # Pop-ups
+    
+    return np.clip(base_distance * drag_factor, 20, 500)
 
 def calculate_hit_distance(coord_x, coord_y):
     """
-    Calculate actual hit distance from Statcast coordinates.
+    Calculate hit distance from Statcast coordinates.
+    
+    DEPRECATED: Use calculate_landing_distance() for physics-based distance.
+    This function is kept for backward compatibility.
     
     Returns:
         float: Distance scaled for plotting
@@ -1062,8 +1106,14 @@ def spray_chart(home_outcomes, away_outcomes,
             if coord_x is None or coord_y is None:
                 continue
             
+            # Spray angle from coordinates (direction is accurate)
             spray_angle = calculate_spray_angle(coord_x, coord_y)
-            distance = calculate_hit_distance(coord_x, coord_y)
+            
+            # Distance from physics (landing distance based on EV/LA)
+            launch_speed = outcome_data.get('launch_speed')
+            launch_angle = outcome_data.get('launch_angle')
+            distance_ft = calculate_landing_distance(launch_speed, launch_angle)
+            distance = distance_ft * FEET_TO_PLOT  # Convert to plot units
             
             outcome_data['venue_name'] = outcome_data.get('venue_name', venue_name)
             xbases = calculate_expected_bases_for_spray(outcome_data, pipeline)
