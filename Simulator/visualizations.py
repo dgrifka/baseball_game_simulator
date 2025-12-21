@@ -12,15 +12,18 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 
-from Simulator.constants import team_colors
+from Simulator.constants import (
+    team_colors, 
+    STADIUM_DIMENSIONS, DEFAULT_STADIUM_DIMENSIONS, FEET_TO_PLOT,
+    TEAM_LOGO_MAP, TEAM_DISPLAY_MAP
+)
+
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import requests
 from io import BytesIO
 from PIL import Image, ImageEnhance
 import os
 import ast
-
-
 
 def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
     """
@@ -732,7 +735,371 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300,
                 facecolor='white', edgecolor='none')
     plt.close()
+
+
+# =============================================================================
+# SPRAY CHART VISUALIZATION
+# =============================================================================
+
+def get_logo_team_name(short_name):
+    """Convert short team name to logo lookup name."""
+    return TEAM_LOGO_MAP.get(short_name, short_name)
+
+
+def get_display_team_name(short_name):
+    """Convert short team name to full display name."""
+    return TEAM_DISPLAY_MAP.get(short_name, short_name)
+
+
+# Statcast coordinate system constants
+HOME_PLATE_X = 125.42
+HOME_PLATE_Y = 199.02
+
+
+def calculate_spray_angle(coord_x, coord_y):
+    """
+    Calculate spray angle from Statcast coordinates.
     
+    Returns:
+        float: Angle in degrees where 0° = CF, negative = LF, positive = RF
+    """
+    delta_x = coord_x - HOME_PLATE_X
+    delta_y = HOME_PLATE_Y - coord_y
+    angle_rad = np.arctan2(delta_x, delta_y)
+    return np.degrees(angle_rad)
+
+
+def calculate_hit_distance(coord_x, coord_y):
+    """
+    Calculate actual hit distance from Statcast coordinates.
+    
+    Returns:
+        float: Distance scaled for plotting
+    """
+    delta_x = coord_x - HOME_PLATE_X
+    delta_y = HOME_PLATE_Y - coord_y
+    raw_distance = np.sqrt(delta_x**2 + delta_y**2)
+    return raw_distance * 0.6
+
+
+def calculate_expected_bases_for_spray(outcome_dict, pipeline):
+    """
+    Calculate expected bases for a batted ball in spray chart context.
+    
+    Returns:
+        float: Expected bases (0-4 scale)
+    """
+    from Simulator.game_simulator import prepare_batted_ball_features
+    
+    try:
+        features = prepare_batted_ball_features(
+            launch_speed=outcome_dict['launch_speed'],
+            launch_angle=outcome_dict['launch_angle'],
+            venue_name=outcome_dict['venue_name'],
+            coord_x=outcome_dict.get('coord_x'),
+            coord_y=outcome_dict.get('coord_y'),
+            bat_side=outcome_dict.get('bat_side')
+        )
+        probs = pipeline.predict_proba(features)[0]
+        return probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4
+    except:
+        return 0.5
+
+
+def get_expected_bases_color(xbases):
+    """
+    Get color for expected bases value.
+    
+    4-category color scheme:
+    - Out: < 0.5 expected bases (gray)
+    - Single: 0.5 - 1.5 expected bases (orange)
+    - XBH: 1.5 - 3.0 expected bases (tomato)
+    - HR: > 3.0 expected bases (crimson)
+    """
+    if xbases < 0.5:
+        return '#808080'  # Gray - Out
+    elif xbases < 1.5:
+        return '#FFA500'  # Orange - Single
+    elif xbases < 3.0:
+        return '#FF6347'  # Tomato - XBH
+    else:
+        return '#DC143C'  # Crimson - HR
+
+
+def get_stadium_fence_curve(venue_name, num_points=100):
+    """
+    Generate fence curve points for a specific stadium.
+    
+    Returns:
+        tuple: (x_coords, y_coords, dims, smooth_angles, smooth_distances)
+    """
+    dims = STADIUM_DIMENSIONS.get(venue_name, DEFAULT_STADIUM_DIMENSIONS)
+    
+    angles_deg = np.array([-45, -22.5, 0, 22.5, 45])
+    distances_ft = np.array([dims['LF'], dims['LCF'], dims['CF'], dims['RCF'], dims['RF']])
+    distances_plot = distances_ft * FEET_TO_PLOT
+    
+    interp_func = interp1d(angles_deg, distances_plot, kind='quadratic')
+    
+    smooth_angles = np.linspace(-45, 45, num_points)
+    smooth_distances = interp_func(smooth_angles)
+    
+    angles_rad = np.radians(90 - smooth_angles)
+    x_coords = smooth_distances * np.cos(angles_rad)
+    y_coords = smooth_distances * np.sin(angles_rad)
+    
+    return x_coords, y_coords, dims, smooth_angles, smooth_distances
+
+
+def draw_baseball_field(ax, venue_name='default'):
+    """
+    Draw baseball field with stadium-specific fence dimensions.
+    Grass fills only to the fence line.
+    """
+    fence_x, fence_y, dims, smooth_angles, smooth_distances = get_stadium_fence_curve(venue_name)
+    
+    grass_color = '#90EE90'
+    dirt_color = '#D2B48C'
+    line_color = '#FFFFFF'
+    
+    # Create outfield grass polygon (follows fence curve)
+    grass_vertices = [(0, 0)]
+    for x, y in zip(fence_x, fence_y):
+        grass_vertices.append((x, y))
+    grass_vertices.append((0, 0))
+    
+    grass_polygon = Polygon(grass_vertices, facecolor=grass_color, 
+                           edgecolor='#228B22', linewidth=2, alpha=0.6, zorder=1)
+    ax.add_patch(grass_polygon)
+    
+    # Infield dirt
+    infield_radius = 35
+    infield = patches.Wedge(
+        center=(0, 0), r=infield_radius,
+        theta1=45, theta2=135,
+        facecolor=dirt_color, edgecolor='none', alpha=0.5, zorder=2
+    )
+    ax.add_patch(infield)
+    
+    # Foul lines (extend past fence for HR visibility)
+    max_fence = max(dims.values()) * FEET_TO_PLOT
+    foul_extension = max_fence + 12
+    
+    for angle in [-45, 45]:
+        angle_rad = np.radians(90 - angle)
+        x_end = foul_extension * np.cos(angle_rad)
+        y_end = foul_extension * np.sin(angle_rad)
+        ax.plot([0, x_end], [0, y_end], color=line_color, linewidth=2, alpha=0.8, zorder=3)
+    
+    # Fence line
+    ax.plot(fence_x, fence_y, color='#333333', linewidth=3, zorder=4)
+    
+    # Distance labels just outside the fence
+    label_positions = [
+        (-45, dims['LF'], 'right'),
+        (0, dims['CF'], 'center'),
+        (45, dims['RF'], 'left')
+    ]
+    
+    for angle, dist_ft, ha in label_positions:
+        angle_rad = np.radians(90 - angle)
+        dist_plot = dist_ft * FEET_TO_PLOT
+        label_dist = dist_plot + 6
+        label_x = label_dist * np.cos(angle_rad)
+        label_y = label_dist * np.sin(angle_rad)
+        ax.text(label_x, label_y, f"{dist_ft}'", ha=ha, va='bottom',
+                fontsize=9, color='#444444', fontweight='bold', zorder=5)
+    
+    # Home plate
+    home_plate = patches.RegularPolygon(
+        (0, 0), numVertices=5, radius=2.5,
+        orientation=np.pi, facecolor='white',
+        edgecolor='black', linewidth=1, zorder=6
+    )
+    ax.add_patch(home_plate)
+
+
+def spray_chart(home_outcomes, away_outcomes, 
+                home_team, away_team, 
+                home_score, away_score,
+                home_win_percentage, away_win_percentage, tie_percentage,
+                mlb_team_logos, formatted_date, 
+                venue_name='default',
+                images_dir="images"):
+    """
+    Creates side-by-side spray chart visualizations with stadium-specific dimensions.
+    
+    Shows batted ball locations with team logos, colored rings indicating expected
+    outcome based on the batted ball model (Out, Single, XBH, HR).
+    
+    Args:
+        home_outcomes: List of home team outcome tuples
+        away_outcomes: List of away team outcome tuples
+        home_team: Home team short name
+        away_team: Away team short name
+        home_score: Home team actual score
+        away_score: Away team actual score
+        home_win_percentage: Home deserve-to-win %
+        away_win_percentage: Away deserve-to-win %
+        tie_percentage: Tie percentage
+        mlb_team_logos: List of team logo dictionaries
+        formatted_date: Date string for display
+        venue_name: Stadium name for fence dimensions
+        images_dir: Directory to save output
+        
+    Returns:
+        str: Path to saved image file
+    """
+    import joblib
+    
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.close('all')
+    
+    pipeline = joblib.load('Model/batted_ball_model.pkl')
+    
+    percentages = {
+        'away': f"{away_win_percentage:.0f}",
+        'home': f"{home_win_percentage:.0f}",
+        'tie': f"{tie_percentage:.0f}"
+    }
+    
+    home_logo_name = get_logo_team_name(home_team)
+    away_logo_name = get_logo_team_name(away_team)
+    home_display_name = get_display_team_name(home_team)
+    away_display_name = get_display_team_name(away_team)
+    
+    # Figure size optimized for two side-by-side square-ish fields
+    fig, (ax_away, ax_home) = plt.subplots(1, 2, figsize=(15, 7), dpi=150)
+    
+    # Tight margins
+    plt.subplots_adjust(left=0.01, right=0.99, top=0.82, bottom=0.08, wspace=0.02)
+    
+    # Process outcomes
+    batted_balls = {'home': [], 'away': []}
+    walk_counts = {'home': 0, 'away': 0}
+    
+    for team_key, team_outcomes in [('home', home_outcomes), ('away', away_outcomes)]:
+        for outcome in team_outcomes:
+            outcome_data = outcome[0] if isinstance(outcome, tuple) else outcome
+            
+            if outcome_data == 'walk':
+                walk_counts[team_key] += 1
+                continue
+            
+            if not isinstance(outcome_data, dict):
+                continue
+            
+            coord_x = outcome_data.get('coord_x')
+            coord_y = outcome_data.get('coord_y')
+            
+            if coord_x is None or coord_y is None:
+                continue
+            
+            spray_angle = calculate_spray_angle(coord_x, coord_y)
+            distance = calculate_hit_distance(coord_x, coord_y)
+            
+            outcome_data['venue_name'] = outcome_data.get('venue_name', venue_name)
+            xbases = calculate_expected_bases_for_spray(outcome_data, pipeline)
+            
+            angle_rad = np.radians(90 - spray_angle)
+            plot_x = distance * np.cos(angle_rad)
+            plot_y = distance * np.sin(angle_rad)
+            
+            batted_balls[team_key].append({
+                'x': plot_x,
+                'y': plot_y,
+                'xbases': xbases,
+            })
+    
+    # Axis limits based on stadium dimensions
+    dims = STADIUM_DIMENSIONS.get(venue_name, DEFAULT_STADIUM_DIMENSIONS)
+    max_fence = max(dims.values()) * FEET_TO_PLOT
+    axis_limit = max_fence + 12
+    
+    # Plot each team
+    for ax, team_key, display_name, logo_name in [
+        (ax_away, 'away', away_display_name, away_logo_name),
+        (ax_home, 'home', home_display_name, home_logo_name)
+    ]:
+        draw_baseball_field(ax, venue_name)
+        
+        logo_url = get_team_logo(logo_name, mlb_team_logos)
+        
+        if not logo_url:
+            print(f"Warning: No logo found for {display_name} (tried: {logo_name})")
+            continue
+        
+        for bb in batted_balls[team_key]:
+            color = get_expected_bases_color(bb['xbases'])
+            img = getImage(logo_url, zoom=0.45, size=(40, 40), alpha=0.85)
+            
+            if img:
+                ab = AnnotationBbox(img, (bb['x'], bb['y']), frameon=False, zorder=10)
+                ax.add_artist(ab)
+                
+                ring = plt.Circle(
+                    (bb['x'], bb['y']), radius=5.5,
+                    fill=False, edgecolor=color,
+                    linewidth=2.5, alpha=0.9, zorder=9
+                )
+                ax.add_patch(ring)
+        
+        ax.set_xlim(-axis_limit, axis_limit)
+        ax.set_ylim(-5, axis_limit)
+        ax.set_aspect('equal')
+        ax.axis('off')
+        
+        # Team title with stats
+        bip_count = len(batted_balls[team_key])
+        walk_count = walk_counts[team_key]
+        ax.set_title(f"{display_name}\n{bip_count} BIP  •  {walk_count} BB/HBP", 
+                     fontsize=14, fontweight='bold', pad=12)
+    
+    # Main title
+    title_text = (
+        f"Batted Ball Spray Chart  •  {venue_name}\n"
+        f"Actual: {away_display_name} {away_score} - {home_display_name} {home_score}  ({formatted_date})    "
+        f"Deserve-to-Win: {away_display_name} {percentages['away']}% - "
+        f"{home_display_name} {percentages['home']}%, Tie {percentages['tie']}%"
+    )
+    fig.suptitle(title_text, fontsize=13, fontweight='bold', y=0.94)
+    
+    # Attribution (centered under title)
+    fig.text(0.5, 0.86, 'Data: MLB  |  @mlb_simulator', 
+             fontsize=9, color='gray', ha='center', va='top')
+    
+    # Legend (bottom center)
+    legend_items = [
+        ('Out', '#808080'),
+        ('Single', '#FFA500'),
+        ('XBH', '#FF6347'),
+        ('HR', '#DC143C')
+    ]
+    
+    fig.text(0.35, 0.025, "Expected Outcome:", ha='right', fontsize=10, fontweight='bold', va='center')
+    
+    for i, (label, color) in enumerate(legend_items):
+        x_pos = 0.37 + (i * 0.085)
+        circle = plt.Circle((x_pos, 0.025), 0.01, 
+                            transform=fig.transFigure, 
+                            color=color, zorder=100)
+        fig.patches.append(circle)
+        fig.text(x_pos + 0.015, 0.025, label, ha='left', fontsize=10, va='center')
+    
+    # Save
+    os.makedirs(images_dir, exist_ok=True)
+    filename = (f"{away_display_name}_{home_display_name}_{away_score}-{home_score}--"
+                f"{percentages['away']}-{percentages['home']}_spray.png")
+    filepath = os.path.join(images_dir, filename)
+    
+    plt.savefig(filepath, dpi=250, facecolor='white', edgecolor='none',
+                bbox_inches='tight', pad_inches=0.05)
+    
+    print(f"Saved spray chart: {filepath}")
+    plt.close(fig)
+    
+    return filepath
+                    
 def add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df):
     """Add team logos to the table at the appropriate cell positions."""
     
