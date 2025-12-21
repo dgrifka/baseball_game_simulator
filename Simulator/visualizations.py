@@ -310,11 +310,21 @@ def prepare_table_data(df):
     """Prepare and format data for the table display."""
     df = df.copy()
     
+    # Rename columns to expected format
+    column_mapping = {
+        'Ev': 'Launch Speed',
+        'La': 'Launch Angle',
+        'Xbases': 'Estimated Bases',
+        '1B%': 'Single Prob',
+        '2B%': 'Double Prob',
+        '3B%': 'Triple Prob',
+        'Hr%': 'Hr Prob',
+        'Out%': 'Out Prob'
+    }
+    df = df.rename(columns=column_mapping)
+    
     # Add rank column
     df.insert(0, 'Rank', range(1, len(df) + 1))
-    
-    # Format player names - keep on single line for cleaner look
-    # df['Player'] = df['Player'].apply(lambda x: x.split()[0][0] + '. ' + ' '.join(x.split()[1:]))
     
     # Format Result column
     df['Result'] = df['Result'].str.replace('_', ' ').str.title()
