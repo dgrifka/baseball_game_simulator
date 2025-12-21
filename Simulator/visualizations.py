@@ -586,9 +586,9 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     player_contributions = {}
     
     # Process each team's outcomes
-    for team, outcomes, team_name in [(home_team, home_outcomes, home_team), 
+    for team, team_outcomes, team_name in [(home_team, home_outcomes, home_team), 
                                        (away_team, away_outcomes, away_team)]:
-        for outcome in outcomes:
+        for outcome in team_outcomes:
             # Handle tuple format (outcome_data, event_type, player_name)
             if isinstance(outcome, tuple) and len(outcome) >= 3:
                 outcome_data, event_type, player_name = outcome[0], outcome[1], outcome[2]
@@ -608,12 +608,34 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                 if outcome_data == 'walk':
                     player_contributions[player_key]['walks'] += 1
                     player_contributions[player_key]['total'] += 1
+                elif isinstance(outcome_data, dict) and 'launch_speed' in outcome_data:
+                    # NEW: Handle dict format from updated outcomes
+                    import joblib
+                    from Simulator.game_simulator import prepare_batted_ball_features
+                    
+                    try:
+                        pipeline = joblib.load('Model/batted_ball_model.pkl')
+                        
+                        features = prepare_batted_ball_features(
+                            launch_speed=outcome_data['launch_speed'],
+                            launch_angle=outcome_data['launch_angle'],
+                            venue_name=outcome_data.get('venue_name', 'Unknown'),
+                            coord_x=outcome_data.get('coord_x'),
+                            coord_y=outcome_data.get('coord_y'),
+                            bat_side=outcome_data.get('bat_side')
+                        )
+                        probs = pipeline.predict_proba(features)[0]
+                        estimated_bases = probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4
+                        
+                        player_contributions[player_key]['batted_balls'] += estimated_bases
+                        player_contributions[player_key]['total'] += estimated_bases
+                    except Exception as e:
+                        print(f"Error calculating estimated bases for {player_name}: {e}")
                 elif isinstance(outcome_data, list) and len(outcome_data) >= 3:
-                    # Batted ball - calculate estimated bases
+                    # LEGACY: Handle old list format [launch_speed, launch_angle, stadium]
                     import pickle
                     from Simulator.game_simulator import create_features_for_prediction
                     
-                    # Load pipeline if not already loaded
                     try:
                         with open('Model/gb_classifier_pipeline_improved.pkl', 'rb') as file:
                             pipeline = pickle.load(file)
@@ -621,8 +643,6 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                         launch_speed, launch_angle, stadium = outcome_data
                         features = create_features_for_prediction(launch_speed, launch_angle, stadium)
                         probs = pipeline.predict_proba(features)[0]
-                        
-                        # Calculate estimated bases (assuming classes: 0=out, 1=single, 2=double, 3=triple, 4=hr)
                         estimated_bases = (probs[1] * 1 + probs[2] * 2 + probs[3] * 3 + probs[4] * 4)
                         
                         player_contributions[player_key]['batted_balls'] += estimated_bases
