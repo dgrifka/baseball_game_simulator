@@ -221,19 +221,21 @@ def calculate_total_bases(outcomes_list):
             )
         
         result_list.append({
-            'player': full_name,
-            'launch_speed': launch_speed,
-            'launch_angle': launch_angle,
-            'stadium': stadium,
-            'event_type': event_type,
-            'original_event_type': original_event_type,
-            'estimated_bases': bases,
-            'out_prob': probabilities[0],
-            'single_prob': probabilities[1],
-            'double_prob': probabilities[2],
-            'triple_prob': probabilities[3],
-            'hr_prob': probabilities[4]
-        })
+                'player': full_name,
+                'launch_speed': launch_speed,
+                'launch_angle': launch_angle,
+                'stadium': stadium,
+                'original_event_type': original_event_type,
+                'estimated_bases': bases,
+                'out_prob': probabilities[0],
+                'single_prob': probabilities[1],
+                'double_prob': probabilities[2],
+                'triple_prob': probabilities[3],
+                'hr_prob': probabilities[4],
+                'coord_x': outcome.get('coord_x') if isinstance(outcome, dict) else None,
+                'coord_y': outcome.get('coord_y') if isinstance(outcome, dict) else None,
+                'bat_side': outcome.get('bat_side') if isinstance(outcome, dict) else None
+            })
     
     return pd.DataFrame(result_list)
 
