@@ -1133,11 +1133,11 @@ def spray_chart(home_outcomes, away_outcomes,
     
     # Attribution (centered under title)
     fig.text(0.5, 0.86, 'Data: MLB  |  @mlb_simulator', 
-             fontsize=9, color='gray', ha='center', va='top')
+             fontsize=10, color='gray', ha='center', va='top')
     
-    # Disclaimer about estimated dimensions
-    fig.text(0.5, 0.01, '* Ballpark dimensions estimated using LF/CF/RF fence distances', 
-             fontsize=8, color='gray', ha='center', va='bottom', style='italic')
+    # Disclaimer about estimated dimensions (just below attribution)
+    fig.text(0.5, 0.83, '* Ballpark dimensions estimated using LF/CF/RF fence distances', 
+             fontsize=8, color='gray', ha='center', va='top', style='italic')
     
     # Legend (bottom center)
     legend_items = [
