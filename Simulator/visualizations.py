@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
+from matplotlib.patches import Polygon
+from scipy.interpolate import interp1d
 import seaborn as sns
 from scipy.interpolate import griddata
 from matplotlib.colors import LinearSegmentedColormap, to_rgb
