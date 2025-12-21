@@ -355,6 +355,15 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     
     # Prepare data - take top 15 instead of top 10
     df = df.copy().head(15)
+    
+    # Add team colors if not present
+    if 'team_color' not in df.columns:
+        df['team_color'] = df['Team'].apply(
+            lambda x: team_colors.get(x, {}).get('primary', '#333333') 
+            if isinstance(team_colors.get(x), dict) 
+            else team_colors.get(x, ['#333333'])[0]
+        )
+    
     team_color_map = dict(zip(df['Team'], df['team_color']))
     
     # Store team names before preparing data (for logo lookup)
