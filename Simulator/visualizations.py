@@ -287,9 +287,9 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.title(title, fontsize=16, loc='left', pad=15, fontweight='bold')
     
     # Watermark in top right
-    plt.text(0.99, 1.02, 'Data: MLB', transform=plt.gca().transAxes,
+    plt.text(0.99, 1.07, 'Data: MLB', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='right', va='bottom')
-    plt.text(0.99, 0.98, 'By: @mlb_simulator', transform=plt.gca().transAxes,
+    plt.text(0.99, 1.03, 'By: @mlb_simulator', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='right', va='top')
     
     # Enhanced legend in top right
