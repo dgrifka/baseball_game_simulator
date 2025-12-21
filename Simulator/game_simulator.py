@@ -270,7 +270,7 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
         away_detailed_df (pd.DataFrame): Away team detailed outcomes
         
     Returns:
-        pd.DataFrame: Top 10 outcomes ranked by estimated bases, formatted for display
+        pd.DataFrame: Top 15 outcomes ranked by estimated bases, formatted for display
     """
     # Combine team outcomes, excluding any remaining stolen bases or pickoffs
     home_detailed_df = home_detailed_df[~home_detailed_df['event_type'].isin(['stolen_base', 'pickoff'])]
@@ -284,17 +284,31 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
     for col in prob_columns:
         total_team_outcomes[col] = (total_team_outcomes[col] * 100).round(0).astype(int).astype(str) + '%'
     
-    selected_columns = ['team', 'player', 'launch_speed', 'launch_angle', "original_event_type", 'estimated_bases', 
-                       "out_prob", "single_prob", "double_prob", "triple_prob", "hr_prob"]
+    # Include coord_x, coord_y, bat_side for spray direction calculation
+    selected_columns = ['team', 'player', 'launch_speed', 'launch_angle', 'original_event_type', 'estimated_bases', 
+                       'out_prob', 'single_prob', 'double_prob', 'triple_prob', 'hr_prob',
+                       'coord_x', 'coord_y', 'bat_side']
+    
+    # Only include columns that exist (for backward compatibility)
+    selected_columns = [col for col in selected_columns if col in total_team_outcomes.columns]
     total_team_outcomes = total_team_outcomes[selected_columns]
+    
     total_team_outcomes['original_event_type'] = total_team_outcomes['original_event_type'].str.title()
     total_team_outcomes = total_team_outcomes.rename(columns={
-        "launch_speed": "EV", "launch_angle": "LA", "original_event_type": "Result", 
-        "out_prob": "Out%", "single_prob": "1B%", "double_prob": "2B%", 
-        "triple_prob": "3B%", "hr_prob": "HR%", "estimated_bases": "xBases", "team": "Team"
+        'launch_speed': 'Launch Speed', 
+        'launch_angle': 'Launch Angle', 
+        'original_event_type': 'Result', 
+        'out_prob': 'Out Prob', 
+        'single_prob': 'Single Prob', 
+        'double_prob': 'Double Prob', 
+        'triple_prob': 'Triple Prob', 
+        'hr_prob': 'Hr Prob', 
+        'estimated_bases': 'Estimated Bases', 
+        'team': 'Team',
+        'player': 'Player'
     })
-    total_team_outcomes.columns = [col.title() for col in total_team_outcomes.columns]
-    return total_team_outcomes.sort_values(by='Xbases', ascending=False).head(15).reset_index(drop=True)
+    
+    return total_team_outcomes.sort_values(by='Estimated Bases', ascending=False).head(15).reset_index(drop=True)
 
 
 # =============================================================================
