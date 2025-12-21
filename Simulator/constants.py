@@ -141,3 +141,63 @@ VENUE_NAME_TO_ID = {
 
 # Default venue ID for unknown stadiums
 DEFAULT_VENUE_ID = '22'
+
+# =============================================================================
+# STADIUM DIMENSIONS (in feet)
+# =============================================================================
+
+STADIUM_DIMENSIONS = {
+    'Oriole Park at Camden Yards': {'LF': 333, 'LCF': 364, 'CF': 400, 'RCF': 373, 'RF': 318},
+    'Fenway Park':                 {'LF': 310, 'LCF': 379, 'CF': 390, 'RCF': 380, 'RF': 302},
+    'Yankee Stadium':              {'LF': 318, 'LCF': 399, 'CF': 408, 'RCF': 385, 'RF': 314},
+    'Tropicana Field':             {'LF': 315, 'LCF': 370, 'CF': 404, 'RCF': 370, 'RF': 322},
+    'Rogers Centre':               {'LF': 328, 'LCF': 375, 'CF': 400, 'RCF': 375, 'RF': 328},
+    'Guaranteed Rate Field':       {'LF': 330, 'LCF': 377, 'CF': 400, 'RCF': 372, 'RF': 335},
+    'Progressive Field':           {'LF': 325, 'LCF': 370, 'CF': 400, 'RCF': 375, 'RF': 325},
+    'Comerica Park':               {'LF': 345, 'LCF': 370, 'CF': 420, 'RCF': 365, 'RF': 330},
+    'Kauffman Stadium':            {'LF': 330, 'LCF': 387, 'CF': 410, 'RCF': 387, 'RF': 330},
+    'Target Field':                {'LF': 339, 'LCF': 377, 'CF': 404, 'RCF': 367, 'RF': 328},
+    'Minute Maid Park':            {'LF': 315, 'LCF': 362, 'CF': 409, 'RCF': 373, 'RF': 326},
+    'Angel Stadium':               {'LF': 330, 'LCF': 387, 'CF': 400, 'RCF': 370, 'RF': 330},
+    'Oakland Coliseum':            {'LF': 330, 'LCF': 388, 'CF': 400, 'RCF': 388, 'RF': 330},
+    'T-Mobile Park':               {'LF': 331, 'LCF': 378, 'CF': 401, 'RCF': 381, 'RF': 326},
+    'Globe Life Field':            {'LF': 329, 'LCF': 372, 'CF': 407, 'RCF': 374, 'RF': 326},
+    'Chase Field':                 {'LF': 330, 'LCF': 374, 'CF': 407, 'RCF': 374, 'RF': 334},
+    'Coors Field':                 {'LF': 347, 'LCF': 390, 'CF': 415, 'RCF': 375, 'RF': 350},
+    'Dodger Stadium':              {'LF': 330, 'LCF': 375, 'CF': 395, 'RCF': 375, 'RF': 330},
+    'Oracle Park':                 {'LF': 339, 'LCF': 364, 'CF': 399, 'RCF': 421, 'RF': 309},
+    'Petco Park':                  {'LF': 336, 'LCF': 390, 'CF': 396, 'RCF': 387, 'RF': 322},
+    'Wrigley Field':               {'LF': 355, 'LCF': 368, 'CF': 400, 'RCF': 368, 'RF': 353},
+    'Great American Ball Park':    {'LF': 328, 'LCF': 379, 'CF': 404, 'RCF': 370, 'RF': 325},
+    'American Family Field':       {'LF': 344, 'LCF': 371, 'CF': 400, 'RCF': 374, 'RF': 345},
+    'PNC Park':                    {'LF': 325, 'LCF': 383, 'CF': 399, 'RCF': 375, 'RF': 320},
+    'Busch Stadium':               {'LF': 336, 'LCF': 375, 'CF': 400, 'RCF': 375, 'RF': 335},
+    'Citi Field':                  {'LF': 335, 'LCF': 379, 'CF': 408, 'RCF': 383, 'RF': 330},
+    'Citizens Bank Park':          {'LF': 329, 'LCF': 374, 'CF': 401, 'RCF': 369, 'RF': 330},
+    'Nationals Park':              {'LF': 336, 'LCF': 377, 'CF': 402, 'RCF': 370, 'RF': 335},
+    'Truist Park':                 {'LF': 335, 'LCF': 385, 'CF': 400, 'RCF': 375, 'RF': 325},
+    'loanDepot park':              {'LF': 344, 'LCF': 386, 'CF': 407, 'RCF': 392, 'RF': 335},
+}
+
+DEFAULT_STADIUM_DIMENSIONS = {'LF': 330, 'LCF': 375, 'CF': 400, 'RCF': 375, 'RF': 330}
+
+# Conversion factor: feet to plot units
+FEET_TO_PLOT = 100 / 400
+
+# =============================================================================
+# TEAM NAME MAPPINGS
+# =============================================================================
+
+# Short name -> logo lookup name
+TEAM_LOGO_MAP = {
+    'Jays': 'Blue Jays',
+    'Sox': 'Red Sox',
+    'D-backs': 'D-backs',
+}
+
+# Short name -> full display name  
+TEAM_DISPLAY_MAP = {
+    'Jays': 'Blue Jays',
+    'Sox': 'Red Sox',
+    'D-backs': 'D-backs',
+}
