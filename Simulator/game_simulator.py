@@ -20,8 +20,10 @@ from Model.feature_engineering import (
 # =============================================================================
 
 # Load the trained pipeline
-pipeline = joblib.load('Model/batted_ball_model.pkl')
-
+import os as _os
+_this_dir = _os.path.dirname(_os.path.abspath(__file__))
+_model_path = _os.path.join(_this_dir, '..', 'Model', 'batted_ball_model.pkl')
+pipeline = joblib.load(_model_path)
 
 # =============================================================================
 # HELPER FUNCTIONS
