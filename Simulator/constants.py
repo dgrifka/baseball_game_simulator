@@ -145,39 +145,58 @@ DEFAULT_VENUE_ID = '22'
 # =============================================================================
 # STADIUM DIMENSIONS (in feet)
 # =============================================================================
+# Standard keys: LF, LCF, CF, RCF, RF (at angles -45, -22.5, 0, 22.5, 45)
+# Optional extra keys for quirky parks:
+#   DLCF = Deep Left-Center Field (angle ~ -15)
+#   DRCF = Deep Right-Center Field (angle ~ +30)
+#   LF_CORNER, RF_CORNER = additional corner points
+# =============================================================================
 
 STADIUM_DIMENSIONS = {
-    'Oriole Park at Camden Yards': {'LF': 333, 'LCF': 364, 'CF': 400, 'RCF': 373, 'RF': 318},
-    'Fenway Park':                 {'LF': 310, 'LCF': 379, 'CF': 390, 'RCF': 380, 'RF': 302},
+    # ----- American League East -----
+    'Oriole Park at Camden Yards': {'LF': 333, 'LCF': 364, 'CF': 400, 'RCF': 373, 'RF': 318},  # 2025 dimensions
+    'Fenway Park':                 {'LF': 310, 'LCF': 379, 'DLCF': 420, 'CF': 390, 'RCF': 380, 'RF': 302},  # Triangle at 420
     'Yankee Stadium':              {'LF': 318, 'LCF': 399, 'CF': 408, 'RCF': 385, 'RF': 314},
-    'Tropicana Field':             {'LF': 315, 'LCF': 370, 'CF': 404, 'RCF': 370, 'RF': 322},
-    'Rogers Centre':               {'LF': 328, 'LCF': 375, 'CF': 400, 'RCF': 375, 'RF': 328},
+    'Tropicana Field':             {'LF': 315, 'LCF': 370, 'CF': 404, 'RCF': 370, 'RF': 322},  # Rays home (not Steinbrenner)
+    'Rogers Centre':               {'LF': 328, 'LCF': 368, 'CF': 400, 'RCF': 359, 'RF': 328},  # Post-2023 renovation
+    
+    # ----- American League Central -----
     'Guaranteed Rate Field':       {'LF': 330, 'LCF': 377, 'CF': 400, 'RCF': 372, 'RF': 335},
-    'Progressive Field':           {'LF': 325, 'LCF': 370, 'CF': 400, 'RCF': 375, 'RF': 325},
-    'Comerica Park':               {'LF': 345, 'LCF': 370, 'CF': 420, 'RCF': 365, 'RF': 330},
-    'Kauffman Stadium':            {'LF': 330, 'LCF': 387, 'CF': 410, 'RCF': 387, 'RF': 330},
+    'Progressive Field':           {'LF': 325, 'LCF': 370, 'CF': 405, 'RCF': 375, 'RF': 325},
+    'Comerica Park':               {'LF': 342, 'LCF': 370, 'CF': 412, 'RCF': 365, 'RF': 330},  # Post-2023 (CF was 420)
+    'Kauffman Stadium':            {'LF': 330, 'LCF': 387, 'CF': 410, 'RCF': 387, 'RF': 330},  # Symmetrical
     'Target Field':                {'LF': 339, 'LCF': 377, 'CF': 404, 'RCF': 367, 'RF': 328},
-    'Minute Maid Park':            {'LF': 315, 'LCF': 362, 'CF': 409, 'RCF': 373, 'RF': 326},
-    'Angel Stadium':               {'LF': 330, 'LCF': 387, 'CF': 400, 'RCF': 370, 'RF': 330},
-    'Oakland Coliseum':            {'LF': 330, 'LCF': 388, 'CF': 400, 'RCF': 388, 'RF': 330},
+    
+    # ----- American League West -----
+    'Minute Maid Park':            {'LF': 315, 'LCF': 362, 'CF': 409, 'RCF': 373, 'RF': 326},  # Tal's Hill removed
+    'Angel Stadium':               {'LF': 330, 'LCF': 387, 'CF': 396, 'RCF': 370, 'RF': 330},
+    'Oakland Coliseum':            {'LF': 330, 'LCF': 388, 'CF': 400, 'RCF': 388, 'RF': 330},  # Symmetrical
     'T-Mobile Park':               {'LF': 331, 'LCF': 378, 'CF': 401, 'RCF': 381, 'RF': 326},
     'Globe Life Field':            {'LF': 329, 'LCF': 372, 'CF': 407, 'RCF': 374, 'RF': 326},
-    'Chase Field':                 {'LF': 330, 'LCF': 374, 'CF': 407, 'RCF': 374, 'RF': 334},
-    'Coors Field':                 {'LF': 347, 'LCF': 390, 'CF': 415, 'RCF': 375, 'RF': 350},
-    'Dodger Stadium':              {'LF': 330, 'LCF': 375, 'CF': 395, 'RCF': 375, 'RF': 330},
-    'Oracle Park':                 {'LF': 339, 'LCF': 364, 'CF': 399, 'RCF': 421, 'RF': 309},
-    'Petco Park':                  {'LF': 336, 'LCF': 390, 'CF': 396, 'RCF': 387, 'RF': 322},
-    'Wrigley Field':               {'LF': 355, 'LCF': 368, 'CF': 400, 'RCF': 368, 'RF': 353},
-    'Great American Ball Park':    {'LF': 328, 'LCF': 379, 'CF': 404, 'RCF': 370, 'RF': 325},
-    'American Family Field':       {'LF': 344, 'LCF': 371, 'CF': 400, 'RCF': 374, 'RF': 345},
-    'PNC Park':                    {'LF': 325, 'LCF': 383, 'CF': 399, 'RCF': 375, 'RF': 320},
-    'Busch Stadium':               {'LF': 336, 'LCF': 375, 'CF': 400, 'RCF': 375, 'RF': 335},
-    'Citi Field':                  {'LF': 335, 'LCF': 379, 'CF': 408, 'RCF': 383, 'RF': 330},
-    'Citizens Bank Park':          {'LF': 329, 'LCF': 374, 'CF': 401, 'RCF': 369, 'RF': 330},
+    
+    # ----- National League East -----
+    'Citi Field':                  {'LF': 335, 'LCF': 358, 'CF': 408, 'RCF': 380, 'RF': 330},  # Post-renovations
+    'Citizens Bank Park':          {'LF': 329, 'LCF': 374, 'DLCF': 409, 'CF': 401, 'RCF': 369, 'RF': 330},  # "The Angle" at 409
     'Nationals Park':              {'LF': 336, 'LCF': 377, 'CF': 402, 'RCF': 370, 'RF': 335},
     'Truist Park':                 {'LF': 335, 'LCF': 385, 'CF': 400, 'RCF': 375, 'RF': 325},
-    'loanDepot park':              {'LF': 344, 'LCF': 386, 'CF': 407, 'RCF': 392, 'RF': 335},
+    'loanDepot park':              {'LF': 344, 'LCF': 384, 'CF': 400, 'RCF': 387, 'RF': 335},  # Post-2020 (CF was 407)
+    
+    # ----- National League Central -----
+    'Wrigley Field':               {'LF': 355, 'LCF': 368, 'CF': 400, 'RCF': 368, 'RF': 353},  # Symmetrical alleys
+    'Great American Ball Park':    {'LF': 328, 'LCF': 379, 'CF': 404, 'RCF': 370, 'RF': 325},
+    'American Family Field':       {'LF': 344, 'LCF': 370, 'CF': 400, 'RCF': 374, 'RF': 345},
+    'PNC Park':                    {'LF': 325, 'LCF': 389, 'DLCF': 410, 'CF': 399, 'RCF': 375, 'RF': 320},  # Deep nook at 410
+    'Busch Stadium':               {'LF': 336, 'LCF': 375, 'CF': 400, 'RCF': 375, 'RF': 335},  # Symmetrical
+    
+    # ----- National League West -----
+    'Chase Field':                 {'LF': 330, 'LCF': 374, 'CF': 407, 'RCF': 374, 'RF': 334},
+    'Coors Field':                 {'LF': 347, 'LCF': 390, 'CF': 415, 'RCF': 375, 'RF': 350},  # Deepest CF in MLB
+    'Dodger Stadium':              {'LF': 330, 'LCF': 385, 'CF': 395, 'RCF': 385, 'RF': 330},  # Symmetrical
+    'Oracle Park':                 {'LF': 339, 'LCF': 364, 'CF': 391, 'DRCF': 415, 'RCF': 399, 'RF': 309},  # Triples Alley at 415
+    'Petco Park':                  {'LF': 336, 'LCF': 386, 'CF': 396, 'RCF': 391, 'RF': 322},
 }
+
+DEFAULT_STADIUM_DIMENSIONS = {'LF': 330, 'LCF': 375, 'CF': 400, 'RCF': 375, 'RF': 330}
 
 DEFAULT_STADIUM_DIMENSIONS = {'LF': 330, 'LCF': 375, 'CF': 400, 'RCF': 375, 'RF': 330}
 

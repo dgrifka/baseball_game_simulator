@@ -941,16 +941,45 @@ def get_stadium_fence_curve(venue_name, num_points=100):
     """
     Generate fence curve points for a specific stadium.
     
+    Supports standard 5-point dimensions (LF, LCF, CF, RCF, RF) as well as
+    enhanced dimensions with extra keys for quirky parks:
+        - DLCF: Deep Left-Center Field (placed at -15 degrees)
+        - DRCF: Deep Right-Center Field (placed at +30 degrees)
+    
     Returns:
         tuple: (x_coords, y_coords, dims, smooth_angles, smooth_distances)
     """
     dims = STADIUM_DIMENSIONS.get(venue_name, DEFAULT_STADIUM_DIMENSIONS)
     
-    angles_deg = np.array([-45, -22.5, 0, 22.5, 45])
-    distances_ft = np.array([dims['LF'], dims['LCF'], dims['CF'], dims['RCF'], dims['RF']])
+    # Map dimension keys to angles (degrees from center field)
+    # Standard: LF=-45, LCF=-22.5, CF=0, RCF=22.5, RF=45
+    # Enhanced: DLCF=-15, DRCF=+30
+    key_to_angle = {
+        'LF': -45,
+        'LCF': -22.5,
+        'DLCF': -15,      # Deep left-center (e.g., Fenway Triangle)
+        'CF': 0,
+        'RCF': 22.5,
+        'DRCF': 30,       # Deep right-center (e.g., Oracle Triples Alley)
+        'RF': 45,
+    }
+    
+    # Build arrays from available keys
+    angle_dist_pairs = []
+    for key, angle in key_to_angle.items():
+        if key in dims:
+            angle_dist_pairs.append((angle, dims[key]))
+    
+    # Sort by angle
+    angle_dist_pairs.sort(key=lambda x: x[0])
+    
+    angles_deg = np.array([p[0] for p in angle_dist_pairs])
+    distances_ft = np.array([p[1] for p in angle_dist_pairs])
     distances_plot = distances_ft * FEET_TO_PLOT
     
-    interp_func = interp1d(angles_deg, distances_plot, kind='quadratic')
+    # Use cubic interpolation if we have 4+ points, else quadratic
+    interp_kind = 'cubic' if len(angles_deg) >= 4 else 'quadratic'
+    interp_func = interp1d(angles_deg, distances_plot, kind=interp_kind)
     
     smooth_angles = np.linspace(-45, 45, num_points)
     smooth_distances = interp_func(smooth_angles)
