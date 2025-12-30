@@ -5,15 +5,17 @@
 
 ## Table of Contents
 - [Description](#description)
+- [Architecture](#architecture)
 - [Model](#model)
 - [Assumptions](#assumptions)
 - [Reasons Actual vs Simulation Can Vary](#reasons-actual-vs-simulation-can-vary)
 - [Future Ideas](#future-ideas)
 - [2025 Additions](#2025-additions)
 - [Project Structure](#project-structure)
-- [Model Testing](#model-testing-expected-bases)
+- [Model Testing](#model-testing)
 - [Outputs](#outputs)
 - [2024 Research](#2024-research)
+- [Contact](#contact)
 
 ## Description
 
@@ -22,6 +24,17 @@ This project simulates alternative outcomes of MLB games by resampling batted ba
 This account was inspired by @MoneyPuckdotcom. The model and account are derived from data gathered from MLB Stats API.
 
 Feel free to submit a pull request with modifications/improvements!
+
+## Architecture
+
+This project uses a **two-repository structure** for security:
+
+| Repository | Visibility | Purpose |
+|------------|------------|---------|
+| [baseball_game_simulator](https://github.com/dgrifka/baseball_game_simulator) | Public | Core simulation engine, model, visualizations |
+| baseball_simulator_model | Private | Orchestration, social media posting, credentials, GitHub Actions |
+
+The private repo imports functions from this public repo and handles posting to Twitter/Bluesky. This keeps API credentials secure while allowing the core simulation logic to be open source.
 
 ## Model
 
@@ -94,6 +107,10 @@ baseball_game_simulator/
 ├── README.md
 ├── main.ipynb                    # Colab file to run and save visualizations
 │
+├── Documentation/
+│   ├── readme_image_generator.ipynb  # Generate README images
+│   └── Images/                   # README visualization images
+│
 ├── Model/
 │   ├── Base_Model.ipynb          # Model training notebook
 │   ├── batted_ball_model.pkl     # Trained model pipeline
@@ -120,24 +137,56 @@ baseball_game_simulator/
     └── 2024_Season_WP_Model.ipynb # Bayesian hierarchical model research
 ```
 
-## Contact
+## Model Testing
 
-Derek Grifka - https://dgrifka.github.io/
+This section demonstrates the model's key features and outputs.
 
-## Model Testing (Expected Bases)
+> 📓 **How these images were created:** [Documentation/readme_image_generator.ipynb](Documentation/readme_image_generator.ipynb)
 
-![image](https://private-user-images.githubusercontent.com/65031380/387723570-4c8390a4-3467-4992-b160-f6d54e4af679.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zODc3MjM1NzAtNGM4MzkwYTQtMzQ2Ny00OTkyLWIxNjAtZjZkNTRlNGFmNjc5LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTkxYTE2YjRmNGYxMDVhYTExMWNkNWM1MWRlYzNhMjg4MjM2NGRjNzU0NjFkNDkyZDYzNWU5NzRjNDAyODJkYjcmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.YueRng4LgVnWz-8obpVpKtOmE3-QcDoPNGgZToKu3zE)
+### Spray Angle Adjustment Validation
+
+The model adjusts spray angle based on batter handedness so that "pull side" is consistently represented for both right-handed and left-handed batters. Blue indicates pull side, red indicates opposite field.
+
+![Spray Angle Validation](Documentation/Images/spray_angle_validation.png)
+
+### Feature Importance
+
+Exit velocity and launch angle remain the most important features, but spray angle features contribute ~23% of the model's predictive power.
+
+![Feature Importance](Documentation/Images/feature_importance.png)
+
+### Exit Velocity vs Launch Angle with Spray Angle
+
+The classic "sweet spot" visualization showing how exit velocity and launch angle combine to determine outcomes. Color indicates spray angle (blue = pull, red = oppo), marker size indicates outcome quality.
+
+![EV vs LA with Spray Angle](Documentation/Images/ev_la_spray_angle.png)
+
+### Expected Bases by EV/LA
+
+![Expected Bases](https://private-user-images.githubusercontent.com/65031380/387723570-4c8390a4-3467-4992-b160-f6d54e4af679.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zODc3MjM1NzAtNGM4MzkwYTQtMzQ2Ny00OTkyLWIxNjAtZjZkNTRlNGFmNjc5LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTkxYTE2YjRmNGYxMDVhYTExMWNkNWM1MWRlYzNhMjg4MjM2NGRjNzU0NjFkNDkyZDYzNWU5NzRjNDAyODJkYjcmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.YueRng4LgVnWz-8obpVpKtOmE3-QcDoPNGgZToKu3zE)
 
 ## Outputs
 
-![Dodgers_Yankees_7-6--27-66_bb](https://private-user-images.githubusercontent.com/65031380/388203819-378f8eba-5450-46bf-b430-96ec639d3960.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zODgyMDM4MTktMzc4ZjhlYmEtNTQ1MC00NmJmLWI0MzAtOTZlYzYzOWQzOTYwLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTk5MjA3OGRkYWQ0YmNlNDg5ZmNjZWJiYzFlZGRhZWVhZDg5MmM0YzhhODYzZmQ1NjE0YjM1MzFmZWZiOTI2NmEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.wz_j7hqFaiR2kMGrcSoodXwJHtRTkBcERyfdW5Fm2Yw)
+### Spray Chart
 
-![Dodgers_Yankees_7-6--27-66_rd](https://private-user-images.githubusercontent.com/65031380/388203851-3b4921b7-0e00-4cee-a3ad-c431877e2766.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zODgyMDM4NTEtM2I0OTIxYjctMGUwMC00Y2VlLWEzYWQtYzQzMTg3N2UyNzY2LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTA4MGEwNzk3MWEzODQxMTI2YmQ4MjUwOGFlODk5MTdmNjE3NjNkYTVkYTA3ZmQyOTdlOTM5YjE1MjkyODE3OGImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.A7bnnqNy9xlHddBiYsS5IEkwppKfSdxMY24A-T37qAM)
+Stadium-specific spray charts showing batted ball locations with expected outcome indicators.
 
-![Dodgers_Yankees_7-6--27-66_estimated_bases](https://private-user-images.githubusercontent.com/65031380/388203888-329c809c-5eba-49de-8c3a-38fd6ce688d5.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zODgyMDM4ODgtMzI5YzgwOWMtNWViYS00OWRlLThjM2EtMzhmZDZjZTY4OGQ1LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTJlMGRmOTM0YzFlZGNlOTliYjQ5ZGYwZWZhODY3ZGRiYzBmYTkxMTlmNTRmYTA0YzM3ZDdhMjIyMzViN2NmMTEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.coHuRa34Qa9QOighfqvKk1IAoiHtmaKDgb3LWisSCL0)
+![Spray Chart Example](Documentation/Images/Dodgers_Blue%20Jays_5-4--60-30_spray.png)
+
+### Run Distribution
+
+![Run Distribution](https://private-user-images.githubusercontent.com/65031380/388203851-3b4921b7-0e00-4cee-a3ad-c431877e2766.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zODgyMDM4NTEtM2I0OTIxYjctMGUwMC00Y2VlLWEzYWQtYzQzMTg3N2UyNzY2LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTA4MGEwNzk3MWEzODQxMTI2YmQ4MjUwOGFlODk5MTdmNjE3NjNkYTVkYTA3ZmQyOTdlOTM5YjE1MjkyODE3OGImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.A7bnnqNy9xlHddBiYsS5IEkwppKfSdxMY24A-T37qAM)
+
+### Estimated Bases Table
+
+![Estimated Bases Table](https://private-user-images.githubusercontent.com/65031380/388203888-329c809c-5eba-49de-8c3a-38fd6ce688d5.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zODgyMDM4ODgtMzI5YzgwOWMtNWViYS00OWRlLThjM2EtMzhmZDZjZTY4OGQ1LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTJlMGRmOTM0YzFlZGNlOTliYjQ5ZGYwZWZhODY3ZGRiYzBmYTkxMTlmNTRmYTA0YzM3ZDdhMjIyMzViN2NmMTEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.coHuRa34Qa9QOighfqvKk1IAoiHtmaKDgb3LWisSCL0)
 
 ## 2024 Research
 
-![image](https://private-user-images.githubusercontent.com/65031380/374580712-c3482c9c-cbfd-426d-b2a2-71b01165d0fb.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zNzQ1ODA3MTItYzM0ODJjOWMtY2JmZC00MjZkLWIyYTItNzFiMDExNjVkMGZiLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTc3ZmZjNGVlYWYyNDRlMjY1ZmNjMGQ2ZDIxNTg3MjJmYTg1NWU2YTMzYTU1MDQ2Njg1Yjg1OTEyNzc4NWIxY2EmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.f79cuEP1GExpOPjQfB2m5KGp3WUZ-Rkile8I4p4B4Eg)
+![2024 Research 1](https://private-user-images.githubusercontent.com/65031380/374580712-c3482c9c-cbfd-426d-b2a2-71b01165d0fb.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zNzQ1ODA3MTItYzM0ODJjOWMtY2JmZC00MjZkLWIyYTItNzFiMDExNjVkMGZiLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTc3ZmZjNGVlYWYyNDRlMjY1ZmNjMGQ2ZDIxNTg3MjJmYTg1NWU2YTMzYTU1MDQ2Njg1Yjg1OTEyNzc4NWIxY2EmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.f79cuEP1GExpOPjQfB2m5KGp3WUZ-Rkile8I4p4B4Eg)
 
-![image](https://private-user-images.githubusercontent.com/65031380/374580767-e74267f4-fe24-47f3-a075-1f9405c27612.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zNzQ1ODA3NjctZTc0MjY3ZjQtZmUyNC00N2YzLWEwNzUtMWY5NDA1YzI3NjEyLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTQxZTE4ZWY2MGFhNTY1ODgyMzg1ZTU3NjdhNzRkNDE3ODBmMWU5MDRlOTM1NjEwOTdlZDdmOWEwMTJjMzk0MDQmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.Pw5dimwEjphOtrFdwg3ILvGz8hDLOPbnj1x7Gy9fM0w)
+![2024 Research 2](https://private-user-images.githubusercontent.com/65031380/374580767-e74267f4-fe24-47f3-a075-1f9405c27612.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU3MzUyNjQsIm5iZiI6MTc2NTczNDk2NCwicGF0aCI6Ii82NTAzMTM4MC8zNzQ1ODA3NjctZTc0MjY3ZjQtZmUyNC00N2YzLWEwNzUtMWY5NDA1YzI3NjEyLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTQlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE0VDE3NTYwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTQxZTE4ZWY2MGFhNTY1ODgyMzg1ZTU3NjdhNzRkNDE3ODBmMWU5MDRlOTM1NjEwOTdlZDdmOWEwMTJjMzk0MDQmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.Pw5dimwEjphOtrFdwg3ILvGz8hDLOPbnj1x7Gy9fM0w)
+
+## Contact
+
+Derek Grifka - https://dgrifka.github.io/
