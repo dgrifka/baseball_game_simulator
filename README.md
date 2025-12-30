@@ -32,7 +32,7 @@ This project uses a **two-repository structure** for security:
 | Repository | Visibility | Purpose |
 |------------|------------|---------|
 | [baseball_game_simulator](https://github.com/dgrifka/baseball_game_simulator) | Public | Core simulation engine, model, visualizations |
-| baseball_simulator_model | Private | Orchestration, social media posting, credentials, GitHub Actions |
+| simulator_private | Private | Orchestration, social media posting, credentials, GitHub Actions |
 
 The private repo imports functions from this public repo and handles posting to Twitter/Bluesky. This keeps API credentials secure while allowing the core simulation logic to be open source.
 
@@ -93,12 +93,8 @@ For more details, see `Model/Base_Model.ipynb` and `Model/model_metadata.json`.
 
 - **Spray angle model**: Added batter handedness-adjusted spray angle as a feature, improving accuracy from 77% to 82%
 - **Feature engineering module**: Centralized spray angle and feature calculations in `Model/feature_engineering.py`
-- **venue_id**: Switched from venue_name to venue_id for stability across seasons
-- **Stadium mapping**: Games played at George M. Steinbrenner Field (Rays 2025 temporary home) mapped to Yankee Stadium
-- Improved code docstrings and documentation
-- Added steals and pickoffs to simulations
-- Cleaner and improved visuals
-- New `best_batted_balls.py` module for analyzing lucky/unlucky outcomes across multiple games
+- **Improved code docstrings and documentation**
+- **Cleaner and improved visuals**
 
 ## Project Structure
 ```
