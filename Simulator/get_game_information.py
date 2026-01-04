@@ -71,7 +71,7 @@ def fetch_games(days_ago, all_columns=False):
     
     # Filter to finished games within date range
     finished_games = games_df[games_df['status.abstractGameState'] == 'Final'].copy()
-    finished_games['gameDate'] = pd.to_datetime(finished_games['gameDate'])
+    finished_games['gameDate'] = pd.to_datetime(finished_games['gameDate'], utc=True)
     
     current_date_time = datetime.datetime.now(pytz.UTC)
     one_day_ago = current_date_time - datetime.timedelta(days=days_ago)
