@@ -292,14 +292,23 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.text(0.99, 1.03, 'By: @mlb_simulator', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='right', va='top')
     
+    # Actual score vertical lines
+    for score, color, team in [
+        (away_score, away_color, away_team),
+        (home_score, home_color, home_team)
+    ]:
+        ax.axvline(x=score + 0.5, color=color, linestyle='--', linewidth=2.5, alpha=0.85, zorder=5)
+        ax.text(score + 0.5, ax.get_ylim()[1] * 0.95, f' {team}: {score}',
+                fontsize=10, fontweight='bold', color=color, va='top', ha='left', zorder=6)
+
     # Enhanced legend in top right
     plt.legend(fontsize=12, frameon=True, framealpha=0.9,
               edgecolor='black', fancybox=True, loc='upper right')
-    
+
     # Clean up spines
     for spine in ['top', 'right']:
         plt.gca().spines[spine].set_visible(False)
-    
+
     # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_rd.png'
@@ -913,7 +922,7 @@ def calculate_expected_bases_for_spray(outcome_dict, pipeline):
         )
         probs = pipeline.predict_proba(features)[0]
         return probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4
-    except:
+    except Exception:
         return 0.5
 
 
@@ -1059,19 +1068,20 @@ def draw_baseball_field(ax, venue_name='default'):
     ax.add_patch(home_plate)
 
 
-def spray_chart(home_outcomes, away_outcomes, 
-                home_team, away_team, 
+def spray_chart(home_outcomes, away_outcomes,
+                home_team, away_team,
                 home_score, away_score,
                 home_win_percentage, away_win_percentage, tie_percentage,
-                mlb_team_logos, formatted_date, 
+                mlb_team_logos, formatted_date,
                 venue_name='default',
-                images_dir="images"):
+                images_dir="images",
+                pipeline=None):
     """
     Creates side-by-side spray chart visualizations with stadium-specific dimensions.
-    
+
     Shows batted ball locations with team logos, colored rings indicating expected
     outcome based on the batted ball model (Out, Single, XBH, HR).
-    
+
     Args:
         home_outcomes: List of home team outcome tuples
         away_outcomes: List of away team outcome tuples
@@ -1086,16 +1096,18 @@ def spray_chart(home_outcomes, away_outcomes,
         formatted_date: Date string for display
         venue_name: Stadium name for fence dimensions
         images_dir: Directory to save output
-        
+        pipeline: Pre-loaded model pipeline (loaded from disk if None)
+
     Returns:
         str: Path to saved image file
     """
     import joblib
-    
+
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.close('all')
-    
-    pipeline = joblib.load('Model/batted_ball_model.pkl')
+
+    if pipeline is None:
+        pipeline = joblib.load('Model/batted_ball_model.pkl')
     
     percentages = {
         'away': f"{away_win_percentage:.0f}",
@@ -1121,40 +1133,45 @@ def spray_chart(home_outcomes, away_outcomes,
     for team_key, team_outcomes in [('home', home_outcomes), ('away', away_outcomes)]:
         for outcome in team_outcomes:
             outcome_data = outcome[0] if isinstance(outcome, tuple) else outcome
-            
+            player_name = outcome[2] if isinstance(outcome, tuple) and len(outcome) > 2 else ''
+
             if outcome_data == 'walk':
                 walk_counts[team_key] += 1
                 continue
-            
+
             if not isinstance(outcome_data, dict):
                 continue
-            
+
             coord_x = outcome_data.get('coord_x')
             coord_y = outcome_data.get('coord_y')
-            
+
             if coord_x is None or coord_y is None:
                 continue
-            
+
             # Spray angle from coordinates (direction is accurate)
             spray_angle = calculate_spray_angle(coord_x, coord_y)
-            
+
             # Distance from physics (landing distance based on EV/LA)
             launch_speed = outcome_data.get('launch_speed')
             launch_angle = outcome_data.get('launch_angle')
             distance_ft = calculate_landing_distance(launch_speed, launch_angle)
             distance = distance_ft * FEET_TO_PLOT  # Convert to plot units
-            
+
             outcome_data['venue_name'] = outcome_data.get('venue_name', venue_name)
             xbases = calculate_expected_bases_for_spray(outcome_data, pipeline)
-            
+
             angle_rad = np.radians(90 - spray_angle)
             plot_x = distance * np.cos(angle_rad)
             plot_y = distance * np.sin(angle_rad)
-            
+
+            # Extract last name for labeling top batted balls
+            last_name = player_name.split()[-1] if player_name else ''
+
             batted_balls[team_key].append({
                 'x': plot_x,
                 'y': plot_y,
                 'xbases': xbases,
+                'last_name': last_name,
             })
     
     # Axis limits based on stadium dimensions
@@ -1178,18 +1195,31 @@ def spray_chart(home_outcomes, away_outcomes,
         for bb in batted_balls[team_key]:
             color = get_expected_bases_color(bb['xbases'])
             img = getImage(logo_url, zoom=0.45, size=(40, 40), alpha=0.85)
-            
+
             if img:
                 ab = AnnotationBbox(img, (bb['x'], bb['y']), frameon=False, zorder=10)
                 ax.add_artist(ab)
-                
+
                 ring = plt.Circle(
                     (bb['x'], bb['y']), radius=5.5,
                     fill=False, edgecolor=color,
                     linewidth=2.5, alpha=0.9, zorder=9
                 )
                 ax.add_patch(ring)
-        
+
+        # Label top 3 batted balls by expected bases
+        top_bbs = sorted(batted_balls[team_key], key=lambda b: b['xbases'], reverse=True)[:3]
+        for bb in top_bbs:
+            if bb['last_name']:
+                ax.annotate(
+                    bb['last_name'], (bb['x'], bb['y']),
+                    textcoords='offset points', xytext=(0, -10),
+                    fontsize=7, fontweight='bold', ha='center', va='top',
+                    color='#222222', zorder=11,
+                    bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
+                              edgecolor='none', alpha=0.7)
+                )
+
         ax.set_xlim(-axis_limit, axis_limit)
         ax.set_ylim(-5, axis_limit)
         ax.set_aspect('equal')
@@ -1214,27 +1244,27 @@ def spray_chart(home_outcomes, away_outcomes,
     fig.text(0.5, 0.86, 'Data: MLB  |  @mlb_simulator', 
              fontsize=10, color='gray', ha='center', va='top')
     
-    # Disclaimer about estimated dimensions (just below attribution)
-    fig.text(0.5, 0.83, '* Ballpark dimensions estimated using LF/CF/RF fence distances', 
+    # Disclaimer about fence curve interpolation (just below attribution)
+    fig.text(0.5, 0.83, '* Fence curve interpolated from LF/CF/RF distances',
              fontsize=8, color='gray', ha='center', va='top', style='italic')
     
-    # Legend (bottom center)
+    # Legend (bottom center) using proper matplotlib handles
+    from matplotlib.lines import Line2D
     legend_items = [
         ('Out', '#808080'),
         ('Single', '#FFA500'),
         ('XBH', '#FF6347'),
         ('HR', '#DC143C')
     ]
-    
-    fig.text(0.35, 0.025, "Expected Outcome:", ha='right', fontsize=10, fontweight='bold', va='center')
-    
-    for i, (label, color) in enumerate(legend_items):
-        x_pos = 0.37 + (i * 0.085)
-        circle = plt.Circle((x_pos, 0.025), 0.01, 
-                            transform=fig.transFigure, 
-                            color=color, zorder=100)
-        fig.patches.append(circle)
-        fig.text(x_pos + 0.015, 0.025, label, ha='left', fontsize=10, va='center')
+    legend_handles = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='none',
+               markeredgecolor=color, markeredgewidth=2.5, markersize=10, label=label)
+        for label, color in legend_items
+    ]
+    fig.legend(handles=legend_handles, loc='lower center', ncol=4,
+               fontsize=10, frameon=False, title='Expected Outcome',
+               title_fontproperties={'weight': 'bold', 'size': 10},
+               bbox_to_anchor=(0.5, 0.0))
     
     # Save
     os.makedirs(images_dir, exist_ok=True)

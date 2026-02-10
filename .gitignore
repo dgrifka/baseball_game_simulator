@@ -1,2 +1,5 @@
 __pycache__/
 .DS_Store
+.venv/
+.claude/
+Research/venue_effects_images/
