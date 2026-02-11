@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 .claude/
 Research/venue_effects_images/
+test_images/
