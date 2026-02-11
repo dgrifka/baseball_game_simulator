@@ -1050,13 +1050,13 @@ def draw_baseball_field(ax, venue_name='default'):
     )
     ax.add_patch(infield)
     
-    # Extract max distance and LF/CF/RF for labels — works with both formats
+    # Extract max distance and LF/CF/RF for labels
     if isinstance(dims, list):
-        dims_dict = {angle: dist for angle, dist in dims}
         max_fence_ft = max(dist for _, dist in dims)
-        lf_dist = dims_dict.get(-45, dims[0][1])
-        cf_dist = dims_dict.get(0, dims[len(dims)//2][1])
-        rf_dist = dims_dict.get(45, dims[-1][1])
+        lf_dist = dims[0][1]   # First point (most negative angle)
+        rf_dist = dims[-1][1]  # Last point (most positive angle)
+        # CF: find point closest to 0°
+        cf_dist = min(dims, key=lambda p: abs(p[0]))[1]
     else:
         max_fence_ft = max(dims.values())
         lf_dist = dims['LF']
