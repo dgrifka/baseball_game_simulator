@@ -3,7 +3,6 @@ import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 import matplotlib.patches as patches
 from matplotlib.patches import Polygon
-from scipy.interpolate import interp1d
 import seaborn as sns
 from scipy.interpolate import griddata
 from matplotlib.colors import LinearSegmentedColormap, to_rgb
@@ -25,6 +24,10 @@ from io import BytesIO
 from PIL import Image, ImageEnhance
 import os
 import ast
+
+# Resolve paths relative to the repo root (parent of Simulator/)
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_MODEL_PATH = os.path.join(_REPO_ROOT, 'Model', 'batted_ball_model.pkl')
 
 def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
     """
@@ -284,22 +287,46 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
             f'Most Likely Outcome: {away_team} {mode_strs["away"]} - {home_team} '
             f'{mode_strs["home"]}')
     
-    plt.title(title, fontsize=16, loc='left', pad=15, fontweight='bold')
-    
-    # Watermark in top right
-    plt.text(0.99, 1.07, 'Data: MLB', transform=plt.gca().transAxes,
+    # Extra title padding when scores are close (labels need room above the plot)
+    scores_close = abs(home_score - away_score) <= 2
+    title_pad = 55 if scores_close else 38
+
+    plt.title(title, fontsize=16, loc='left', pad=title_pad, fontweight='bold')
+
+    # Watermark in top right (positioned relative to the expanded title area)
+    watermark_y = 1.19 if scores_close else 1.15
+    plt.text(0.99, watermark_y, 'Data: MLB', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='right', va='bottom')
-    plt.text(0.99, 1.03, 'By: @mlb_simulator', transform=plt.gca().transAxes,
+    plt.text(0.99, watermark_y - 0.03, 'By: @mlb_simulator', transform=plt.gca().transAxes,
              fontsize=12, color='gray', ha='right', va='top')
-    
-    # Actual score vertical lines
-    for score, color, team in [
+
+    # Actual score vertical lines with labels just above the plot area
+    score_labels = [
         (away_score, away_color, away_team),
         (home_score, home_color, home_team)
-    ]:
+    ]
+    for score, color, team in score_labels:
         ax.axvline(x=score + 0.5, color=color, linestyle='--', linewidth=2.5, alpha=0.85, zorder=5)
-        ax.text(score + 0.5, ax.get_ylim()[1] * 0.95, f' {team}: {score}',
-                fontsize=10, fontweight='bold', color=color, va='top', ha='left', zorder=6)
+
+    # Place labels above the plot in axes coordinates
+    xlim = ax.get_xlim()
+    x_range = xlim[1] - xlim[0]
+
+    base_y = 1.005  # Just above the plot edge
+    label_offsets = [base_y, base_y]  # [away, home]
+
+    # If scores are close (within 2 runs), offset one label higher to avoid overlap
+    if scores_close:
+        if away_score <= home_score:
+            label_offsets[0] = base_y + 0.055
+        else:
+            label_offsets[1] = base_y + 0.055
+
+    for idx, (score, color, team) in enumerate(score_labels):
+        x_frac = (score + 0.5 - xlim[0]) / x_range
+        ax.text(x_frac, label_offsets[idx], f'{team}: {score}\n(Actual)',
+                transform=ax.transAxes, fontsize=9, fontweight='bold',
+                color=color, va='bottom', ha='center', zorder=6)
 
     # Enhanced legend in top right
     plt.legend(fontsize=12, frameon=True, framealpha=0.9,
@@ -618,7 +645,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                     from Simulator.game_simulator import prepare_batted_ball_features
                     
                     try:
-                        pipeline = joblib.load('Model/batted_ball_model.pkl')
+                        pipeline = joblib.load(_MODEL_PATH)
                         
                         features = prepare_batted_ball_features(
                             launch_speed=outcome_data['launch_speed'],
@@ -946,58 +973,51 @@ def get_expected_bases_color(xbases):
         return '#DC143C'  # Crimson - HR
 
 
-def get_stadium_fence_curve(venue_name, num_points=100):
+def get_stadium_fence_curve(venue_name):
     """
     Generate fence curve points for a specific stadium.
-    
-    Supports standard 5-point dimensions (LF, LCF, CF, RCF, RF) as well as
-    enhanced dimensions with extra keys for quirky parks:
-        - DLCF: Deep Left-Center Field (placed at -15 degrees)
-        - DRCF: Deep Right-Center Field (placed at +30 degrees)
-    
+
+    Supports two data formats in STADIUM_DIMENSIONS:
+      1. List of (angle, distance) tuples — used directly (new format)
+      2. Dict with named keys (LF, LCF, CF, etc.) — converted via key_to_angle mapping (legacy)
+
+    Waypoints are converted to Cartesian directly (no polar interpolation).
+    matplotlib connects them with straight lines, so straight walls like
+    Fenway's Green Monster render as straight lines instead of circular arcs.
+
     Returns:
-        tuple: (x_coords, y_coords, dims, smooth_angles, smooth_distances)
+        tuple: (x_coords, y_coords, dims_raw, angles_deg, distances_plot)
     """
-    dims = STADIUM_DIMENSIONS.get(venue_name, DEFAULT_STADIUM_DIMENSIONS)
-    
-    # Map dimension keys to angles (degrees from center field)
-    # Standard: LF=-45, LCF=-22.5, CF=0, RCF=22.5, RF=45
-    # Enhanced: DLCF=-15, DRCF=+30
-    key_to_angle = {
-        'LF': -45,
-        'LCF': -22.5,
-        'DLCF': -15,      # Deep left-center (e.g., Fenway Triangle)
-        'CF': 0,
-        'RCF': 22.5,
-        'DRCF': 30,       # Deep right-center (e.g., Oracle Triples Alley)
-        'RF': 45,
-    }
-    
-    # Build arrays from available keys
-    angle_dist_pairs = []
-    for key, angle in key_to_angle.items():
-        if key in dims:
-            angle_dist_pairs.append((angle, dims[key]))
-    
-    # Sort by angle
+    dims_raw = STADIUM_DIMENSIONS.get(venue_name, DEFAULT_STADIUM_DIMENSIONS)
+
+    if isinstance(dims_raw, list):
+        angle_dist_pairs = list(dims_raw)
+    else:
+        # Legacy dict format — convert using key-to-angle mapping
+        key_to_angle = {
+            'LF': -45,
+            'LCF': -22.5,
+            'DLCF': -15,
+            'CF': 0,
+            'RCF': 22.5,
+            'DRCF': 30,
+            'RF': 45,
+        }
+        angle_dist_pairs = [(angle, dims_raw[key])
+                            for key, angle in key_to_angle.items() if key in dims_raw]
+
     angle_dist_pairs.sort(key=lambda x: x[0])
-    
+
     angles_deg = np.array([p[0] for p in angle_dist_pairs])
     distances_ft = np.array([p[1] for p in angle_dist_pairs])
     distances_plot = distances_ft * FEET_TO_PLOT
-    
-    # Use cubic interpolation if we have 4+ points, else quadratic
-    interp_kind = 'cubic' if len(angles_deg) >= 4 else 'quadratic'
-    interp_func = interp1d(angles_deg, distances_plot, kind=interp_kind)
-    
-    smooth_angles = np.linspace(-45, 45, num_points)
-    smooth_distances = interp_func(smooth_angles)
-    
-    angles_rad = np.radians(90 - smooth_angles)
-    x_coords = smooth_distances * np.cos(angles_rad)
-    y_coords = smooth_distances * np.sin(angles_rad)
-    
-    return x_coords, y_coords, dims, smooth_angles, smooth_distances
+
+    # Convert to Cartesian directly — straight lines between waypoints
+    angles_rad = np.radians(90 - angles_deg)
+    x_coords = distances_plot * np.cos(angles_rad)
+    y_coords = distances_plot * np.sin(angles_rad)
+
+    return x_coords, y_coords, dims_raw, angles_deg, distances_plot
 
 
 def draw_baseball_field(ax, venue_name='default'):
@@ -1021,8 +1041,8 @@ def draw_baseball_field(ax, venue_name='default'):
                            edgecolor='#228B22', linewidth=2, alpha=0.6, zorder=1)
     ax.add_patch(grass_polygon)
     
-    # Infield dirt
-    infield_radius = 35
+    # Infield dirt — real grass-dirt arc is ~95ft from home plate
+    infield_radius = 95 * FEET_TO_PLOT  # ~23.75 plot units
     infield = patches.Wedge(
         center=(0, 0), r=infield_radius,
         theta1=45, theta2=135,
@@ -1030,24 +1050,37 @@ def draw_baseball_field(ax, venue_name='default'):
     )
     ax.add_patch(infield)
     
+    # Extract max distance and LF/CF/RF for labels — works with both formats
+    if isinstance(dims, list):
+        dims_dict = {angle: dist for angle, dist in dims}
+        max_fence_ft = max(dist for _, dist in dims)
+        lf_dist = dims_dict.get(-45, dims[0][1])
+        cf_dist = dims_dict.get(0, dims[len(dims)//2][1])
+        rf_dist = dims_dict.get(45, dims[-1][1])
+    else:
+        max_fence_ft = max(dims.values())
+        lf_dist = dims['LF']
+        cf_dist = dims['CF']
+        rf_dist = dims['RF']
+
     # Foul lines (extend past fence for HR visibility)
-    max_fence = max(dims.values()) * FEET_TO_PLOT
+    max_fence = max_fence_ft * FEET_TO_PLOT
     foul_extension = max_fence + 12
-    
+
     for angle in [-45, 45]:
         angle_rad = np.radians(90 - angle)
         x_end = foul_extension * np.cos(angle_rad)
         y_end = foul_extension * np.sin(angle_rad)
         ax.plot([0, x_end], [0, y_end], color=line_color, linewidth=2, alpha=0.8, zorder=3)
-    
+
     # Fence line
     ax.plot(fence_x, fence_y, color='#333333', linewidth=3, zorder=4)
-    
+
     # Distance labels just outside the fence
     label_positions = [
-        (-45, dims['LF'], 'right'),
-        (0, dims['CF'], 'center'),
-        (45, dims['RF'], 'left')
+        (-45, lf_dist, 'right'),
+        (0, cf_dist, 'center'),
+        (45, rf_dist, 'left')
     ]
     
     for angle, dist_ft, ha in label_positions:
@@ -1107,7 +1140,7 @@ def spray_chart(home_outcomes, away_outcomes,
     plt.close('all')
 
     if pipeline is None:
-        pipeline = joblib.load('Model/batted_ball_model.pkl')
+        pipeline = joblib.load(_MODEL_PATH)
     
     percentages = {
         'away': f"{away_win_percentage:.0f}",
@@ -1120,11 +1153,8 @@ def spray_chart(home_outcomes, away_outcomes,
     home_display_name = get_display_team_name(home_team)
     away_display_name = get_display_team_name(away_team)
     
-    # Figure size optimized for two side-by-side square-ish fields
-    fig, (ax_away, ax_home) = plt.subplots(1, 2, figsize=(15, 7), dpi=150)
-    
-    # Tight margins
-    plt.subplots_adjust(left=0.01, right=0.99, top=0.82, bottom=0.08, wspace=0.02)
+    fig, (ax_away, ax_home) = plt.subplots(1, 2, figsize=(16, 7.5), dpi=150)
+    plt.subplots_adjust(left=0.02, right=0.98, top=0.86, bottom=0.07, wspace=0.02)
     
     # Process outcomes
     batted_balls = {'home': [], 'away': []}
@@ -1176,7 +1206,10 @@ def spray_chart(home_outcomes, away_outcomes,
     
     # Axis limits based on stadium dimensions
     dims = STADIUM_DIMENSIONS.get(venue_name, DEFAULT_STADIUM_DIMENSIONS)
-    max_fence = max(dims.values()) * FEET_TO_PLOT
+    if isinstance(dims, list):
+        max_fence = max(dist for _, dist in dims) * FEET_TO_PLOT
+    else:
+        max_fence = max(dims.values()) * FEET_TO_PLOT
     axis_limit = max_fence + 12
     
     # Plot each team
@@ -1220,35 +1253,29 @@ def spray_chart(home_outcomes, away_outcomes,
                               edgecolor='none', alpha=0.7)
                 )
 
-        ax.set_xlim(-axis_limit, axis_limit)
-        ax.set_ylim(-5, axis_limit)
+        x_extent = axis_limit * 0.80
+        ax.set_xlim(-x_extent, x_extent)
+        ax.set_ylim(-3, axis_limit)
         ax.set_aspect('equal')
         ax.axis('off')
-        
-        # Team title with stats
+
         bip_count = len(batted_balls[team_key])
         walk_count = walk_counts[team_key]
-        ax.set_title(f"{display_name}\n{bip_count} BIP  •  {walk_count} BB/HBP", 
-                     fontsize=14, fontweight='bold', pad=12)
-    
-    # Main title
-    title_text = (
-        f"Batted Ball Spray Chart  •  {venue_name}\n"
+        ax.set_title(f"{display_name}\n{bip_count} BIP  •  {walk_count} BB/HBP",
+                     fontsize=14, fontweight='bold', pad=4)
+
+    title_line1 = f"Batted Ball Spray Chart  •  {venue_name}"
+    title_line2 = (
         f"Actual: {away_display_name} {away_score} - {home_display_name} {home_score}  ({formatted_date})    "
-        f"Deserve-to-Win: {away_display_name} {percentages['away']}% - "
+        f"DTW: {away_display_name} {percentages['away']}% - "
         f"{home_display_name} {percentages['home']}%, Tie {percentages['tie']}%"
     )
-    fig.suptitle(title_text, fontsize=13, fontweight='bold', y=0.94)
-    
-    # Attribution (centered under title)
-    fig.text(0.5, 0.86, 'Data: MLB  |  @mlb_simulator', 
-             fontsize=10, color='gray', ha='center', va='top')
-    
-    # Disclaimer about fence curve interpolation (just below attribution)
-    fig.text(0.5, 0.83, '* Fence curve interpolated from LF/CF/RF distances',
-             fontsize=8, color='gray', ha='center', va='top', style='italic')
-    
-    # Legend (bottom center) using proper matplotlib handles
+    fig.suptitle(f"{title_line1}\n{title_line2}",
+                 fontsize=13, fontweight='bold', y=0.96)
+
+    fig.text(0.98, 0.96, 'Data: MLB  |  @mlb_simulator',
+             fontsize=9, color='gray', ha='right', va='top')
+
     from matplotlib.lines import Line2D
     legend_items = [
         ('Out', '#808080'),
@@ -1264,16 +1291,15 @@ def spray_chart(home_outcomes, away_outcomes,
     fig.legend(handles=legend_handles, loc='lower center', ncol=4,
                fontsize=10, frameon=False, title='Expected Outcome',
                title_fontproperties={'weight': 'bold', 'size': 10},
-               bbox_to_anchor=(0.5, 0.0))
-    
-    # Save
+               bbox_to_anchor=(0.5, 0.01))
+
     os.makedirs(images_dir, exist_ok=True)
     filename = (f"{away_display_name}_{home_display_name}_{away_score}-{home_score}--"
                 f"{percentages['away']}-{percentages['home']}_spray.png")
     filepath = os.path.join(images_dir, filename)
-    
+
     plt.savefig(filepath, dpi=250, facecolor='white', edgecolor='none',
-                bbox_inches='tight', pad_inches=0.05)
+                bbox_inches='tight', pad_inches=0.1)
     
     print(f"Saved spray chart: {filepath}")
     plt.close(fig)
