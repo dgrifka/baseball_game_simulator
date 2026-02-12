@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 import matplotlib.patches as patches
@@ -28,6 +29,76 @@ import ast
 # Resolve paths relative to the repo root (parent of Simulator/)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _MODEL_PATH = os.path.join(_REPO_ROOT, 'Model', 'batted_ball_model.pkl')
+_LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'mlb_simulator_logo.png')
+
+
+def _apply_watermark(filepath):
+    """Add logo + watermark text to a saved image file using PIL.
+
+    Positions the logo and text at a fixed percentage offset from the
+    top-right corner of the saved image.  This is immune to matplotlib
+    figure-size, DPI, and bbox_inches='tight' differences, so every
+    visualization gets identical watermark placement.
+    """
+    from PIL import ImageDraw, ImageFont
+    import matplotlib.font_manager as fm
+
+    try:
+        img = Image.open(filepath).convert('RGBA')
+        w, h = img.size
+
+        # --- Load logo with transparent background ---
+        logo = Image.open(_LOGO_PATH).convert('RGBA')
+        logo_data = np.array(logo)
+        r, g, b = logo_data[:, :, 0], logo_data[:, :, 1], logo_data[:, :, 2]
+        white_mask = (r > 240) & (g > 240) & (b > 240)
+        logo_data[white_mask, 3] = 0
+        logo_data[:, :, 3] = (logo_data[:, :, 3].astype(float) * 0.85).astype(np.uint8)
+        logo = Image.fromarray(logo_data)
+
+        # Scale logo to ~5.5% of image height
+        logo_h = max(30, int(h * 0.055))
+        logo_w = int(logo_h * logo.width / logo.height)
+        logo = logo.resize((logo_w, logo_h), Image.LANCZOS)
+
+        # --- Prepare text ---
+        text = 'Data: MLB  |  @mlb_simulator'
+        font_size = max(12, int(h * 0.015))
+        try:
+            font_path = fm.findfont(fm.FontProperties(family='sans-serif'))
+            font = ImageFont.truetype(font_path, font_size)
+        except Exception:
+            font = ImageFont.load_default()
+
+        tmp_draw = ImageDraw.Draw(img)
+        text_bbox = tmp_draw.textbbox((0, 0), text, font=font)
+        text_w = text_bbox[2] - text_bbox[0]
+        text_h = text_bbox[3] - text_bbox[1]
+
+        # --- Position: top-right corner ---
+        margin_r = int(w * 0.02)
+        margin_t = int(h * 0.012)
+        gap = int(h * 0.005)
+
+        # Horizontal center shared by logo and text
+        block_w = max(logo_w, text_w)
+        center_x = w - margin_r - block_w // 2
+
+        logo_x = center_x - logo_w // 2
+        logo_y = margin_t
+
+        text_x = center_x - text_w // 2
+        text_y = logo_y + logo_h + gap
+
+        # --- Draw ---
+        img.paste(logo, (logo_x, logo_y), logo)
+        draw = ImageDraw.Draw(img)
+        draw.text((text_x, text_y), text, fill=(160, 160, 160), font=font)
+
+        img.convert('RGB').save(filepath)
+    except Exception as e:
+        print(f"Warning: could not apply watermark to {filepath}: {e}")
+
 
 def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
     """
@@ -217,7 +288,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
     # plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
     # plt.savefig(os.path.join(images_dir, filename), dpi=300)
-    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=350)
+    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=200)
     plt.close(fig)
 
 
@@ -279,26 +350,24 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     plt.xlabel('Runs Scored', fontsize=14, labelpad=10)
     plt.ylabel('Frequency', fontsize=14, labelpad=10)
     
-    # Enhanced title with better spacing
-    title = (f'Distribution of Runs Scored ({num_simulations:,} Simulations)\n'
-            f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
-            f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} '
-            f'{percentages["home"]}%, Tie {percentages["tie"]}%\n'
-            f'Most Likely Outcome: {away_team} {mode_strs["away"]} - {home_team} '
-            f'{mode_strs["home"]}')
-    
-    # Extra title padding when scores are close (labels need room above the plot)
+    # Title: bold main line + plain subtitle (using ax.text for precise control)
     scores_close = abs(home_score - away_score) <= 2
-    title_pad = 55 if scores_close else 38
+    title_y = 1.24 if scores_close else 1.17
+    subtitle_y = title_y - 0.04
 
-    plt.title(title, fontsize=16, loc='left', pad=title_pad, fontweight='bold')
+    ax.text(0.0, title_y,
+            f'Distribution of Runs Scored ({num_simulations:,} Simulations)',
+            transform=ax.transAxes, fontsize=16, fontweight='bold', ha='left', va='top')
 
-    # Watermark in top right (positioned relative to the expanded title area)
-    watermark_y = 1.19 if scores_close else 1.15
-    plt.text(0.99, watermark_y, 'Data: MLB', transform=plt.gca().transAxes,
-             fontsize=12, color='gray', ha='right', va='bottom')
-    plt.text(0.99, watermark_y - 0.03, 'By: @mlb_simulator', transform=plt.gca().transAxes,
-             fontsize=12, color='gray', ha='right', va='top')
+    subtitle = (
+        f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
+        f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} '
+        f'{percentages["home"]}%, Tie {percentages["tie"]}%\n'
+        f'Most Likely Outcome: {away_team} {mode_strs["away"]} - {home_team} '
+        f'{mode_strs["home"]}'
+    )
+    ax.text(0.0, subtitle_y, subtitle, transform=ax.transAxes,
+            fontsize=12, color='#333333', ha='left', va='top', linespacing=1.5)
 
     # Actual score vertical lines with labels just above the plot area
     score_labels = [
@@ -339,8 +408,10 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_rd.png'
-    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
+    filepath = os.path.join(images_dir, filename)
+    plt.savefig(filepath, bbox_inches='tight', dpi=200)
     plt.close()
+    _apply_watermark(filepath)
 
 def prepare_table_data(df):
     """Prepare and format data for table visualization."""
@@ -460,22 +531,14 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     plt.text(0.5, 0.84, title_lines[2], transform=fig.transFigure,
              fontsize=14, ha='center', va='top', color='#666666')
     
-    # Attribution - back to top left corner
-    plt.text(0.1, 0.915, 'Data: MLB', 
-             transform=fig.transFigure, fontsize=18, 
-             ha='left', va='top', color='#999999')
-    
-    plt.text(0.1, 0.89, 'By: @mlb_simulator', 
-             transform=fig.transFigure, fontsize=18, 
-             ha='left', va='top', color='#999999')
-    
     # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'
-    plt.savefig(os.path.join(images_dir, filename), 
-                bbox_inches='tight', dpi=300,
+    filepath = os.path.join(images_dir, filename)
+    plt.savefig(filepath, bbox_inches='tight', dpi=200,
                 facecolor='white', edgecolor='none')
     plt.close()
+    _apply_watermark(filepath)
 
 
 def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
@@ -771,13 +834,17 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     ax.set_xlabel('Estimated Total Bases', fontsize=14, labelpad=10)
     # ax.set_ylabel('Player', fontsize=14, labelpad=40)  # REMOVED THIS LINE
     
-    # Title with game information
-    title = f'Player Contributions by Estimated Total Bases\n' \
-            f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n' \
-            f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} ' \
-            f'{percentages["home"]}%, Tie {percentages["tie"]}%'
-    
-    ax.set_title(title, fontsize=16, loc='left', pad=15, fontweight='bold')
+    # Title: bold main line + plain subtitle
+    ax.set_title('Player Contributions by Estimated Total Bases',
+                 fontsize=16, loc='left', pad=55, fontweight='bold')
+
+    subtitle = (
+        f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
+        f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} '
+        f'{percentages["home"]}%, Tie {percentages["tie"]}%'
+    )
+    ax.text(0.0, 1.08, subtitle, transform=ax.transAxes,
+            fontsize=12, color='#333333', ha='left', va='top', linespacing=1.5)
     
     # Add legend
     ax.legend(loc='lower right', fontsize=11, frameon=True, 
@@ -790,22 +857,18 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     # Add grid for better readability
     ax.grid(axis='x', alpha=0.3, linestyle='--')
     
-    # MOVED watermark to top right
-    ax.text(0.91, 1.07, 'Data: MLB', transform=ax.transAxes,
-           fontsize=13, color='gray', ha='right', va='top')
-    ax.text(0.91, 1.05, 'By: @mlb_simulator', transform=ax.transAxes,
-           fontsize=13, color='gray', ha='right', va='top')
-    
     # Set x-axis limit with some padding
     max_value = max([sum(x) for x in zip(batted_balls_values, walks_values)])
     ax.set_xlim(0, max_value * 1.15)
-    
+
     # Save figure
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{percentages["away"]}-{percentages["home"]}_player_contributions.png'
-    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300,
+    filepath = os.path.join(images_dir, filename)
+    plt.savefig(filepath, bbox_inches='tight', dpi=200,
                 facecolor='white', edgecolor='none')
     plt.close()
+    _apply_watermark(filepath)
 
 
 # =============================================================================
@@ -1092,12 +1155,18 @@ def draw_baseball_field(ax, venue_name='default'):
         ax.text(label_x, label_y, f"{dist_ft}'", ha=ha, va='bottom',
                 fontsize=9, color='#444444', fontweight='bold', zorder=5)
     
-    # Home plate
-    home_plate = patches.RegularPolygon(
-        (0, 0), numVertices=5, radius=2.5,
-        orientation=np.pi, facecolor='white',
-        edgecolor='black', linewidth=1, zorder=6
-    )
+    # Home plate — real proportions: 17" front, 8.5" sides, 12" back edges
+    # Scaled so half-width = 2.5 plot units; back depth = sqrt(12²-8.5²)/8.5 * 2.5
+    hp_hw = 2.5   # half-width
+    hp_sd = 2.5   # side depth (8.5" / 8.5" * 2.5)
+    hp_bd = 2.49  # back-edge depth (sqrt(71.75) / 8.5 * 2.5)
+    home_plate = Polygon([
+        (-hp_hw,  2.0),   # front left  (faces pitcher)
+        ( hp_hw,  2.0),   # front right
+        ( hp_hw, -0.5),   # right corner
+        ( 0,     -3.0),   # point       (faces catcher)
+        (-hp_hw, -0.5),   # left corner
+    ], closed=True, facecolor='white', edgecolor='black', linewidth=1, zorder=6)
     ax.add_patch(home_plate)
 
 
@@ -1154,7 +1223,7 @@ def spray_chart(home_outcomes, away_outcomes,
     away_display_name = get_display_team_name(away_team)
     
     fig, (ax_away, ax_home) = plt.subplots(1, 2, figsize=(16, 7.5), dpi=150)
-    plt.subplots_adjust(left=0.02, right=0.98, top=0.86, bottom=0.07, wspace=0.02)
+    plt.subplots_adjust(left=0.02, right=0.98, top=0.80, bottom=0.03, wspace=0.02)
     
     # Process outcomes
     batted_balls = {'home': [], 'away': []}
@@ -1264,17 +1333,16 @@ def spray_chart(home_outcomes, away_outcomes,
         ax.set_title(f"{display_name}\n{bip_count} BIP  •  {walk_count} BB/HBP",
                      fontsize=14, fontweight='bold', pad=4)
 
-    title_line1 = f"Batted Ball Spray Chart  •  {venue_name}"
+    title_line1 = "Batted Ball Spray Chart"
     title_line2 = (
         f"Actual: {away_display_name} {away_score} - {home_display_name} {home_score}  ({formatted_date})    "
         f"DTW: {away_display_name} {percentages['away']}% - "
         f"{home_display_name} {percentages['home']}%, Tie {percentages['tie']}%"
     )
-    fig.suptitle(f"{title_line1}\n{title_line2}",
-                 fontsize=13, fontweight='bold', y=0.96)
-
-    fig.text(0.98, 0.96, 'Data: MLB  |  @mlb_simulator',
-             fontsize=9, color='gray', ha='right', va='top')
+    fig.text(0.5, 0.97, title_line1,
+             fontsize=15, fontweight='bold', ha='center', va='top')
+    fig.text(0.5, 0.935, title_line2,
+             fontsize=11, color='#333333', ha='center', va='top')
 
     from matplotlib.lines import Line2D
     legend_items = [
@@ -1285,25 +1353,28 @@ def spray_chart(home_outcomes, away_outcomes,
     ]
     legend_handles = [
         Line2D([0], [0], marker='o', color='w', markerfacecolor='none',
-               markeredgecolor=color, markeredgewidth=2.5, markersize=10, label=label)
+               markeredgecolor=color, markeredgewidth=2.5, markersize=11, label=label)
         for label, color in legend_items
     ]
-    fig.legend(handles=legend_handles, loc='lower center', ncol=4,
-               fontsize=10, frameon=False, title='Expected Outcome',
-               title_fontproperties={'weight': 'bold', 'size': 10},
-               bbox_to_anchor=(0.5, 0.01))
+    fig.legend(handles=legend_handles, loc='upper center', ncol=4,
+               fontsize=11, frameon=False, title='Expected Outcome',
+               title_fontproperties={'weight': 'bold', 'size': 11},
+               bbox_to_anchor=(0.5, 0.895))
+
+    fig.text(0.5, 0.02, 'Stadium dimensions are estimated for this visual',
+             fontsize=8, fontstyle='italic', color='gray', ha='center', va='bottom')
 
     os.makedirs(images_dir, exist_ok=True)
     filename = (f"{away_display_name}_{home_display_name}_{away_score}-{home_score}--"
                 f"{percentages['away']}-{percentages['home']}_spray.png")
     filepath = os.path.join(images_dir, filename)
 
-    plt.savefig(filepath, dpi=250, facecolor='white', edgecolor='none',
+    plt.savefig(filepath, dpi=200, facecolor='white', edgecolor='none',
                 bbox_inches='tight', pad_inches=0.1)
-    
-    print(f"Saved spray chart: {filepath}")
     plt.close(fig)
-    
+    _apply_watermark(filepath)
+
+    print(f"Saved spray chart: {filepath}")
     return filepath
                     
 def add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df):
