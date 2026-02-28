@@ -1,15 +1,16 @@
 {
   "model_name": "MLB Batted Ball Outcome Classifier",
-  "model_type": "GradientBoostingClassifier",
-  "created_date": "2025-12-14",
-  "training_samples": 203041,
-  "test_samples": 50761,
+  "model_type": "CalibratedClassifierCV(GradientBoostingClassifier)",
+  "created_date": "2026-02-27",
+  "training_samples": 167542,
+  "calibration_samples": 35902,
+  "test_samples": 35902,
   "seasons": [
     2024,
     2025
   ],
-  "accuracy": 0.8204,
-  "log_loss": 0.4506,
+  "accuracy": 0.8233,
+  "log_loss": 0.4554,
   "features": {
     "numeric": [
       "hitData_launchSpeed",
@@ -47,8 +48,10 @@
     "min_samples_leaf": 20
   },
   "notes": [
+    "Trained from S3 batted ball parquet data",
+    "sklearn Pipeline: StandardScaler + OneHotEncoder + GBC",
+    "Calibrated with CalibratedClassifierCV (isotonic, cv='prefit')",
     "Spray angle adjusted for batter handedness (negative = pull side)",
-    "Steinbrenner Field (Rays 2025) mapped to Yankee Stadium venue_id",
     "venue_id used instead of venue_name for stability"
   ]
 }
