@@ -194,13 +194,20 @@ def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y,
     spray_ev_interaction = spray_angle_adj * launch_speed
     pulled_ground_ball = int(is_pulled and launch_category == 'ground_ball')
     oppo_line_drive = int(is_opposite and launch_category == 'line_drive')
-    
+
+    # Nonlinear EV features for tail accuracy
+    launch_speed_squared = launch_speed ** 2
+    angle_rad = np.radians(launch_angle)
+    hr_distance_proxy = launch_speed * np.sin(angle_rad)
+
     # Create DataFrame matching model's expected feature order
     return pd.DataFrame({
         # Numeric features (order must match training)
         'hitData_launchSpeed': [launch_speed],
         'hitData_launchAngle': [launch_angle],
         'distance_proxy': [distance_proxy],
+        'hr_distance_proxy': [hr_distance_proxy],
+        'launch_speed_squared': [launch_speed_squared],
         'spray_angle_adj': [spray_angle_adj],
         'spray_angle_abs': [spray_angle_abs],
         'is_barrel': [barrel],
