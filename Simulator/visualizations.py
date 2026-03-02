@@ -32,13 +32,22 @@ _MODEL_PATH = os.path.join(_REPO_ROOT, 'Model', 'batted_ball_model.pkl')
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'mlb_simulator_logo.png')
 
 
-def _apply_watermark(filepath):
+def _apply_watermark(filepath, position='top-right', y_pct=None):
     """Add logo + watermark text to a saved image file using PIL.
 
     Positions the logo and text at a fixed percentage offset from the
-    top-right corner of the saved image.  This is immune to matplotlib
-    figure-size, DPI, and bbox_inches='tight' differences, so every
-    visualization gets identical watermark placement.
+    specified corner of the saved image.  This is immune to matplotlib
+    figure-size, DPI, and bbox_inches='tight' differences.
+
+    Parameters
+    ----------
+    filepath : str
+        Path to the saved image file (modified in place).
+    position : str
+        'top-right' or 'top-left'.
+    y_pct : float, optional
+        Vertical position as fraction of image height (0.0 = top, 1.0 = bottom).
+        The logo top edge is placed at this position. Default ~1.2% from top.
     """
     from PIL import ImageDraw, ImageFont
     import matplotlib.font_manager as fm
@@ -47,7 +56,6 @@ def _apply_watermark(filepath):
         img = Image.open(filepath).convert('RGBA')
         w, h = img.size
 
-        # --- Load logo with transparent background ---
         logo = Image.open(_LOGO_PATH).convert('RGBA')
         logo_data = np.array(logo)
         r, g, b = logo_data[:, :, 0], logo_data[:, :, 1], logo_data[:, :, 2]
@@ -56,16 +64,17 @@ def _apply_watermark(filepath):
         logo_data[:, :, 3] = (logo_data[:, :, 3].astype(float) * 0.85).astype(np.uint8)
         logo = Image.fromarray(logo_data)
 
-        # Scale logo to ~5.5% of image height
-        logo_h = max(30, int(h * 0.055))
+        # Scale logo relative to the smaller dimension (avoids overflow on narrow images)
+        ref = min(w, h)
+        logo_h = max(25, int(ref * 0.04))
         logo_w = int(logo_h * logo.width / logo.height)
         logo = logo.resize((logo_w, logo_h), Image.LANCZOS)
 
-        # --- Prepare text ---
+        # Prepare text — sized so it's slightly wider than the logo
         text = 'Data: MLB  |  @mlb_simulator'
-        font_size = max(12, int(h * 0.015))
+        font_size = max(12, int(ref * 0.013))
         try:
-            font_path = fm.findfont(fm.FontProperties(family='sans-serif'))
+            font_path = fm.findfont(fm.FontProperties(family='DejaVu Sans'))
             font = ImageFont.truetype(font_path, font_size)
         except Exception:
             font = ImageFont.load_default()
@@ -75,25 +84,25 @@ def _apply_watermark(filepath):
         text_w = text_bbox[2] - text_bbox[0]
         text_h = text_bbox[3] - text_bbox[1]
 
-        # --- Position: top-right corner ---
-        margin_r = int(w * 0.02)
-        margin_t = int(h * 0.012)
-        gap = int(h * 0.005)
+        # Position
+        margin = int(w * 0.02)
+        gap = int(ref * 0.003)
 
-        # Horizontal center shared by logo and text
         block_w = max(logo_w, text_w)
-        center_x = w - margin_r - block_w // 2
 
+        if position == 'top-left':
+            center_x = margin + block_w // 2
+        else:
+            center_x = w - margin - block_w // 2
+
+        logo_y = int(h * y_pct) if y_pct is not None else int(h * 0.012)
         logo_x = center_x - logo_w // 2
-        logo_y = margin_t
-
         text_x = center_x - text_w // 2
         text_y = logo_y + logo_h + gap
 
-        # --- Draw ---
         img.paste(logo, (logo_x, logo_y), logo)
         draw = ImageDraw.Draw(img)
-        draw.text((text_x, text_y), text, fill=(160, 160, 160), font=font)
+        draw.text((text_x, text_y), text, fill=(140, 140, 140), font=font)
 
         img.convert('RGB').save(filepath)
     except Exception as e:
@@ -1170,6 +1179,116 @@ def draw_baseball_field(ax, venue_name='default'):
     ax.add_patch(home_plate)
 
 
+def _place_spray_labels(ax, team_bbs, x_extent, axis_limit):
+    """Place labels for the top 3 batted balls with smart positioning.
+
+    Scores 8 candidate offsets per label to avoid overlaps with other labels,
+    stay inside axis bounds, and prefer positions below the marker.  Draws a
+    thin gray connecting line from the label to the batted ball marker.
+
+    Parameters
+    ----------
+    ax : matplotlib Axes
+    team_bbs : list[dict]
+        Batted ball dicts with keys 'x', 'y', 'xbases', 'last_name'.
+    x_extent : float
+        Half-width of the x-axis (symmetric about 0).
+    axis_limit : float
+        Upper y-axis limit.
+    """
+    top_bbs = sorted(team_bbs, key=lambda b: b['xbases'], reverse=True)[:3]
+    top_bbs = [bb for bb in top_bbs if bb['last_name']]
+
+    if not top_bbs:
+        return
+
+    # Candidate offsets (dx, dy in points) and alignment hints
+    # (offset_pts_x, offset_pts_y, ha, va)
+    _CANDIDATES = [
+        ( 12, -12, 'left',   'top'),      # below-right
+        (-12, -12, 'right',  'top'),      # below-left
+        ( 12,  12, 'left',   'bottom'),   # above-right
+        (-12,  12, 'right',  'bottom'),   # above-left
+        ( 16,   0, 'left',   'center'),   # right
+        (-16,   0, 'right',  'center'),   # left
+        ( 10,  22, 'left',   'bottom'),   # far-above-right
+        (-10,  22, 'right',  'bottom'),   # far-above-left
+    ]
+
+    # Approximate label size in data coordinates for overlap checks.
+    # A rough heuristic: ~18 data-units wide, ~8 tall (depends on zoom/DPI,
+    # but close enough for penalty scoring).
+    label_half_w = 18
+    label_half_h = 8
+
+    placed = []  # list of (cx, cy) in data coords for placed labels
+
+    for bb in top_bbs:
+        bx, by = bb['x'], bb['y']
+        best_score = -1e9
+        best_pos = _CANDIDATES[0]
+
+        for dx_pt, dy_pt, ha, va in _CANDIDATES:
+            # Convert point offset to approximate data-coord offset.
+            # The axes span ~2*x_extent horizontally over ~800 display points
+            # (16-inch figure at 100 DPI / 2 subplots), so 1 point ≈ x_extent/400.
+            scale = x_extent / 400.0
+            cx = bx + dx_pt * scale
+            cy = by + dy_pt * scale
+
+            score = 0.0
+
+            # --- Overlap penalty (steep) ---
+            for px, py in placed:
+                dist = max(abs(cx - px) / label_half_w,
+                           abs(cy - py) / label_half_h)
+                if dist < 1.0:
+                    score -= 200 * (1.0 - dist)
+                elif dist < 1.8:
+                    score -= 40 * (1.8 - dist)
+
+            # --- Boundary penalty ---
+            margin_x = x_extent * 0.05
+            margin_y_top = axis_limit * 0.12  # extra heavy near subtitle
+            margin_y_bot = 3  # bottom axis starts at -3
+
+            if cx - label_half_w * 0.5 < -x_extent + margin_x:
+                score -= 100
+            if cx + label_half_w * 0.5 > x_extent - margin_x:
+                score -= 100
+            if cy + label_half_h > axis_limit - margin_y_top:
+                score -= 150  # heavier near top (subtitle)
+            if cy - label_half_h < -margin_y_bot:
+                score -= 80
+
+            # --- Distance penalty (mild, prefer closer) ---
+            data_dist = ((cx - bx) ** 2 + (cy - by) ** 2) ** 0.5
+            score -= data_dist * 0.3
+
+            # --- Below bonus (natural reading) ---
+            if dy_pt < 0:
+                score += 10
+
+            if score > best_score:
+                best_score = score
+                best_pos = (dx_pt, dy_pt, ha, va)
+
+        dx_pt, dy_pt, ha, va = best_pos
+        scale = x_extent / 400.0
+        placed.append((bx + dx_pt * scale, by + dy_pt * scale))
+
+        ax.annotate(
+            bb['last_name'], (bx, by),
+            textcoords='offset points', xytext=(dx_pt, dy_pt),
+            fontsize=7, fontweight='bold', ha=ha, va=va,
+            color='#222222', zorder=11,
+            bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
+                      edgecolor='#aaaaaa', alpha=0.85, linewidth=0.5),
+            arrowprops=dict(arrowstyle='-', color='#999999',
+                            linewidth=0.7, shrinkA=0, shrinkB=6),
+        )
+
+
 def spray_chart(home_outcomes, away_outcomes,
                 home_team, away_team,
                 home_score, away_score,
@@ -1280,7 +1399,8 @@ def spray_chart(home_outcomes, away_outcomes,
     else:
         max_fence = max(dims.values()) * FEET_TO_PLOT
     axis_limit = max_fence + 12
-    
+    x_extent = axis_limit * 0.80
+
     # Plot each team
     for ax, team_key, display_name, logo_name in [
         (ax_away, 'away', away_display_name, away_logo_name),
@@ -1309,20 +1429,9 @@ def spray_chart(home_outcomes, away_outcomes,
                 )
                 ax.add_patch(ring)
 
-        # Label top 3 batted balls by expected bases
-        top_bbs = sorted(batted_balls[team_key], key=lambda b: b['xbases'], reverse=True)[:3]
-        for bb in top_bbs:
-            if bb['last_name']:
-                ax.annotate(
-                    bb['last_name'], (bb['x'], bb['y']),
-                    textcoords='offset points', xytext=(0, -10),
-                    fontsize=7, fontweight='bold', ha='center', va='top',
-                    color='#222222', zorder=11,
-                    bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
-                              edgecolor='none', alpha=0.7)
-                )
+        # Label top 3 batted balls by expected bases with smart placement
+        _place_spray_labels(ax, batted_balls[team_key], x_extent, axis_limit)
 
-        x_extent = axis_limit * 0.80
         ax.set_xlim(-x_extent, x_extent)
         ax.set_ylim(-3, axis_limit)
         ax.set_aspect('equal')
