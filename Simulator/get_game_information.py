@@ -226,7 +226,8 @@ def get_game_info(game_id, all_columns=False):
     
     if not all_columns:
         cols_needed = [
-            "gamePk", "batter.fullName", "playId", "ab_num", "eventType", 
+            "gamePk", "batter.fullName", "pitcher.fullName",
+            "playId", "ab_num", "eventType",
             "description", "outs", "isOut", "isTopInning", "inning",
             "hitData.launchSpeed", "hitData.launchAngle",
             # New columns for spray angle model

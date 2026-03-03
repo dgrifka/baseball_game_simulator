@@ -101,9 +101,9 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
         home_or_away (str): 'home' or 'away' to filter team data
         
     Returns:
-        list: Tuples of (outcome_data, event_type, player_name) where outcome_data is either
-              a string ('strikeout'/'walk'/'stolen_base'/'pickoff') or 
-              dict with batted ball data
+        list: Tuples of (outcome_data, event_type, player_name, pitcher_name) where
+              outcome_data is either a string ('strikeout'/'walk'/'stolen_base'/'pickoff')
+              or dict with batted ball data
     """
     home_or_away_team = game_data.copy()
     if home_or_away == 'home':
@@ -112,21 +112,27 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
     else:
         home_or_away_team = home_or_away_team[home_or_away_team['isTopInning'] == True]
         baserunning_events = steals_and_pickoffs[steals_and_pickoffs['isTopInning'] == True]
-    
+
+    # Check if pitcher column is available
+    has_pitcher = 'pitcher.fullName' in home_or_away_team.columns
+
     outcomes_list = []
-    
+
     # Process batting outcomes
-    automatic_outs = home_or_away_team[(home_or_away_team['eventType'] == 'out') & 
+    automatic_outs = home_or_away_team[(home_or_away_team['eventType'] == 'out') &
                                      (home_or_away_team['hitData.launchSpeed'].isnull())]
     for _, row in automatic_outs.iterrows():
-        outcomes_list.append(("strikeout", row['eventType'], row['batter.fullName']))
-        
+        pitcher_name = row.get('pitcher.fullName') if has_pitcher else None
+        outcomes_list.append(("strikeout", row['eventType'], row['batter.fullName'], pitcher_name))
+
     walks = home_or_away_team[home_or_away_team['eventType'] == 'walk']
     for _, row in walks.iterrows():
-        outcomes_list.append(("walk", row['eventType'], row['batter.fullName']))
-        
+        pitcher_name = row.get('pitcher.fullName') if has_pitcher else None
+        outcomes_list.append(("walk", row['eventType'], row['batter.fullName'], pitcher_name))
+
     put_in_play = home_or_away_team[~home_or_away_team['hitData.launchSpeed'].isnull()].reset_index(drop=True)
     for _, row in put_in_play.iterrows():
+        pitcher_name = row.get('pitcher.fullName') if has_pitcher else None
         # Create dict with all batted ball data (including spray angle fields)
         batted_ball_data = {
             'launch_speed': row['hitData.launchSpeed'],
@@ -136,13 +142,14 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
             'coord_y': row.get('hitData.coordinates.coordY'),
             'bat_side': row.get('batSide.code')  # Flattened column name
         }
-        outcomes_list.append((batted_ball_data, row['eventType'], row['batter.fullName']))
-    
+        outcomes_list.append((batted_ball_data, row['eventType'], row['batter.fullName'], pitcher_name))
+
     # Process baserunning events
     if not baserunning_events.empty:
         for _, row in baserunning_events.iterrows():
-            outcomes_list.append((row['play'], row['play'], row['batter.fullName']))
-    
+            pitcher_name = row.get('pitcher.fullName') if has_pitcher else None
+            outcomes_list.append((row['play'], row['play'], row['batter.fullName'], pitcher_name))
+
     return outcomes_list
 
 
@@ -157,8 +164,14 @@ def calculate_total_bases(outcomes_list):
         pd.DataFrame: Detailed stats including launch data, probabilities, and estimated bases
     """
     result_list = []
-    
-    for outcome, original_event_type, full_name in outcomes_list:
+
+    for item in outcomes_list:
+        # Support both 3-element (legacy) and 4-element (with pitcher) tuples
+        if len(item) == 4:
+            outcome, original_event_type, full_name, pitcher_name = item
+        else:
+            outcome, original_event_type, full_name = item
+            pitcher_name = None
         if outcome == "strikeout":
             bases = 0
             event_type = "strikeout"
@@ -222,7 +235,7 @@ def calculate_total_bases(outcomes_list):
                 probabilities[4] * 4
             )
         
-        result_list.append({
+        row_dict = {
             'player': full_name,
             'launch_speed': launch_speed,
             'launch_angle': launch_angle,
@@ -238,7 +251,11 @@ def calculate_total_bases(outcomes_list):
             'coord_x': outcome.get('coord_x') if isinstance(outcome, dict) else None,
             'coord_y': outcome.get('coord_y') if isinstance(outcome, dict) else None,
             'bat_side': outcome.get('bat_side') if isinstance(outcome, dict) else None
-        })
+        }
+        # Only include pitcher if available (avoids dropna() removing batted balls)
+        if pitcher_name is not None:
+            row_dict['pitcher'] = pitcher_name
+        result_list.append(row_dict)
     
     return pd.DataFrame(result_list)
 
