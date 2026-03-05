@@ -140,7 +140,8 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
             'venue_name': row['venue.name'],
             'coord_x': row.get('hitData.coordinates.coordX'),
             'coord_y': row.get('hitData.coordinates.coordY'),
-            'bat_side': row.get('batSide.code')  # Flattened column name
+            'bat_side': row.get('batSide.code'),  # Flattened column name
+            'play_id': row.get('playId'),
         }
         outcomes_list.append((batted_ball_data, row['eventType'], row['batter.fullName'], pitcher_name))
 
@@ -250,8 +251,12 @@ def calculate_total_bases(outcomes_list):
             'hr_prob': probabilities[4],
             'coord_x': outcome.get('coord_x') if isinstance(outcome, dict) else None,
             'coord_y': outcome.get('coord_y') if isinstance(outcome, dict) else None,
-            'bat_side': outcome.get('bat_side') if isinstance(outcome, dict) else None
+            'bat_side': outcome.get('bat_side') if isinstance(outcome, dict) else None,
         }
+        # Include play_id if available (used for Statcast video links)
+        play_id = outcome.get('play_id') if isinstance(outcome, dict) else None
+        if play_id is not None:
+            row_dict['play_id'] = play_id
         # Only include pitcher if available (avoids dropna() removing batted balls)
         if pitcher_name is not None:
             row_dict['pitcher'] = pitcher_name
