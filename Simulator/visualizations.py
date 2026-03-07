@@ -1407,21 +1407,40 @@ def spray_chart(home_outcomes, away_outcomes,
         (ax_home, 'home', home_display_name, home_logo_name)
     ]:
         draw_baseball_field(ax, venue_name)
-        
+        ax.grid(False)
+
         logo_url = get_team_logo(logo_name, mlb_team_logos)
-        
+
         if not logo_url:
             print(f"Warning: No logo found for {display_name} (tried: {logo_name})")
-            continue
-        
+
         for bb in batted_balls[team_key]:
             color = get_expected_bases_color(bb['xbases'])
-            img = getImage(logo_url, zoom=0.45, size=(40, 40), alpha=0.85)
+
+            if logo_url:
+                img = getImage(logo_url, zoom=0.45, size=(40, 40), alpha=0.85)
+            else:
+                img = None
 
             if img:
                 ab = AnnotationBbox(img, (bb['x'], bb['y']), frameon=False, zorder=10)
                 ax.add_artist(ab)
 
+                ring = plt.Circle(
+                    (bb['x'], bb['y']), radius=5.5,
+                    fill=False, edgecolor=color,
+                    linewidth=2.5, alpha=0.9, zorder=9
+                )
+                ax.add_patch(ring)
+            else:
+                # Fallback: filled circle with team color + outcome ring
+                fill_color = team_colors.get(display_name, ('#666666', '#666666'))[0]
+                dot = plt.Circle(
+                    (bb['x'], bb['y']), radius=4.0,
+                    facecolor=fill_color, edgecolor='white',
+                    linewidth=1.0, alpha=0.85, zorder=10
+                )
+                ax.add_patch(dot)
                 ring = plt.Circle(
                     (bb['x'], bb['y']), radius=5.5,
                     fill=False, edgecolor=color,

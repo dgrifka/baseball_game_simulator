@@ -21,7 +21,11 @@ venue_names = ['Oriole Park at Camden Yards', 'Great American Ball Park',
        'Target Field', 'Busch Stadium', 'Yankee Stadium', 'Comerica Park',
        'Coors Field', 'PNC Park', 'Oracle Park', 'Truist Park',
        'Angel Stadium', 'Progressive Field', 'Rogers Centre',
-       'Fenway Park', 'George M. Steinbrenner Field']
+       'Fenway Park', 'George M. Steinbrenner Field',
+       # Neutral-site venues
+       'Alfredo Harp Helu Stadium', 'Estadio Alfredo Harp Helu',
+       'Bowman Field', 'Muncy Bank Ballpark',
+       'Field of Dreams', 'London Stadium', 'Rickwood Field']
 
 ## Colors and Logo
 team_colors = {
@@ -137,10 +141,33 @@ VENUE_NAME_TO_ID = {
     'Sutter Health Park': '10',               # → Oakland Coliseum
     'Daikin Park': '2392',                    # → Minute Maid Park
     'Rate Field': '4',                        # → Guaranteed Rate Field
+    # Neutral-site venues (use generic venue for venue-neutral predictions)
+    'Alfredo Harp Helu Stadium': 'neutral',
+    'Estadio Alfredo Harp Helu': 'neutral',
+    'Bowman Field': 'neutral',
+    'Muncy Bank Ballpark': 'neutral',
+    'Field of Dreams': 'neutral',
+    'London Stadium': 'neutral',
+    'Rickwood Field': 'neutral',
 }
 
+# Venue ID for neutral/unknown sites — produces all-zero one-hot columns
+# in the model (OneHotEncoder handle_unknown='ignore'), giving venue-neutral predictions.
+GENERIC_VENUE_ID = 'neutral'
+
 # Default venue ID for unknown stadiums
-DEFAULT_VENUE_ID = '22'
+DEFAULT_VENUE_ID = GENERIC_VENUE_ID
+
+# Neutral-site venues (non-MLB parks used for special events)
+NEUTRAL_SITE_VENUES = {
+    'Alfredo Harp Helu Stadium',     # Mexico City Series
+    'Estadio Alfredo Harp Helu',     # alternate name
+    'Bowman Field',                   # Little League Classic
+    'Field of Dreams',                # Field of Dreams game (Dyersville, Iowa)
+    'London Stadium',                 # London Series
+    'Muncy Bank Ballpark',            # alternate Bowman Field name
+    'Rickwood Field',                 # Birmingham, Alabama tribute game
+}
 
 # =============================================================================
 # STADIUM DIMENSIONS (in feet)
