@@ -361,7 +361,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     
     # Title: bold main line + plain subtitle (using ax.text for precise control)
     scores_close = abs(home_score - away_score) <= 2
-    title_y = 1.24 if scores_close else 1.17
+    title_y = 1.29 if scores_close else 1.22
     subtitle_y = title_y - 0.04
 
     ax.text(0.0, title_y,
