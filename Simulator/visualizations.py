@@ -4,32 +4,52 @@ import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 import matplotlib.patches as patches
 from matplotlib.patches import Polygon
-import seaborn as sns
 from scipy.interpolate import griddata
 from matplotlib.colors import LinearSegmentedColormap, to_rgb
-import colorsys
 import matplotlib.colors as colors
 import pandas as pd
 import numpy as np
 from scipy import stats
+import joblib
 
 from Simulator.constants import (
-    team_colors, 
+    team_colors,
     STADIUM_DIMENSIONS, DEFAULT_STADIUM_DIMENSIONS, FEET_TO_PLOT,
     TEAM_LOGO_MAP, TEAM_DISPLAY_MAP
 )
+from Simulator.game_simulator import prepare_batted_ball_features
 
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import requests
 from io import BytesIO
 from PIL import Image, ImageEnhance
 import os
-import ast
 
 # Resolve paths relative to the repo root (parent of Simulator/)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _MODEL_PATH = os.path.join(_REPO_ROOT, 'Model', 'batted_ball_model.pkl')
+_CONTOUR_PATH = os.path.join(_REPO_ROOT, 'Data', 'contour_data.csv')
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'mlb_simulator_logo.png')
+
+# Lazy-loaded caches
+_contour_cache = None
+_model_cache = None
+
+
+def _get_contour_data():
+    """Load and cache contour data for la_ev_graph."""
+    global _contour_cache
+    if _contour_cache is None:
+        _contour_cache = pd.read_csv(_CONTOUR_PATH).dropna()
+    return _contour_cache
+
+
+def _get_model():
+    """Load and cache the batted ball model."""
+    global _model_cache
+    if _model_cache is None:
+        _model_cache = joblib.load(_MODEL_PATH)
+    return _model_cache
 
 
 def _apply_watermark(filepath, position='top-right', y_pct=None):
@@ -200,10 +220,6 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
                 'stolen_base': away_outcomes.count('stolen_base')}
     }
     
-    # for team, team_outcomes in [('home', home_outcomes), ('away', away_outcomes)]:
-    #     outcomes[team]['ev'] = [o[0] for o in team_outcomes if isinstance(o, list)]
-    #     outcomes[team]['la'] = [o[1] for o in team_outcomes if isinstance(o, list)]
-
     # At the beginning of your function, filter out data points below your x-axis limit:
     for team, team_outcomes in [('home', home_outcomes), ('away', away_outcomes)]:
         temp_ev = [o[0] for o in team_outcomes if isinstance(o, list)]
@@ -217,7 +233,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     fig = plt.figure(figsize=(12, 8), dpi=150, constrained_layout=True)
     
     # Load and process contour data with improved interpolation
-    contour_data = pd.read_csv('Data/contour_data.csv').dropna()
+    contour_data = _get_contour_data()
     x, y, z = contour_data['x'].values, contour_data['y'].values, contour_data['z'].values
     
     xi = np.linspace(x.min(), x.max(), 200)  # Increased resolution
@@ -264,9 +280,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     plt.text(0.05, 0.85, f'{home_team}: {outcomes["home"]["walks"] + outcomes["home"]["stolen_base"]}', 
              transform=plt.gca().transAxes, fontsize=14, verticalalignment='top')
     
-    # Enhanced metadata with larger font
-    plt.text(0.02, 0.02, 'Data: MLB\nBy: @mlb_simulator', transform=plt.gca().transAxes, 
-             fontsize=12, color='gray', ha='left', va='bottom')
+    # Watermark (applied after save via _apply_watermark below)
     
     # Improved labels and title
     plt.xlabel('Exit Velocity (mph)', fontsize=16, labelpad=12)
@@ -295,10 +309,10 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # Save with high quality
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
-    # plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=300)
-    # plt.savefig(os.path.join(images_dir, filename), dpi=300)
-    plt.savefig(os.path.join(images_dir, filename), bbox_inches='tight', dpi=200)
+    filepath = os.path.join(images_dir, filename)
+    plt.savefig(filepath, bbox_inches='tight', dpi=200)
     plt.close(fig)
+    _apply_watermark(filepath)
 
 
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
@@ -333,16 +347,16 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     max_runs = max(max(home_runs_scored), max(away_runs_scored))
     bins = range(max_runs + 2)
     
-    # Custom colors with better contrast
-    home_color = team_colors[home_team][0]
-    away_color = team_colors[away_team][0]
-    
+    # Pick team colors — away team gets lower alpha for separation
+    home_color = team_colors.get(home_team, ['#333333', '#666666'])[0]
+    away_color = team_colors.get(away_team, ['#333333', '#666666'])[0]
+
     # Create histograms with enhanced styling
-    for runs, team, color, pattern in [
-        (home_runs_scored, home_team, home_color, '//'),
-        (away_runs_scored, away_team, away_color, '\\')
+    for runs, team, color, alpha, pattern in [
+        (home_runs_scored, home_team, home_color, 0.85, '//'),
+        (away_runs_scored, away_team, away_color, 0.55, '\\')
     ]:
-        plt.hist(runs, bins=bins, alpha=0.75, label=team,
+        plt.hist(runs, bins=bins, alpha=alpha, label=team,
                 color=color, edgecolor='black',
                 linewidth=1.2, hatch=pattern)
 
@@ -379,12 +393,13 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
             fontsize=12, color='#333333', ha='left', va='top', linespacing=1.5)
 
     # Actual score vertical lines with labels just above the plot area
+    # Away gets lower alpha to match its histogram
     score_labels = [
-        (away_score, away_color, away_team),
-        (home_score, home_color, home_team)
+        (away_score, away_color, away_team, 0.55),
+        (home_score, home_color, home_team, 0.85)
     ]
-    for score, color, team in score_labels:
-        ax.axvline(x=score + 0.5, color=color, linestyle='--', linewidth=2.5, alpha=0.85, zorder=5)
+    for score, color, team, alpha in score_labels:
+        ax.axvline(x=score + 0.5, color=color, linestyle='--', linewidth=2.5, alpha=alpha, zorder=5)
 
     # Place labels above the plot in axes coordinates
     xlim = ax.get_xlim()
@@ -400,11 +415,11 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         else:
             label_offsets[1] = base_y + 0.055
 
-    for idx, (score, color, team) in enumerate(score_labels):
+    for idx, (score, color, team, alpha) in enumerate(score_labels):
         x_frac = (score + 0.5 - xlim[0]) / x_range
         ax.text(x_frac, label_offsets[idx], f'{team}: {score}\n(Actual)',
                 transform=ax.transAxes, fontsize=9, fontweight='bold',
-                color=color, va='bottom', ha='center', zorder=6)
+                color=color, alpha=alpha, va='bottom', ha='center', zorder=6)
 
     # Enhanced legend in top right
     plt.legend(fontsize=12, frameon=True, framealpha=0.9,
@@ -712,13 +727,9 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                     player_contributions[player_key]['walks'] += 1
                     player_contributions[player_key]['total'] += 1
                 elif isinstance(outcome_data, dict) and 'launch_speed' in outcome_data:
-                    # NEW: Handle dict format from updated outcomes
-                    import joblib
-                    from Simulator.game_simulator import prepare_batted_ball_features
-                    
                     try:
-                        pipeline = joblib.load(_MODEL_PATH)
-                        
+                        pipeline = _get_model()
+
                         features = prepare_batted_ball_features(
                             launch_speed=outcome_data['launch_speed'],
                             launch_angle=outcome_data['launch_angle'],
@@ -729,29 +740,11 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                         )
                         probs = pipeline.predict_proba(features)[0]
                         estimated_bases = probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4
-                        
+
                         player_contributions[player_key]['batted_balls'] += estimated_bases
                         player_contributions[player_key]['total'] += estimated_bases
                     except Exception as e:
                         print(f"Error calculating estimated bases for {player_name}: {e}")
-                elif isinstance(outcome_data, list) and len(outcome_data) >= 3:
-                    # LEGACY: Handle old list format [launch_speed, launch_angle, stadium]
-                    import pickle
-                    from Simulator.game_simulator import create_features_for_prediction
-                    
-                    try:
-                        with open('Model/gb_classifier_pipeline_improved.pkl', 'rb') as file:
-                            pipeline = pickle.load(file)
-                        
-                        launch_speed, launch_angle, stadium = outcome_data
-                        features = create_features_for_prediction(launch_speed, launch_angle, stadium)
-                        probs = pipeline.predict_proba(features)[0]
-                        estimated_bases = (probs[1] * 1 + probs[2] * 2 + probs[3] * 3 + probs[4] * 4)
-                        
-                        player_contributions[player_key]['batted_balls'] += estimated_bases
-                        player_contributions[player_key]['total'] += estimated_bases
-                    except Exception as e:
-                        print(f"Error calculating estimated bases: {e}")
     
     # Sort players by total contribution
     sorted_players = sorted(player_contributions.items(), key=lambda x: x[1]['total'], reverse=True)
@@ -771,6 +764,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     batted_balls_values = []
     walks_values = []
     team_colors_list = []
+    walk_colors_list = []
     
     for (player_name, team_name), contributions in top_players:
         # Format player label (shortened first name + last name)
@@ -784,18 +778,20 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         batted_balls_values.append(contributions['batted_balls'])
         walks_values.append(contributions['walks'])
         
-        # Get team color
+        # Get team color and build lighter tint for walks
         team_color = team_colors.get(team_name, ['#666666'])[0]
         team_colors_list.append(team_color)
-    
+        r, g, b = to_rgb(team_color)
+        walk_colors_list.append((r + (1 - r) * 0.5, g + (1 - g) * 0.5, b + (1 - b) * 0.5))
+
     # Create horizontal bars
     y_positions = np.arange(len(player_labels))
-    
-    # Plot stacked bars with distinct colors
-    bars1 = ax.barh(y_positions, batted_balls_values, label='Batted Balls', 
-                    color='#2E7D32', edgecolor='black', linewidth=0.5)
+
+    # Plot stacked bars — team color for batted balls, lighter tint for walks
+    bars1 = ax.barh(y_positions, batted_balls_values, label='Batted Balls',
+                    color=team_colors_list, edgecolor='black', linewidth=0.5)
     bars2 = ax.barh(y_positions, walks_values, left=batted_balls_values,
-                    label='Walks', color='#1976D2', edgecolor='black', linewidth=0.5)
+                    label='Walks', color=walk_colors_list, edgecolor='black', linewidth=0.5)
     
     # Add team logos right at the axis edge and player names to the left
     for idx, ((player_name, team_name), _) in enumerate(top_players):
@@ -817,13 +813,13 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
             except Exception as e:
                 print(f"Error adding logo for {team_name}: {e}")
     
-    # Add value labels on bars (only if value > 0.5)
+    # Add value labels on bars
     for idx, (bb, w) in enumerate(zip(batted_balls_values, walks_values)):
         # Batted balls label
         if bb > 0.5:
-            ax.text(bb/2, idx, f'{bb:.1f}', ha='center', va='center', 
+            ax.text(bb/2, idx, f'{bb:.1f}', ha='center', va='center',
                    fontsize=10, color='white', fontweight='bold')
-        
+
         # Walks label
         if w > 0.5:
             ax.text(bb + w/2, idx, f'{w:.0f}', ha='center', va='center',
@@ -839,9 +835,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     ax.set_yticklabels([])  # Remove y-axis labels since we're adding them manually
     ax.invert_yaxis()  # Highest values at top
     
-    # Set labels - REMOVED the ylabel for "Player"
     ax.set_xlabel('Estimated Total Bases', fontsize=14, labelpad=10)
-    # ax.set_ylabel('Player', fontsize=14, labelpad=40)  # REMOVED THIS LINE
     
     # Title: bold main line + plain subtitle
     ax.set_title('Player Contributions by Estimated Total Bases',
@@ -855,9 +849,13 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     ax.text(0.0, 1.08, subtitle, transform=ax.transAxes,
             fontsize=12, color='#333333', ha='left', va='top', linespacing=1.5)
     
-    # Add legend
-    ax.legend(loc='lower right', fontsize=11, frameon=True, 
-             framealpha=0.9, edgecolor='black')
+    # Add legend with team-agnostic colors (dark = batted balls, light = walks)
+    legend_patches = [
+        patches.Patch(facecolor='#444444', edgecolor='black', linewidth=0.5, label='Batted Balls'),
+        patches.Patch(facecolor='#AAAAAA', edgecolor='black', linewidth=0.5, label='Walks'),
+    ]
+    ax.legend(handles=legend_patches, loc='lower right', fontsize=11,
+             frameon=True, framealpha=0.9, edgecolor='black')
     
     # Clean up spines
     ax.spines['top'].set_visible(False)
@@ -985,31 +983,14 @@ def calculate_landing_distance(launch_speed, launch_angle):
     
     return np.clip(base_distance * drag_factor, 20, 500)
 
-def calculate_hit_distance(coord_x, coord_y):
-    """
-    Calculate hit distance from Statcast coordinates.
-    
-    DEPRECATED: Use calculate_landing_distance() for physics-based distance.
-    This function is kept for backward compatibility.
-    
-    Returns:
-        float: Distance scaled for plotting
-    """
-    delta_x = coord_x - HOME_PLATE_X
-    delta_y = HOME_PLATE_Y - coord_y
-    raw_distance = np.sqrt(delta_x**2 + delta_y**2)
-    return raw_distance * 0.6
-
 
 def calculate_expected_bases_for_spray(outcome_dict, pipeline):
     """
     Calculate expected bases for a batted ball in spray chart context.
-    
+
     Returns:
         float: Expected bases (0-4 scale)
     """
-    from Simulator.game_simulator import prepare_batted_ball_features
-    
     try:
         features = prepare_batted_ball_features(
             launch_speed=outcome_dict['launch_speed'],
@@ -1280,7 +1261,7 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit):
         ax.annotate(
             bb['last_name'], (bx, by),
             textcoords='offset points', xytext=(dx_pt, dy_pt),
-            fontsize=7, fontweight='bold', ha=ha, va=va,
+            fontsize=8, fontweight='bold', ha=ha, va=va,
             color='#222222', zorder=11,
             bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
                       edgecolor='#aaaaaa', alpha=0.85, linewidth=0.5),
@@ -1322,13 +1303,11 @@ def spray_chart(home_outcomes, away_outcomes,
     Returns:
         str: Path to saved image file
     """
-    import joblib
-
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.close('all')
 
     if pipeline is None:
-        pipeline = joblib.load(_MODEL_PATH)
+        pipeline = _get_model()
     
     percentages = {
         'away': f"{away_win_percentage:.0f}",
@@ -1490,7 +1469,7 @@ def spray_chart(home_outcomes, away_outcomes,
                bbox_to_anchor=(0.5, 0.895))
 
     fig.text(0.5, 0.02, 'Stadium dimensions are estimated for this visual',
-             fontsize=8, fontstyle='italic', color='gray', ha='center', va='bottom')
+             fontsize=9, fontstyle='italic', color='gray', ha='center', va='bottom')
 
     os.makedirs(images_dir, exist_ok=True)
     filename = (f"{away_display_name}_{home_display_name}_{away_score}-{home_score}--"
