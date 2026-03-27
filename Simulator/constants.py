@@ -13,7 +13,8 @@ game_ver = 'v1.1'
 
 ## Venue names to filter for the model, since we don't have batted ball data on games played at different parks
 venue_names = ['Oriole Park at Camden Yards', 'Great American Ball Park',
-       'Petco Park', 'Dodger Stadium', 'Tropicana Field',
+       'Petco Park', 'Dodger Stadium', 'UNIQLO FIELD AT DODGER STADIUM',
+       'Tropicana Field',
        'Kauffman Stadium', 'Rate Field', 'loanDepot park',
        'Daikin Park', 'Globe Life Field', 'Sutter Health Park',
        'Chase Field', 'T-Mobile Park', 'Citi Field', 'Citizens Bank Park',
@@ -141,6 +142,7 @@ VENUE_NAME_TO_ID = {
     'Sutter Health Park': '10',               # → Oakland Coliseum
     'Daikin Park': '2392',                    # → Minute Maid Park
     'Rate Field': '4',                        # → Guaranteed Rate Field
+    'UNIQLO FIELD AT DODGER STADIUM': '22',  # → Dodger Stadium
     # Neutral-site venues (use generic venue for venue-neutral predictions)
     'Alfredo Harp Helu Stadium': 'neutral',
     'Estadio Alfredo Harp Helu': 'neutral',
@@ -157,6 +159,9 @@ GENERIC_VENUE_ID = 'neutral'
 
 # Default venue ID for unknown stadiums
 DEFAULT_VENUE_ID = GENERIC_VENUE_ID
+
+# Stable set of MLB venue IDs — immune to stadium name changes
+VALID_VENUE_IDS = {int(vid) for vid in VENUE_NAME_TO_ID.values() if vid != 'neutral'}
 
 # Neutral-site venues (non-MLB parks used for special events)
 NEUTRAL_SITE_VENUES = {

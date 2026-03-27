@@ -11,9 +11,9 @@ import pytz
 import datetime
 
 from Simulator.constants import (
-    base_url, league, season, endpoint, 
+    base_url, league, season, endpoint,
     team_ver, schedule_ver, game_ver, venue_names,
-    VENUE_NAME_TO_ID, DEFAULT_VENUE_ID
+    VENUE_NAME_TO_ID, DEFAULT_VENUE_ID, VALID_VENUE_IDS
 )
 
 def response_code(base_url, ver, endpoint):
@@ -76,18 +76,21 @@ def fetch_games(days_ago, all_columns=False):
     current_date_time = datetime.datetime.now(pytz.UTC)
     one_day_ago = current_date_time - datetime.timedelta(days=days_ago)
     
+    # Filter by venue ID (stable) instead of venue name (changes with naming rights)
+    finished_games['venue.id'] = pd.to_numeric(finished_games.get('venue.id'), errors='coerce')
     filtered_games_df = (finished_games[
-        (finished_games['gameDate'] >= one_day_ago) & 
+        (finished_games['gameDate'] >= one_day_ago) &
         (finished_games['gameDate'] <= current_date_time) &
-        (finished_games['venue.name'].isin(venue_names))
+        (finished_games['venue.id'].isin(VALID_VENUE_IDS))
     ].reset_index(drop=True))
-    
-    # Handle stadium name mapping
+
+    # Handle stadium name mapping (normalize display names for VENUE_NAME_TO_ID lookup)
     stadium_mapping = {
         'George M. Steinbrenner Field': 'Yankee Stadium',
         'Sutter Health Park': 'Oakland Coliseum',
         'Daikin Park': 'Minute Maid Park',
-        'Rate Field': 'Guaranteed Rate Field'
+        'Rate Field': 'Guaranteed Rate Field',
+        'UNIQLO FIELD AT DODGER STADIUM': 'Dodger Stadium',
     }
     filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(stadium_mapping)
     
