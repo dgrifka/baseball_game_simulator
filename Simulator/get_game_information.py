@@ -206,7 +206,7 @@ def get_game_info(game_id, all_columns=False):
     
     # Create copy for filtered batted balls
     total_pbp_filtered = total_pbp.copy()
-    other_plays = ['walk', 'hit_by_pitch', 'strikeout']
+    other_plays = ['walk', 'intent_walk', 'hit_by_pitch', 'strikeout']
     total_pbp_filtered = total_pbp_filtered[
         (total_pbp_filtered['details.isInPlay'] == True) |
         (total_pbp_filtered['eventType'].isin(other_plays))
@@ -222,10 +222,11 @@ def get_game_info(game_id, all_columns=False):
     total_pbp_filtered = (total_pbp_filtered
         .drop_duplicates(subset="ab_num", keep="last")
         .assign(eventType=lambda x: x['eventType'].apply(
-            lambda y: y if y in ['single', 'double', 'triple', 'home_run', 'walk', 'hit_by_pitch'] 
+            lambda y: y if y in ['single', 'double', 'triple', 'home_run', 'walk', 'intent_walk', 'hit_by_pitch']
             else 'out'
         )))
     total_pbp_filtered['eventType'] = total_pbp_filtered['eventType'].str.replace("hit_by_pitch", "walk")
+    total_pbp_filtered['eventType'] = total_pbp_filtered['eventType'].str.replace("intent_walk", "walk")
     
     if not all_columns:
         cols_needed = [

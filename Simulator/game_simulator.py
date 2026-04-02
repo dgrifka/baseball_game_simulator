@@ -16,6 +16,18 @@ from Model.feature_engineering import (
 )
 
 # =============================================================================
+# HR TAIL CORRECTION
+# =============================================================================
+# Post-hoc correction for systematic HR under-prediction at high exit velocities.
+# The GBC model under-predicts HR probability at 100+ mph (validated on 32k batted
+# balls from 2025: ~1.04x at 100-105 mph, ~1.10x at 105+ mph). We apply a
+# conservative half-correction to the HR probability and redistribute from out_prob.
+HR_TAIL_CORRECTIONS = {
+    (100, 105): 1.02,  # actual/model ratio ~1.04, apply half
+    (105, 200): 1.05,  # actual/model ratio ~1.10, apply half
+}
+
+# =============================================================================
 # LOAD MODEL
 # =============================================================================
 
@@ -28,6 +40,33 @@ pipeline = joblib.load(_model_path)
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
+
+def _apply_hr_tail_correction(probabilities, launch_speed):
+    """Apply post-hoc HR probability correction for high exit velocities.
+
+    Boosts HR probability and redistributes the increase from out_prob to keep
+    the probability vector summing to 1. Only affects 100+ mph batted balls.
+
+    Args:
+        probabilities: array of [out, single, double, triple, hr] probabilities
+        launch_speed: exit velocity in mph
+
+    Returns:
+        Corrected probability array (new copy if modified, original otherwise)
+    """
+    if launch_speed < 100:
+        return probabilities
+
+    for (lo, hi), factor in HR_TAIL_CORRECTIONS.items():
+        if lo <= launch_speed < hi:
+            probs = probabilities.copy()
+            hr_boost = probs[4] * (factor - 1.0)
+            probs[4] += hr_boost
+            probs[0] = max(0.0, probs[0] - hr_boost)
+            return probs
+
+    return probabilities
 
 def get_venue_id(venue_name):
     """
@@ -424,13 +463,13 @@ def advance_runner(bases, count=1, is_walk=False):
             if original_bases[i]:
                 advancement = count
                 
-                # Probabilistic advancements
+                # Probabilistic advancements (halfway between original rules and MLB averages)
                 if count == 1 and i == 1:  # Single with runner on 2nd
-                    advancement = 2 if random.random() < 0.5 else 1
+                    advancement = 2 if random.random() < 0.56 else 1
                 elif count == 1 and i == 0 and not original_bases[1]:
-                    advancement = 2 if random.random() < 0.25 else 1
+                    advancement = 2 if random.random() < 0.265 else 1
                 elif count == 2 and i == 0:  # Double with runner on 1st
-                    advancement = 3 if random.random() < 0.75 else 2
+                    advancement = 3 if random.random() < 0.675 else 2
                 
                 new_position = i + advancement
                 if new_position >= 3:
@@ -491,7 +530,9 @@ def simulate_game(outcomes_list, prob_cache):
         elif isinstance(outcome, (dict, tuple)):
             # Get cache key
             if isinstance(outcome, dict):
-                cache_key = (outcome['launch_speed'], outcome['launch_angle'], outcome['venue_name'])
+                cache_key = (outcome['launch_speed'], outcome['launch_angle'],
+                             outcome['venue_name'], outcome.get('coord_x'),
+                             outcome.get('coord_y'), outcome.get('bat_side'))
             else:
                 cache_key = outcome
             
@@ -549,7 +590,9 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     
     for outcome in all_outcomes:
         if isinstance(outcome, dict):
-            cache_key = (outcome['launch_speed'], outcome['launch_angle'], outcome['venue_name'])
+            cache_key = (outcome['launch_speed'], outcome['launch_angle'],
+                         outcome['venue_name'], outcome.get('coord_x'),
+                         outcome.get('coord_y'), outcome.get('bat_side'))
             if cache_key not in prob_cache:
                 features = prepare_batted_ball_features(
                     launch_speed=outcome['launch_speed'],
@@ -559,7 +602,8 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
                     coord_y=outcome.get('coord_y'),
                     bat_side=outcome.get('bat_side')
                 )
-                prob_cache[cache_key] = pipeline.predict_proba(features)[0]
+                probs = pipeline.predict_proba(features)[0]
+                prob_cache[cache_key] = _apply_hr_tail_correction(probs, outcome['launch_speed'])
         elif isinstance(outcome, list) and len(outcome) == 3:
             # Legacy format
             cache_key = tuple(outcome)
