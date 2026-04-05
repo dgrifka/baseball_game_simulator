@@ -139,7 +139,7 @@ VENUE_NAME_TO_ID = {
     'loanDepot park': '4169',
     # Temporary/alternate venues (map to similar parks)
     'George M. Steinbrenner Field': '3313',  # → Yankee Stadium
-    'Sutter Health Park': '10',               # → Oakland Coliseum
+    'Sutter Health Park': '2529',             # Sacramento (Athletics home, 2025+)
     'Daikin Park': '2392',                    # → Minute Maid Park
     'Rate Field': '4',                        # → Guaranteed Rate Field
     'UNIQLO FIELD AT DODGER STADIUM': '22',  # → Dodger Stadium
