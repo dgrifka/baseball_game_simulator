@@ -52,6 +52,61 @@ def _get_model():
     return _model_cache
 
 
+# ---------------------------------------------------------------------------
+# Player headshot helpers
+# ---------------------------------------------------------------------------
+_HEADSHOT_CACHE_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", ".headshot_cache"
+)
+_headshot_mem_cache = {}
+
+
+def _load_headshot(player_id, size=80):
+    """Download, circular-crop, and cache a player headshot. Returns np.ndarray or None."""
+    if player_id in _headshot_mem_cache:
+        return _headshot_mem_cache[player_id]
+
+    if player_id is None:
+        _headshot_mem_cache[player_id] = None
+        return None
+
+    try:
+        pid = int(player_id)
+    except (ValueError, TypeError):
+        _headshot_mem_cache[player_id] = None
+        return None
+
+    os.makedirs(_HEADSHOT_CACHE_DIR, exist_ok=True)
+    cache_path = os.path.join(_HEADSHOT_CACHE_DIR, f"{pid}.png")
+
+    try:
+        if os.path.exists(cache_path):
+            img = Image.open(cache_path).convert("RGBA")
+        else:
+            url = (
+                f"https://img.mlbstatic.com/mlb-photos/image/upload/"
+                f"d_people:generic:headshot:silo:current.png/"
+                f"w_213,q_auto:best/v1/people/{pid}/headshot/silo/current.png"
+            )
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            img = Image.open(BytesIO(resp.content)).convert("RGBA")
+            img.save(cache_path)
+
+        img = img.resize((size, size), Image.Resampling.LANCZOS)
+        mask = Image.new("L", (size, size), 0)
+        from PIL import ImageDraw as _ImageDraw
+        _ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+        r, g, b, a = img.split()
+        img = Image.merge("RGBA", (r, g, b, mask))
+        data = np.array(img)
+        _headshot_mem_cache[player_id] = data
+        return data
+    except Exception:
+        _headshot_mem_cache[player_id] = None
+        return None
+
+
 def _apply_watermark(filepath, position='top-right', y_pct=None):
     """Add logo + watermark text to a saved image file using PIL.
 
@@ -670,205 +725,255 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
             xba_cell.get_text().set_color('#1565C0')
 
 
-def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team, 
-                             home_score, away_score, home_win_percentage, away_win_percentage, 
-                             tie_percentage, mlb_team_logos, formatted_date, images_dir="images"):
+def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team,
+                             home_score, away_score, home_win_percentage, away_win_percentage,
+                             tie_percentage, mlb_team_logos, formatted_date, images_dir="images",
+                             player_id_map=None):
     """
-    Creates a horizontal stacked bar chart showing individual player contributions to the game.
-    Each bar shows total estimated bases broken down by type (batted balls, walks).
-    
-    Args:
-        home_outcomes: List of home team outcomes
-        away_outcomes: List of away team outcomes  
-        home_team: Home team name
-        away_team: Away team name
-        home_score: Home team actual score
-        away_score: Away team actual score
-        home_win_percentage: Home team deserve-to-win percentage
-        away_win_percentage: Away team deserve-to-win percentage
-        tie_percentage: Tie percentage
-        mlb_team_logos: List of team logo URLs
-        formatted_date: Formatted date string
-        images_dir: Directory to save images
+    Creates a two-panel horizontal bar chart:
+      Top: hitter contributions (batted balls + walks) with PA counts.
+      Bottom: pitcher bases allowed with BF counts, on its own x-axis scale.
+    Uses player headshots when player_id_map is provided.
     """
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.close('all')
-    
+
     percentages = {
         'away': f"{away_win_percentage:.0f}",
         'home': f"{home_win_percentage:.0f}",
         'tie': f"{tie_percentage:.0f}"
     }
-    
-    # Process outcomes to aggregate by player
-    player_contributions = {}
-    
-    # Process each team's outcomes
-    for team, team_outcomes, team_name in [(home_team, home_outcomes, home_team), 
-                                       (away_team, away_outcomes, away_team)]:
+
+    # ------- Aggregate outcomes -------
+    player_contributions = {}   # (name, team) -> {batted_balls, walks, pa, total}
+    pitcher_contributions = {}  # (name, team) -> {batted_balls, walks, bf, total}
+
+    for team, team_outcomes, team_name in [(home_team, home_outcomes, home_team),
+                                           (away_team, away_outcomes, away_team)]:
+        opposing_team = away_team if team_name == home_team else home_team
+
         for outcome in team_outcomes:
-            # Handle tuple format (outcome_data, event_type, player_name)
-            if isinstance(outcome, tuple) and len(outcome) >= 3:
-                outcome_data, event_type, player_name = outcome[0], outcome[1], outcome[2]
-                
-                # Create unique player key with team
-                player_key = (player_name, team_name)
-                
-                # Initialize player data if not exists
-                if player_key not in player_contributions:
-                    player_contributions[player_key] = {
-                        'batted_balls': 0,
-                        'walks': 0,
-                        'total': 0
-                    }
-                
-                # Categorize and add contribution
-                if outcome_data == 'walk':
-                    player_contributions[player_key]['walks'] += 1
-                    player_contributions[player_key]['total'] += 1
-                elif isinstance(outcome_data, dict) and 'launch_speed' in outcome_data:
-                    try:
-                        pipeline = _get_model()
+            if not (isinstance(outcome, tuple) and len(outcome) >= 3):
+                continue
+            outcome_data, event_type, player_name = outcome[0], outcome[1], outcome[2]
+            pitcher_name = outcome[3] if len(outcome) >= 4 else None
 
-                        features = prepare_batted_ball_features(
-                            launch_speed=outcome_data['launch_speed'],
-                            launch_angle=outcome_data['launch_angle'],
-                            venue_name=outcome_data.get('venue_name', 'Unknown'),
-                            coord_x=outcome_data.get('coord_x'),
-                            coord_y=outcome_data.get('coord_y'),
-                            bat_side=outcome_data.get('bat_side')
-                        )
-                        probs = pipeline.predict_proba(features)[0]
-                        estimated_bases = probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4
+            # --- Hitter ---
+            player_key = (player_name, team_name)
+            if player_key not in player_contributions:
+                player_contributions[player_key] = {'batted_balls': 0, 'walks': 0, 'pa': 0, 'total': 0}
 
-                        player_contributions[player_key]['batted_balls'] += estimated_bases
-                        player_contributions[player_key]['total'] += estimated_bases
-                    except Exception as e:
-                        print(f"Error calculating estimated bases for {player_name}: {e}")
-    
-    # Sort players by total contribution
-    sorted_players = sorted(player_contributions.items(), key=lambda x: x[1]['total'], reverse=True)
-    
-    # Take top 20 players (or all if less than 20)
-    top_players = sorted_players[:20]
-    
-    if not top_players:
+            if outcome_data == 'walk':
+                player_contributions[player_key]['walks'] += 1
+                player_contributions[player_key]['total'] += 1
+                player_contributions[player_key]['pa'] += 1
+                if pitcher_name:
+                    p_key = (pitcher_name, opposing_team)
+                    if p_key not in pitcher_contributions:
+                        pitcher_contributions[p_key] = {'batted_balls': 0, 'walks': 0, 'bf': 0, 'total': 0}
+                    pitcher_contributions[p_key]['walks'] += 1
+                    pitcher_contributions[p_key]['total'] += 1
+                    pitcher_contributions[p_key]['bf'] += 1
+            elif outcome_data == 'strikeout':
+                player_contributions[player_key]['pa'] += 1
+                if pitcher_name:
+                    p_key = (pitcher_name, opposing_team)
+                    if p_key not in pitcher_contributions:
+                        pitcher_contributions[p_key] = {'batted_balls': 0, 'walks': 0, 'bf': 0, 'total': 0}
+                    pitcher_contributions[p_key]['bf'] += 1
+            elif isinstance(outcome_data, dict) and 'launch_speed' in outcome_data:
+                player_contributions[player_key]['pa'] += 1
+                try:
+                    pipeline = _get_model()
+                    features = prepare_batted_ball_features(
+                        launch_speed=outcome_data['launch_speed'],
+                        launch_angle=outcome_data['launch_angle'],
+                        venue_name=outcome_data.get('venue_name', 'Unknown'),
+                        coord_x=outcome_data.get('coord_x'),
+                        coord_y=outcome_data.get('coord_y'),
+                        bat_side=outcome_data.get('bat_side')
+                    )
+                    probs = pipeline.predict_proba(features)[0]
+                    estimated_bases = probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4
+
+                    player_contributions[player_key]['batted_balls'] += estimated_bases
+                    player_contributions[player_key]['total'] += estimated_bases
+
+                    if pitcher_name:
+                        p_key = (pitcher_name, opposing_team)
+                        if p_key not in pitcher_contributions:
+                            pitcher_contributions[p_key] = {'batted_balls': 0, 'walks': 0, 'bf': 0, 'total': 0}
+                        pitcher_contributions[p_key]['batted_balls'] += estimated_bases
+                        pitcher_contributions[p_key]['total'] += estimated_bases
+                        pitcher_contributions[p_key]['bf'] += 1
+                except Exception as e:
+                    print(f"Error calculating estimated bases for {player_name}: {e}")
+
+    sorted_hitters = sorted(player_contributions.items(), key=lambda x: x[1]['total'], reverse=True)[:12]
+    sorted_pitchers = sorted(pitcher_contributions.items(), key=lambda x: x[1]['total'], reverse=True)[:10]
+
+    if not sorted_hitters:
         print("No player contributions found")
         return
-    
-    # Create figure with high DPI for sharp rendering
-    fig, ax = plt.subplots(figsize=(14, 10), dpi=150, constrained_layout=True)
-    
-    # Prepare data for plotting
-    player_labels = []
-    batted_balls_values = []
-    walks_values = []
-    team_colors_list = []
-    walk_colors_list = []
-    
-    for (player_name, team_name), contributions in top_players:
-        # Format player label (shortened first name + last name)
-        name_parts = player_name.split()
-        if len(name_parts) >= 2:
-            formatted_name = f"{name_parts[0][0]}. {' '.join(name_parts[1:])}"
-        else:
-            formatted_name = player_name
-        player_labels.append(formatted_name)
-        
-        batted_balls_values.append(contributions['batted_balls'])
-        walks_values.append(contributions['walks'])
-        
-        # Get team color and build lighter tint for walks
-        team_color = team_colors.get(team_name, ['#666666'])[0]
-        team_colors_list.append(team_color)
-        r, g, b = to_rgb(team_color)
-        walk_colors_list.append((r + (1 - r) * 0.5, g + (1 - g) * 0.5, b + (1 - b) * 0.5))
 
-    # Create horizontal bars
-    y_positions = np.arange(len(player_labels))
+    n_hitters = len(sorted_hitters)
+    n_pitchers = len(sorted_pitchers)
+    has_pitchers = n_pitchers > 0
 
-    # Plot stacked bars — team color for batted balls, lighter tint for walks
-    bars1 = ax.barh(y_positions, batted_balls_values, label='Batted Balls',
-                    color=team_colors_list, edgecolor='black', linewidth=0.5)
-    bars2 = ax.barh(y_positions, walks_values, left=batted_balls_values,
-                    label='Walks', color=walk_colors_list, edgecolor='black', linewidth=0.5)
-    
-    # Add team logos right at the axis edge and player names to the left
-    for idx, ((player_name, team_name), _) in enumerate(top_players):
-        # Add player name to the left of where logo will be (right-aligned)
-        formatted_name = player_labels[idx]
-        ax.text(-0.27, idx, formatted_name, ha='right', va='center', 
-                fontsize=12, color='black')
-        
-        # Add team logo closer to the axis
-        logo_url = get_team_logo(team_name, mlb_team_logos)
-        if logo_url:
-            try:
-                img = getImage(logo_url, zoom=0.4, size=(30, 30), alpha=1.0)
-                if img:
-                    # Position logo right at the axis edge
-                    ab = AnnotationBbox(img, (-0.075, idx), frameon=False, 
-                                      xycoords=('data', 'data'), box_alignment=(1, 0.5))
-                    ax.add_artist(ab)
-            except Exception as e:
-                print(f"Error adding logo for {team_name}: {e}")
-    
-    # Add value labels on bars
-    for idx, (bb, w) in enumerate(zip(batted_balls_values, walks_values)):
-        # Batted balls label
-        if bb > 0.5:
-            ax.text(bb/2, idx, f'{bb:.1f}', ha='center', va='center',
-                   fontsize=10, color='white', fontweight='bold')
+    # Pre-load headshots
+    if player_id_map:
+        all_names = set()
+        for (name, _), _ in sorted_hitters:
+            all_names.add(name)
+        for (name, _), _ in sorted_pitchers:
+            all_names.add(name)
+        for name in all_names:
+            pid = player_id_map.get(name)
+            if pid is not None:
+                _load_headshot(pid)
 
-        # Walks label
-        if w > 0.5:
-            ax.text(bb + w/2, idx, f'{w:.0f}', ha='center', va='center',
-                   fontsize=10, color='white', fontweight='bold')
-        
-        # Total at end of bar
-        total = bb + w
-        ax.text(total + 0.125, idx, f'{total:.1f}', ha='left', va='center',
-               fontsize=12, color='black', fontweight='bold')
-    
-    # Customize plot
-    ax.set_yticks(y_positions)
-    ax.set_yticklabels([])  # Remove y-axis labels since we're adding them manually
-    ax.invert_yaxis()  # Highest values at top
-    
-    ax.set_xlabel('Estimated Total Bases', fontsize=14, labelpad=10)
-    
-    # Title: bold main line + plain subtitle
-    ax.set_title('Player Contributions by Estimated Total Bases',
-                 fontsize=16, loc='left', pad=55, fontweight='bold')
+    # ------- Figure with two independent axes -------
+    if has_pitchers:
+        fig, (ax_hit, ax_pitch) = plt.subplots(
+            2, 1, figsize=(14, max(10, (n_hitters + n_pitchers) * 0.52 + 3)),
+            dpi=150,
+            gridspec_kw={'height_ratios': [n_hitters, n_pitchers], 'hspace': 0.30},
+        )
+    else:
+        fig, ax_hit = plt.subplots(figsize=(14, max(8, n_hitters * 0.52 + 3)), dpi=150)
+        ax_pitch = None
 
+    # ------- Helper: draw one section -------
+    def _draw_section(ax, entries, color_style, stat_key):
+        """stat_key: 'pa' for hitters, 'bf' for pitchers."""
+        from matplotlib.transforms import blended_transform_factory
+
+        labels = []
+        bb_vals = []
+        walk_vals = []
+        tc_list = []
+        wc_list = []
+        stat_vals = []
+
+        for (pname, tname), contribs in entries:
+            name_parts = pname.split()
+            if len(name_parts) >= 2:
+                fmt = f"{name_parts[0][0]}. {' '.join(name_parts[1:])}"
+            else:
+                fmt = pname
+            labels.append(fmt)
+            bb_vals.append(contribs['batted_balls'])
+            walk_vals.append(contribs['walks'])
+            stat_vals.append(contribs[stat_key])
+
+            team_color = team_colors.get(tname, ['#666666'])[0]
+            tc_list.append(team_color)
+            r, g, b = to_rgb(team_color)
+            wc_list.append((r + (1 - r) * 0.5, g + (1 - g) * 0.5, b + (1 - b) * 0.5))
+
+        y_positions = np.arange(len(entries))
+
+        ax.barh(y_positions, bb_vals, color=tc_list, edgecolor='black', linewidth=0.5)
+        ax.barh(y_positions, walk_vals, left=bb_vals, color=wc_list, edgecolor='black', linewidth=0.5)
+
+        # Use blended transform: x in axes fraction (0-1), y in data coords
+        # This keeps name/headshot spacing identical regardless of x-axis scale
+        trans = blended_transform_factory(ax.transAxes, ax.transData)
+
+        # Fixed x positions (axes fraction) — consistent across both panels
+        headshot_x = -0.015   # just left of y-axis
+        name_x = -0.055      # left of headshot
+
+        stat_label = 'PA' if stat_key == 'pa' else 'BF'
+        for idx, ((pname, tname), _) in enumerate(entries):
+            # Headshot / logo
+            placed = False
+            if player_id_map:
+                pid = player_id_map.get(pname)
+                if pid is not None:
+                    headshot_data = _load_headshot(pid)
+                    if headshot_data is not None:
+                        headshot_img = OffsetImage(headshot_data, zoom=0.38)
+                        ab = AnnotationBbox(headshot_img, (headshot_x, idx),
+                                           frameon=False, xycoords=trans,
+                                           box_alignment=(1, 0.5))
+                        ax.add_artist(ab)
+                        placed = True
+            if not placed:
+                logo_url = get_team_logo(tname, mlb_team_logos)
+                if logo_url:
+                    try:
+                        img_obj = getImage(logo_url, zoom=0.4, size=(30, 30), alpha=1.0)
+                        if img_obj:
+                            ab = AnnotationBbox(img_obj, (headshot_x, idx),
+                                              frameon=False, xycoords=trans,
+                                              box_alignment=(1, 0.5))
+                            ax.add_artist(ab)
+                    except Exception:
+                        pass
+
+            # Name label with PA/BF count
+            display_name = f"{labels[idx]}  ({stat_vals[idx]} {stat_label})"
+            ax.text(name_x, idx, display_name, ha='right', va='center',
+                    fontsize=11, color='black', transform=trans)
+
+        # Value labels on bars
+        for idx, (bb, w) in enumerate(zip(bb_vals, walk_vals)):
+            if bb > 0.5:
+                ax.text(bb/2, idx, f'{bb:.1f}', ha='center', va='center',
+                       fontsize=10, color='white', fontweight='bold')
+            if w > 0.5:
+                ax.text(bb + w/2, idx, f'{w:.0f}', ha='center', va='center',
+                       fontsize=10, color='white', fontweight='bold')
+            total = bb + w
+            ax.text(total + 0.08, idx, f'{total:.1f}', ha='left', va='center',
+                   fontsize=11, color='black', fontweight='bold')
+
+        # Styling
+        ax.set_yticks(y_positions)
+        ax.set_yticklabels([''] * len(entries))
+        ax.invert_yaxis()
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.grid(axis='x', alpha=0.3, linestyle='--')
+        ax.set_axisbelow(True)
+
+        max_val = max(bb + w for bb, w in zip(bb_vals, walk_vals)) if bb_vals else 1
+        ax.set_xlim(0, max_val * 1.18)
+
+    # ------- Draw hitter section -------
+    _draw_section(ax_hit, sorted_hitters, 'hitter', 'pa')
+    ax_hit.set_xlabel('Estimated Total Bases', fontsize=12, labelpad=8)
+
+    # ------- Titles anchored to axes (no floating fig.text gap) -------
     subtitle = (
-        f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
+        f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})    '
         f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} '
         f'{percentages["home"]}%, Tie {percentages["tie"]}%'
     )
-    ax.text(0.0, 1.08, subtitle, transform=ax.transAxes,
-            fontsize=12, color='#333333', ha='left', va='top', linespacing=1.5)
-    
-    # Add legend with team-agnostic colors (dark = batted balls, light = walks)
+    fig.suptitle('Player Contributions by Estimated Total Bases',
+                 fontsize=16, fontweight='bold', x=0.01, ha='left', y=0.98)
+    fig.text(0.01, 0.955, subtitle, fontsize=11, color='#555555', va='top')
+
+    ax_hit.set_title('Hitting — Estimated Bases', fontsize=13, fontweight='bold',
+                    loc='left', color='#555555', pad=8)
+
+    # ------- Draw pitcher section -------
+    if has_pitchers and ax_pitch is not None:
+        _draw_section(ax_pitch, sorted_pitchers, 'pitcher', 'bf')
+        ax_pitch.set_xlabel('Estimated Total Bases Allowed', fontsize=12, labelpad=8)
+        ax_pitch.set_title('Pitching — Bases Allowed  (different scale)',
+                          fontsize=13, fontweight='bold', loc='left', color='#555555', pad=8)
+
+    # Legend on hitter axis
     legend_patches = [
         patches.Patch(facecolor='#444444', edgecolor='black', linewidth=0.5, label='Batted Balls'),
         patches.Patch(facecolor='#AAAAAA', edgecolor='black', linewidth=0.5, label='Walks'),
     ]
-    ax.legend(handles=legend_patches, loc='lower right', fontsize=11,
-             frameon=True, framealpha=0.9, edgecolor='black')
-    
-    # Clean up spines
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    
-    # Add grid for better readability
-    ax.grid(axis='x', alpha=0.3, linestyle='--')
-    
-    # Set x-axis limit with some padding
-    max_value = max([sum(x) for x in zip(batted_balls_values, walks_values)])
-    ax.set_xlim(0, max_value * 1.15)
+    ax_hit.legend(handles=legend_patches, loc='lower right', fontsize=10,
+                 frameon=True, framealpha=0.9, edgecolor='black')
 
-    # Save figure
+    # Save
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{percentages["away"]}-{percentages["home"]}_player_contributions.png'
     filepath = os.path.join(images_dir, filename)

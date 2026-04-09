@@ -230,15 +230,16 @@ def get_game_info(game_id, all_columns=False):
     
     if not all_columns:
         cols_needed = [
-            "gamePk", "batter.fullName", "pitcher.fullName",
+            "gamePk", "batter.fullName", "batter.id",
+            "pitcher.fullName", "pitcher.id",
             "playId", "ab_num", "eventType",
             "description", "outs", "isOut", "isTopInning", "inning",
             "hitData.launchSpeed", "hitData.launchAngle",
             # New columns for spray angle model
             "hitData.coordinates.coordX", "hitData.coordinates.coordY",
             "batSide.code",
-            # Pitcher handedness and ID for platoon analysis
-            "pitchHand.code", "pitcher.id"
+            # Pitcher handedness for platoon analysis
+            "pitchHand.code",
         ]
         # Only keep columns that exist (some may be missing in edge cases)
         cols_available = [c for c in cols_needed if c in total_pbp_filtered.columns]

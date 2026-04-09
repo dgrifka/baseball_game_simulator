@@ -2,5 +2,6 @@ __pycache__/
 .DS_Store
 .venv/
 .claude/
+.headshot_cache/
 Research/venue_effects_images/
 test_images/
