@@ -13,7 +13,7 @@ import datetime
 from Simulator.constants import (
     base_url, league, season, endpoint,
     team_ver, schedule_ver, game_ver, venue_names,
-    VENUE_NAME_TO_ID, DEFAULT_VENUE_ID, VALID_VENUE_IDS
+    VENUE_NAME_TO_ID, DEFAULT_VENUE_ID, VALID_VENUE_IDS, NEUTRAL_SITE_VENUES
 )
 
 def response_code(base_url, ver, endpoint):
@@ -76,12 +76,15 @@ def fetch_games(days_ago, all_columns=False):
     current_date_time = datetime.datetime.now(pytz.UTC)
     one_day_ago = current_date_time - datetime.timedelta(days=days_ago)
     
-    # Filter by venue ID (stable) instead of venue name (changes with naming rights)
+    # Filter by venue ID (stable) for regular parks; fall back to name for neutral sites
+    # (neutral-site venue IDs are not in VALID_VENUE_IDS but names are in NEUTRAL_SITE_VENUES)
     finished_games['venue.id'] = pd.to_numeric(finished_games.get('venue.id'), errors='coerce')
+    is_known_venue = finished_games['venue.id'].isin(VALID_VENUE_IDS)
+    is_neutral = finished_games['venue.name'].isin(NEUTRAL_SITE_VENUES)
     filtered_games_df = (finished_games[
         (finished_games['gameDate'] >= one_day_ago) &
         (finished_games['gameDate'] <= current_date_time) &
-        (finished_games['venue.id'].isin(VALID_VENUE_IDS))
+        (is_known_venue | is_neutral)
     ].reset_index(drop=True))
 
     # Handle stadium name mapping (normalize display names for VENUE_NAME_TO_ID lookup)
