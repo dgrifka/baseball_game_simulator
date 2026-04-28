@@ -176,6 +176,7 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
         batted_ball_data = {
             'launch_speed': row['hitData.launchSpeed'],
             'launch_angle': row['hitData.launchAngle'],
+            'total_distance': row.get('hitData.totalDistance'),
             'venue_name': row['venue.name'],
             'coord_x': row.get('hitData.coordinates.coordX'),
             'coord_y': row.get('hitData.coordinates.coordY'),
