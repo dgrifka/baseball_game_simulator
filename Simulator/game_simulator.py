@@ -183,6 +183,8 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
             'pitcher_hand': row.get('pitchHand.code'),
             'pitcher_id': row.get('pitcher.id'),
             'play_id': row.get('playId'),
+            'inning': row.get('inning'),
+            'is_top_inning': row.get('isTopInning'),
         }
         outcomes_list.append((batted_ball_data, row['eventType'], row['batter.fullName'], pitcher_name))
 
@@ -295,6 +297,8 @@ def calculate_total_bases(outcomes_list):
             'bat_side': outcome.get('bat_side') if isinstance(outcome, dict) else None,
             'pitcher_hand': outcome.get('pitcher_hand') if isinstance(outcome, dict) else None,
             'pitcher_id': outcome.get('pitcher_id') if isinstance(outcome, dict) else None,
+            'inning': outcome.get('inning') if isinstance(outcome, dict) else None,
+            'is_top_inning': outcome.get('is_top_inning') if isinstance(outcome, dict) else None,
         }
         # Include play_id if available (used for Statcast video links)
         play_id = outcome.get('play_id') if isinstance(outcome, dict) else None
