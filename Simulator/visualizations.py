@@ -18,6 +18,7 @@ from Simulator.constants import (
     TEAM_LOGO_MAP, TEAM_DISPLAY_MAP
 )
 from Simulator.game_simulator import prepare_batted_ball_features
+from Model.feature_engineering import HOME_PLATE_X, HOME_PLATE_Y, calculate_spray_angle
 
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import requests
@@ -997,54 +998,28 @@ def get_display_team_name(short_name):
     return TEAM_DISPLAY_MAP.get(short_name, short_name)
 
 
-# Statcast coordinate system constants
-HOME_PLATE_X = 125.42
-HOME_PLATE_Y = 199.02
-
-
 def get_spray_direction(coord_x, coord_y, bat_side):
     """
     Calculate spray direction category for display in tables.
-    
+
     Returns:
         str: 'Pull', 'Center', 'Oppo', or '-' if data unavailable
     """
-    # Check for missing data
     if coord_x is None or coord_y is None or bat_side is None:
         return '-'
     if pd.isna(coord_x) or pd.isna(coord_y) or pd.isna(bat_side):
         return '-'
-    
-    # Calculate raw spray angle
-    delta_x = coord_x - HOME_PLATE_X
-    delta_y = HOME_PLATE_Y - coord_y
-    angle_rad = np.arctan2(delta_x, delta_y)
-    spray_angle = np.degrees(angle_rad)
-    
-    # Adjust for handedness (flip for lefties so pull is always negative)
+
+    spray_angle = calculate_spray_angle(coord_x, coord_y)
     if bat_side == 'L':
         spray_angle = -spray_angle
-    
-    # Categorize
+
     if spray_angle < -15:
         return 'Pull'
     elif spray_angle > 15:
         return 'Oppo'
     else:
         return 'Center'
-
-
-def calculate_spray_angle(coord_x, coord_y):
-    """
-    Calculate spray angle from Statcast coordinates.
-    
-    Returns:
-        float: Angle in degrees where 0° = CF, negative = LF, positive = RF
-    """
-    delta_x = coord_x - HOME_PLATE_X
-    delta_y = HOME_PLATE_Y - coord_y
-    angle_rad = np.arctan2(delta_x, delta_y)
-    return np.degrees(angle_rad)
 
 def calculate_landing_distance(launch_speed, launch_angle):
     """
