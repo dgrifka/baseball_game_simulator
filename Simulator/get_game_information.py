@@ -238,6 +238,7 @@ def get_game_info(game_id, all_columns=False):
             "playId", "ab_num", "eventType",
             "description", "outs", "isOut", "isTopInning", "inning",
             "hitData.launchSpeed", "hitData.launchAngle",
+            "hitData.totalDistance",
             # New columns for spray angle model
             "hitData.coordinates.coordX", "hitData.coordinates.coordY",
             "batSide.code",

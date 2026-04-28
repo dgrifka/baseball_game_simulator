@@ -1453,10 +1453,14 @@ def spray_chart(home_outcomes, away_outcomes,
             # Spray angle from coordinates (direction is accurate)
             spray_angle = calculate_spray_angle(coord_x, coord_y)
 
-            # Distance from physics (landing distance based on EV/LA)
+            # Distance: use Statcast totalDistance (feet) when available; fall back to physics estimate
             launch_speed = outcome_data.get('launch_speed')
             launch_angle = outcome_data.get('launch_angle')
-            distance_ft = calculate_landing_distance(launch_speed, launch_angle)
+            total_distance = outcome_data.get('total_distance')
+            if total_distance is not None and not np.isnan(float(total_distance)):
+                distance_ft = float(total_distance)
+            else:
+                distance_ft = calculate_landing_distance(launch_speed, launch_angle)
             distance = distance_ft * FEET_TO_PLOT  # Convert to plot units
 
             outcome_data['venue_name'] = outcome_data.get('venue_name', venue_name)
