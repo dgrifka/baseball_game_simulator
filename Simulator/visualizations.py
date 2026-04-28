@@ -1457,7 +1457,7 @@ def spray_chart(home_outcomes, away_outcomes,
             launch_speed = outcome_data.get('launch_speed')
             launch_angle = outcome_data.get('launch_angle')
             total_distance = outcome_data.get('total_distance')
-            if total_distance is not None and not np.isnan(float(total_distance)):
+            if pd.notna(total_distance) and float(total_distance) > 0:
                 distance_ft = float(total_distance)
             else:
                 distance_ft = calculate_landing_distance(launch_speed, launch_angle)
