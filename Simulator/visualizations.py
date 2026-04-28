@@ -728,7 +728,7 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
 def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team,
                              home_score, away_score, home_win_percentage, away_win_percentage,
                              tie_percentage, mlb_team_logos, formatted_date, images_dir="images",
-                             player_id_map=None):
+                             player_id_map=None, precomputed_home=None, precomputed_away=None):
     """
     Creates a two-panel horizontal bar chart:
       Top: hitter contributions (batted balls + walks) with PA counts.
@@ -751,6 +751,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     for team, team_outcomes, team_name in [(home_team, home_outcomes, home_team),
                                            (away_team, away_outcomes, away_team)]:
         opposing_team = away_team if team_name == home_team else home_team
+        precomputed = precomputed_home if team_name == home_team else precomputed_away
 
         for outcome in team_outcomes:
             if not (isinstance(outcome, tuple) and len(outcome) >= 3):
@@ -784,17 +785,21 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
             elif isinstance(outcome_data, dict) and 'launch_speed' in outcome_data:
                 player_contributions[player_key]['pa'] += 1
                 try:
-                    pipeline = _get_model()
-                    features = prepare_batted_ball_features(
-                        launch_speed=outcome_data['launch_speed'],
-                        launch_angle=outcome_data['launch_angle'],
-                        venue_name=outcome_data.get('venue_name', 'Unknown'),
-                        coord_x=outcome_data.get('coord_x'),
-                        coord_y=outcome_data.get('coord_y'),
-                        bat_side=outcome_data.get('bat_side')
-                    )
-                    probs = pipeline.predict_proba(features)[0]
-                    estimated_bases = probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4
+                    play_id = outcome_data.get('play_id')
+                    if precomputed is not None and play_id is not None and play_id in precomputed:
+                        estimated_bases = precomputed[play_id]
+                    else:
+                        pipeline = _get_model()
+                        features = prepare_batted_ball_features(
+                            launch_speed=outcome_data['launch_speed'],
+                            launch_angle=outcome_data['launch_angle'],
+                            venue_name=outcome_data.get('venue_name', 'Unknown'),
+                            coord_x=outcome_data.get('coord_x'),
+                            coord_y=outcome_data.get('coord_y'),
+                            bat_side=outcome_data.get('bat_side')
+                        )
+                        probs = pipeline.predict_proba(features)[0]
+                        estimated_bases = probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4
 
                     player_contributions[player_key]['batted_balls'] += estimated_bases
                     player_contributions[player_key]['total'] += estimated_bases
