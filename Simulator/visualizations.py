@@ -18,6 +18,10 @@ from Simulator.constants import (
     TEAM_LOGO_MAP, TEAM_DISPLAY_MAP
 )
 from Simulator.game_simulator import prepare_batted_ball_features
+from Simulator.style import (
+    PALETTE, apply_base_style, get_team_color, lighten,
+    stamp_header, title_axes, draw_title_block, finalize, heading_font,
+)
 from Model.feature_engineering import HOME_PLATE_X, HOME_PLATE_Y, calculate_spray_angle
 
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -142,13 +146,13 @@ def _apply_watermark(filepath, position='top-right', y_pct=None):
 
         # Scale logo relative to the smaller dimension (avoids overflow on narrow images)
         ref = min(w, h)
-        logo_h = max(25, int(ref * 0.04))
+        logo_h = max(20, int(ref * 0.028))
         logo_w = int(logo_h * logo.width / logo.height)
         logo = logo.resize((logo_w, logo_h), Image.LANCZOS)
 
         # Prepare text — sized so it's slightly wider than the logo
         text = 'Data: MLB  |  @mlb_simulator'
-        font_size = max(12, int(ref * 0.013))
+        font_size = max(10, int(ref * 0.0095))
         try:
             font_path = fm.findfont(fm.FontProperties(family='DejaVu Sans'))
             font = ImageFont.truetype(font_path, font_size)
@@ -372,126 +376,141 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
 
 
 def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, away_team,
-             home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage, 
+             home_score, away_score, home_win_percentage, away_win_percentage, tie_percentage,
              formatted_date, images_dir="images"):
+    """Histogram of simulated run distributions for both teams.
 
-    plt.style.use('seaborn-v0_8-whitegrid')
-    plt.close('all')
-    
+    Solid filled bars at moderate alpha so individual run-totals stay
+    legible (no hatches). If the two teams' primary colors are too
+    similar, the away team falls back to its secondary color so the
+    histograms remain distinguishable. Score badges (dashed vline +
+    rounded label) call out the actual outcome, and a bottom-right
+    inline note states the leader's win share.
+    """
+    apply_base_style()
+
     percentages = {
         'away': f"{away_win_percentage:.0f}",
         'home': f"{home_win_percentage:.0f}",
-        'tie': f"{tie_percentage:.0f}"
+        'tie':  f"{tie_percentage:.0f}",
     }
-    
-    # Calculate modes
-    modes = {
-        'home': stats.mode(home_runs_scored, keepdims=True),
-        'away': stats.mode(away_runs_scored, keepdims=True)
-    }
-    
-    mode_strs = {team: ','.join(map(str, 
-                mode.mode.flatten() if hasattr(mode, 'mode') 
-                else mode.flatten() if isinstance(mode, np.ndarray)
-                else [mode])) 
-                for team, mode in modes.items()}
-    
-    # Create figure with improved resolution
-    plt.figure(figsize=(12, 8), dpi=150)
-    
-    # Set up bins and colors
-    max_runs = max(max(home_runs_scored), max(away_runs_scored))
-    bins = range(max_runs + 2)
-    
-    # Pick team colors — away team gets lower alpha for separation
-    home_color = team_colors.get(home_team, ['#333333', '#666666'])[0]
-    away_color = team_colors.get(away_team, ['#333333', '#666666'])[0]
 
-    # Create histograms with enhanced styling
-    for runs, team, color, alpha, pattern in [
-        (home_runs_scored, home_team, home_color, 0.85, '//'),
-        (away_runs_scored, away_team, away_color, 0.55, '\\')
-    ]:
-        plt.hist(runs, bins=bins, alpha=alpha, label=team,
-                color=color, edgecolor='black',
-                linewidth=1.2, hatch=pattern)
+    home_runs_scored = np.asarray(home_runs_scored)
+    away_runs_scored = np.asarray(away_runs_scored)
+    max_runs = int(max(home_runs_scored.max(), away_runs_scored.max()))
+    bins = np.arange(max_runs + 2) - 0.5  # bars centered on integer runs
 
-    # Enhanced axis formatting
-    ax = plt.gca()
-    ax.set_xticks(np.arange(max_runs + 1) + 0.5)
-    ax.set_xticklabels(range(max_runs + 1), fontsize=12)
-    
-    # Set integer y-axis ticks
-    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-    plt.yticks(fontsize=12)
-    
-    # Improved labels
-    plt.xlabel('Runs Scored', fontsize=14, labelpad=10)
-    plt.ylabel('Frequency', fontsize=14, labelpad=10)
-    
-    # Title: bold main line + plain subtitle (using ax.text for precise control)
-    scores_close = abs(home_score - away_score) <= 2
-    title_y = 1.29 if scores_close else 1.22
-    subtitle_y = title_y - 0.04
+    home_mode = int(stats.mode(home_runs_scored, keepdims=True).mode.flatten()[0])
+    away_mode = int(stats.mode(away_runs_scored, keepdims=True).mode.flatten()[0])
 
-    ax.text(0.0, title_y,
-            f'Distribution of Runs Scored ({num_simulations:,} Simulations)',
-            transform=ax.transAxes, fontsize=16, fontweight='bold', ha='left', va='top')
+    home_color = get_team_color(team_colors, home_team, idx=0)
+    away_color = get_team_color(team_colors, away_team, idx=0)
 
-    subtitle = (
-        f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})\n'
-        f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} '
-        f'{percentages["home"]}%, Tie {percentages["tie"]}%\n'
-        f'Most Likely Outcome: {away_team} {mode_strs["away"]} - {home_team} '
-        f'{mode_strs["home"]}'
+    # If the two team primaries are too close, lighten the away team's
+    # primary to keep the bars distinguishable. (Some teams' secondary
+    # entries in team_colors aren't valid hex strings, so we don't rely
+    # on them here.)
+    def _color_distance(c1, c2):
+        r1, g1, b1 = to_rgb(c1)
+        r2, g2, b2 = to_rgb(c2)
+        return ((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2) ** 0.5
+
+    if _color_distance(home_color, away_color) < 0.20:
+        r, g, b = lighten(away_color, 0.45)
+        away_color = colors.to_hex((r, g, b))
+
+    # Reserve space at the top for a dedicated title strip.
+    fig = plt.figure(figsize=(12, 8.5), dpi=150)
+    fig.patch.set_facecolor(PALETTE['bg'])
+    ax = fig.add_axes([0.08, 0.10, 0.88, 0.70])
+    ax.set_facecolor(PALETTE['bg'])
+
+    # Histograms — solid fills, thin matching edges (no hatches).
+    home_counts, _, home_patches = ax.hist(
+        home_runs_scored, bins=bins, color=home_color, alpha=0.78,
+        edgecolor=home_color, linewidth=0.8, label=home_team, zorder=3,
     )
-    ax.text(0.0, subtitle_y, subtitle, transform=ax.transAxes,
-            fontsize=12, color='#333333', ha='left', va='top', linespacing=1.5)
+    away_counts, _, away_patches = ax.hist(
+        away_runs_scored, bins=bins, color=away_color, alpha=0.55,
+        edgecolor=away_color, linewidth=0.8, label=away_team, zorder=2,
+    )
 
-    # Actual score vertical lines with labels just above the plot area
-    # Away gets lower alpha to match its histogram
-    score_labels = [
-        (away_score, away_color, away_team, 0.55),
-        (home_score, home_color, home_team, 0.85)
-    ]
-    for score, color, team, alpha in score_labels:
-        ax.axvline(x=score + 0.5, color=color, linestyle='--', linewidth=2.5, alpha=alpha, zorder=5)
-
-    # Place labels above the plot in axes coordinates
-    xlim = ax.get_xlim()
-    x_range = xlim[1] - xlim[0]
-
-    base_y = 1.005  # Just above the plot edge
-    label_offsets = [base_y, base_y]  # [away, home]
-
-    # If scores are close (within 2 runs), offset one label higher to avoid overlap
+    # Actual-score markers + rounded-bbox labels anchored above bar tops.
+    # Bumped headroom so badges sit clearly above the tallest bar.
+    # Close-score stagger spans more vertically so the two boxes don't
+    # graze each other or the bar tops.
+    y_top = max(home_counts.max(), away_counts.max()) * 1.45
+    scores_close = abs(home_score - away_score) <= 1
     if scores_close:
-        if away_score <= home_score:
-            label_offsets[0] = base_y + 0.055
-        else:
-            label_offsets[1] = base_y + 0.055
+        # Lower-scoring team's badge sits higher to clear the overlap.
+        away_badge_y = y_top * 0.97 if away_score > home_score else y_top * 0.78
+        home_badge_y = y_top * 0.97 if home_score > away_score else y_top * 0.78
+        if away_score == home_score:
+            away_badge_y, home_badge_y = y_top * 0.97, y_top * 0.78
+    else:
+        away_badge_y = home_badge_y = y_top * 0.97
 
-    for idx, (score, color, team, alpha) in enumerate(score_labels):
-        x_frac = (score + 0.5 - xlim[0]) / x_range
-        ax.text(x_frac, label_offsets[idx], f'{team}: {score}\n(Actual)',
-                transform=ax.transAxes, fontsize=9, fontweight='bold',
-                color=color, alpha=alpha, va='bottom', ha='center', zorder=6)
+    for score, color, team, badge_y in [
+        (away_score, away_color, away_team, away_badge_y),
+        (home_score, home_color, home_team, home_badge_y),
+    ]:
+        ax.axvline(x=score, color=color, linestyle='--',
+                   linewidth=2.0, alpha=0.85, zorder=4)
+        ax.text(score, badge_y,
+                f'{team} {score}\n(Actual)',
+                ha='center', va='top', fontsize=9, fontweight='bold',
+                color=PALETTE['text'], zorder=6,
+                bbox=dict(boxstyle='round,pad=0.4',
+                          facecolor=PALETTE['bg'], edgecolor=color,
+                          linewidth=1.4))
 
-    # Enhanced legend in top right
-    plt.legend(fontsize=12, frameon=True, framealpha=0.9,
-              edgecolor='black', fancybox=True, loc='upper right')
+    # Win-prob inline annotation — concise phrasing.
+    leader = home_team if home_win_percentage >= away_win_percentage else away_team
+    leader_pct = max(home_win_percentage, away_win_percentage)
+    leader_color = home_color if leader == home_team else away_color
+    ax.text(0.99, 0.04,
+            f'{leader} win {leader_pct:.0f}% of simulations',
+            transform=ax.transAxes, ha='right', va='bottom',
+            fontsize=10, fontstyle='italic', color=leader_color,
+            fontweight='bold')
 
-    # Clean up spines
-    for spine in ['top', 'right']:
-        plt.gca().spines[spine].set_visible(False)
+    # Axis formatting
+    ax.set_xlim(-0.5, max_runs + 1.5)
+    ax.set_ylim(0, y_top * 1.05)
+    ax.set_xticks(range(max_runs + 1))
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    ax.set_xlabel('Runs Scored', fontsize=12, labelpad=8, color=PALETTE['text'])
+    ax.set_ylabel('Frequency', fontsize=12, labelpad=8, color=PALETTE['text'])
+    ax.grid(True, axis='y', linestyle='--', alpha=0.45, color=PALETTE['grid'])
+    ax.set_axisbelow(True)
+    for s in ['top', 'right']:
+        ax.spines[s].set_visible(False)
+    for s in ['bottom', 'left']:
+        ax.spines[s].set_color(PALETTE['spine'])
 
-    # Save with high quality
+    ax.legend(loc='upper right', frameon=False, fontsize=11)
+
+    # Dedicated title strip at the top of the figure (separate axes
+    # from the plot, so it can't collide with bars / legend / score
+    # badges). Title big and bold; subtitle in two muted lines below a
+    # thin divider rule.
+    tax = title_axes(fig, height_frac=0.13, top_pad=0.02)
+    subtitle_lines = [
+        f'Actual: {away_team} {away_score} - {home_team} {home_score}   '
+        f'({formatted_date})    DTW: {away_team} {percentages["away"]}% • '
+        f'{home_team} {percentages["home"]}% • Tie {percentages["tie"]}%',
+        f'Most Likely: {away_team} {away_mode} - {home_team} {home_mode}',
+    ]
+    draw_title_block(tax,
+                     f'Distribution of Runs Scored  —  {num_simulations:,} Simulations',
+                     subtitle_lines,
+                     title_size=20, subtitle_size=11)
+
     os.makedirs(images_dir, exist_ok=True)
-    filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_rd.png'
+    filename = (f'{away_team}_{home_team}_{away_score}-{home_score}'
+                f'--{percentages["away"]}-{percentages["home"]}_rd.png')
     filepath = os.path.join(images_dir, filename)
-    plt.savefig(filepath, bbox_inches='tight', dpi=200)
-    plt.close()
-    _apply_watermark(filepath)
+    finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
 
 def prepare_table_data(df):
     """Prepare and format data for table visualization."""
@@ -539,191 +558,154 @@ def prepare_table_data(df):
     return df
 
 def create_estimated_bases_table(df, away_team, home_team, away_score, home_score,
-                               away_win_percentage, home_win_percentage, formatted_date, 
+                               away_win_percentage, home_win_percentage, formatted_date,
                                mlb_team_logos, images_dir):
     """Creates enhanced table visualization of estimated bases statistics with team logos."""
-    
-    plt.style.use('seaborn-v0_8-whitegrid')
-    plt.close('all')
-    
-    # Prepare data - take top 15 instead of top 10
+
+    apply_base_style()
+
     df = df.copy().head(15)
-    
-    # Add team colors if not present
+
     if 'team_color' not in df.columns:
         df['team_color'] = df['Team'].apply(
-            lambda x: team_colors.get(x, {}).get('primary', '#333333') 
-            if isinstance(team_colors.get(x), dict) 
-            else team_colors.get(x, ['#333333'])[0]
+            lambda x: get_team_color(team_colors, x)
         )
-    
+
     team_color_map = dict(zip(df['Team'], df['team_color']))
-    
+
     # Store team names before preparing data (for logo lookup)
     team_names = df['Team'].tolist()
-    
+
     # Prepare data - this now keeps full player names
     df = prepare_table_data(df)
-    
-    # Create figure with wider, less tall proportions
+
     fig = plt.figure(figsize=(20, 10), dpi=150)
-    
-    # Add subplot with more space at top for titles
+    fig.patch.set_facecolor(PALETTE['bg'])
+
     ax = fig.add_subplot(111)
     ax.set_position([0.05, 0.05, 0.9, 0.65])  # [left, bottom, width, height]
     ax.axis('off')
-    
+    ax.set_facecolor(PALETTE['bg'])
+
     # Column widths: Rank, Team, Player, Launch Speed, Launch Angle, Spray, Result, Est Bases, xBA, HR%
     col_widths = [0.05, 0.06, 0.18, 0.10, 0.10, 0.07, 0.08, 0.12, 0.07, 0.07]
-    
-    # Create table
+
     table = ax.table(cellText=df.values,
                     colLabels=df.columns,
                     loc='center',
                     cellLoc='center',
                     colWidths=col_widths)
-    
-    # Apply enhanced styling (modified to hide team text)
+
     create_enhanced_cell_styles_with_logos(table, df, team_color_map)
-    
-    # Scale table with adjusted scaling
+
     table.auto_set_font_size(False)
-    table.scale(1.1, 1.5)  # Reduced height scaling from 2.0 to 1.5
-    
-    # Add team logos after table is created and scaled
+    table.scale(1.1, 1.5)
+
     add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df)
-    
-    # Enhanced title with better spacing - moved all text elements up
-    title_lines = [
-        f"Top 15 Batted Balls by Estimated Total Bases",
-        f"{away_team} {away_score} - {home_team} {home_score}  •  {formatted_date}",
-        f"Win Probability: {away_team} {away_win_percentage:.0f}% - {home_team} {home_win_percentage:.0f}%"
-    ]
-    
-    # Main title - moved higher to 0.94
-    plt.text(0.5, 0.93, title_lines[0], transform=fig.transFigure,
-             fontsize=23, fontweight='bold', ha='center', va='top')
-    
-    # Subtitle lines - moved higher
-    plt.text(0.5, 0.88, title_lines[1], transform=fig.transFigure,
-             fontsize=16, ha='center', va='top', color='#333333')
-    
-    plt.text(0.5, 0.84, title_lines[2], transform=fig.transFigure,
-             fontsize=14, ha='center', va='top', color='#666666')
-    
-    # Save with high quality
+
+    title = "Top 15 Batted Balls by Estimated Total Bases"
+    subtitle = (
+        f"{away_team} {away_score} - {home_team} {home_score}   •   {formatted_date}\n"
+        f"Win Probability: {away_team} {away_win_percentage:.0f}% • "
+        f"{home_team} {home_win_percentage:.0f}%"
+    )
+    stamp_header(fig, title, subtitle,
+                 y_title=0.93, y_subtitle=0.88,
+                 title_size=23, subtitle_size=15)
+
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'
     filepath = os.path.join(images_dir, filename)
-    plt.savefig(filepath, bbox_inches='tight', dpi=200,
-                facecolor='white', edgecolor='none')
-    plt.close()
-    _apply_watermark(filepath)
+    finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
 
 
 def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
     """Apply enhanced styling to table cells, hiding team text for logo placement."""
-    
-    # Column indices
+
     rank_col = 0
     team_col = 1
     player_col = 2
     bases_col = df.columns.get_loc('Estimated Bases')
     result_col = df.columns.get_loc('Result')
     xba_col = df.columns.get_loc('xBA')
-    hr_col = df.columns.get_loc('HR%')
-    
-    # Helper function for color brightness
-    def is_dark_color(color):
-        from matplotlib.colors import to_rgb
-        r, g, b = to_rgb(color)
-        return (r * 0.299 + g * 0.587 + b * 0.114) < 0.5
-    
-    # Style all cells
+
+    # Cream-friendly stripe colors
+    row_even = PALETTE['row_alt']   # warmer cream
+    row_odd  = PALETTE['bg']        # base cream
+    cell_edge = '#E6DFD2'
+
+    # Single styling pass — base + alternating fill for every (row, col).
     for (row, col), cell in table.get_celld().items():
-        
-        # Base cell styling
         if row == 0:  # Header row
             cell.set_height(0.06)
-            # Adjust font size for Team header since column is narrower
-            if col == team_col:
-                cell.set_text_props(weight='bold', fontsize=14)
-            else:
-                cell.set_text_props(weight='bold', fontsize=15)
-            cell.set_facecolor('#2C3E50')
-            cell.get_text().set_color('white')
-            cell.set_edgecolor('#1A252F')
-            cell.set_linewidth(2)
-        else:  # Data rows
+            cell.set_text_props(weight='bold',
+                                fontsize=14 if col == team_col else 15)
+            cell.set_facecolor(PALETTE['text'])
+            cell.get_text().set_color(PALETTE['bg'])
+            cell.set_edgecolor(PALETTE['text'])
+            cell.set_linewidth(1.5)
+        else:
             cell.set_height(0.055)
             cell.set_text_props(fontsize=14)
-            cell.set_edgecolor('#E0E0E0')
+            cell.set_edgecolor(cell_edge)
             cell.set_linewidth(0.5)
-            
-            # Alternating row colors for better readability
-            if row % 2 == 0:
-                cell.set_facecolor('#F8F9FA')
-            else:
-                cell.set_facecolor('#FFFFFF')
-    
-    # Apply special formatting
+            cell.set_facecolor(row_even if row % 2 == 0 else row_odd)
+
+    # Per-row highlights — applied AFTER the base pass so they win.
+    cmap = plt.cm.YlOrRd
+    norm = plt.Normalize(0, 4)
+    # Compute the luminance threshold below which white text reads better
+    # than dark text against the YlOrRd cmap. Drops the magic 2.5 constant.
+    def _needs_white_text(rgba):
+        r, g, b = rgba[0], rgba[1], rgba[2]
+        return (r * 0.299 + g * 0.587 + b * 0.114) < 0.55
+
     for row in range(1, len(df) + 1):
-        
-        # Rank column - bold and centered
+        # Rank — bold
         rank_cell = table[(row, rank_col)]
         rank_cell.get_text().set_weight('bold')
         rank_cell.get_text().set_fontsize(14)
-        
-        # Team column - hide text and use alternating row background
-        team = df.iloc[row-1]['Team']
+
+        # Team — text hidden so the logo sits in the empty cell.
+        # Background was already set in the base pass.
         team_cell = table[(row, team_col)]
-        # Use alternating row colors to match other columns
-        if row % 2 == 0:
-            team_cell.set_facecolor('#F8F9FA')  # Light gray for even rows
-        else:
-            team_cell.set_facecolor('#FFFFFF')  # White for odd rows
-        # Make text transparent/invisible since we'll add logo
         team_cell.get_text().set_alpha(0)
-        
-        # Player names - keep readable size for full names
+
+        # Player — slightly smaller font so full names fit.
         player_cell = table[(row, player_col)]
-        player_cell.get_text().set_fontsize(13)  # Slightly smaller to fit full names
-        
-        # Estimated bases - gradient coloring
-        bases_value = df.iloc[row-1]['Estimated Bases']
+        player_cell.get_text().set_fontsize(13)
+        player_cell.get_text().set_color(PALETTE['text'])
+
+        # Estimated bases — YlOrRd gradient with luminance-driven text color.
+        bases_value = df.iloc[row - 1]['Estimated Bases']
         bases_cell = table[(row, bases_col)]
-        
-        # Create gradient from light yellow to dark orange/red
-        norm = plt.Normalize(0, 4)
-        cmap = plt.cm.YlOrRd
-        color = cmap(norm(bases_value))
-        bases_cell.set_facecolor(color)
+        rgba = cmap(norm(bases_value))
+        bases_cell.set_facecolor(rgba)
         bases_cell.get_text().set_weight('bold')
         bases_cell.get_text().set_fontsize(14)
-        if bases_value > 2.5:
-            bases_cell.get_text().set_color('white')
-        
-        # Result column - color coding
-        result = df.iloc[row-1]['Result']
+        bases_cell.get_text().set_color('white' if _needs_white_text(rgba) else PALETTE['text'])
+
+        # Result — semantic colors warmed for cream background.
+        result = df.iloc[row - 1]['Result']
         result_cell = table[(row, result_col)]
         if result == 'Out':
-            result_cell.set_facecolor('#FFE5E5')
-            result_cell.get_text().set_color('#D32F2F')
+            result_cell.set_facecolor('#F7DEDA')
+            result_cell.get_text().set_color('#A6362B')
         elif result == 'Home Run':
-            result_cell.set_facecolor('#E8F5E9')
+            result_cell.set_facecolor('#DDECDC')
             result_cell.get_text().set_color('#2E7D32')
         elif result in ['Single', 'Double', 'Triple']:
-            result_cell.set_facecolor('#E3F2FD')
-            result_cell.get_text().set_color('#1565C0')
-        
-        # xBA column - highlight high values
-        xba_value = float(df.iloc[row-1]['xBA'])
+            result_cell.set_facecolor('#DDE7F4')
+            result_cell.get_text().set_color('#1A4F8B')
+
+        # xBA — highlight high values
+        xba_value = float(df.iloc[row - 1]['xBA'])
         xba_cell = table[(row, xba_col)]
         if xba_value >= 0.500:
             xba_cell.get_text().set_weight('bold')
             xba_cell.get_text().set_color('#2E7D32')
         elif xba_value >= 0.300:
-            xba_cell.get_text().set_color('#1565C0')
+            xba_cell.get_text().set_color('#1A4F8B')
 
 
 def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team,
@@ -736,8 +718,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
       Bottom: pitcher bases allowed with BF counts, on its own x-axis scale.
     Uses player headshots when player_id_map is provided.
     """
-    plt.style.use('seaborn-v0_8-whitegrid')
-    plt.close('all')
+    apply_base_style()
 
     percentages = {
         'away': f"{away_win_percentage:.0f}",
@@ -839,18 +820,23 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                 _load_headshot(pid)
 
     # ------- Figure with two independent axes -------
+    # Add ~1.5" of vertical headroom for the dedicated title strip.
     if has_pitchers:
         fig, (ax_hit, ax_pitch) = plt.subplots(
-            2, 1, figsize=(14, max(10, (n_hitters + n_pitchers) * 0.52 + 3)),
+            2, 1, figsize=(14, max(11.5, (n_hitters + n_pitchers) * 0.52 + 4.5)),
             dpi=150,
             gridspec_kw={'height_ratios': [n_hitters, n_pitchers], 'hspace': 0.30},
         )
     else:
-        fig, ax_hit = plt.subplots(figsize=(14, max(8, n_hitters * 0.52 + 3)), dpi=150)
+        fig, ax_hit = plt.subplots(figsize=(14, max(9.5, n_hitters * 0.52 + 4.5)), dpi=150)
         ax_pitch = None
 
+    fig.patch.set_facecolor(PALETTE['bg'])
+    # Reserve top of figure for title strip; subplots pulled down accordingly.
+    fig.subplots_adjust(top=0.85)
+
     # ------- Helper: draw one section -------
-    def _draw_section(ax, entries, color_style, stat_key):
+    def _draw_section(ax, entries, stat_key):
         """stat_key: 'pa' for hitters, 'bf' for pitchers."""
         from matplotlib.transforms import blended_transform_factory
 
@@ -872,15 +858,16 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
             walk_vals.append(contribs['walks'])
             stat_vals.append(contribs[stat_key])
 
-            team_color = team_colors.get(tname, ['#666666'])[0]
+            team_color = get_team_color(team_colors, tname)
             tc_list.append(team_color)
-            r, g, b = to_rgb(team_color)
-            wc_list.append((r + (1 - r) * 0.5, g + (1 - g) * 0.5, b + (1 - b) * 0.5))
+            wc_list.append(lighten(team_color, 0.5))
 
         y_positions = np.arange(len(entries))
-
-        ax.barh(y_positions, bb_vals, color=tc_list, edgecolor='black', linewidth=0.5)
-        ax.barh(y_positions, walk_vals, left=bb_vals, color=wc_list, edgecolor='black', linewidth=0.5)
+        ax.set_facecolor(PALETTE['bg'])
+        ax.barh(y_positions, bb_vals, color=tc_list,
+                edgecolor=PALETTE['bg'], linewidth=0.6)
+        ax.barh(y_positions, walk_vals, left=bb_vals, color=wc_list,
+                edgecolor=PALETTE['bg'], linewidth=0.6)
 
         # Use blended transform: x in axes fraction (0-1), y in data coords
         # This keeps name/headshot spacing identical regardless of x-axis scale
@@ -921,7 +908,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
             # Name label with PA/BF count
             display_name = f"{labels[idx]}  ({stat_vals[idx]} {stat_label})"
             ax.text(name_x, idx, display_name, ha='right', va='center',
-                    fontsize=11, color='black', transform=trans)
+                    fontsize=11, color=PALETTE['text'], transform=trans)
 
         # Value labels on bars
         for idx, (bb, w) in enumerate(zip(bb_vals, walk_vals)):
@@ -933,7 +920,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                        fontsize=10, color='white', fontweight='bold')
             total = bb + w
             ax.text(total + 0.08, idx, f'{total:.1f}', ha='left', va='center',
-                   fontsize=11, color='black', fontweight='bold')
+                   fontsize=11, color=PALETTE['text'], fontweight='bold')
 
         # Styling
         ax.set_yticks(y_positions)
@@ -941,52 +928,65 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         ax.invert_yaxis()
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax.grid(axis='x', alpha=0.3, linestyle='--')
+        ax.spines['left'].set_color(PALETTE['spine'])
+        ax.spines['bottom'].set_color(PALETTE['spine'])
+        ax.grid(axis='x', alpha=0.5, linestyle='--', color=PALETTE['grid'])
         ax.set_axisbelow(True)
 
         max_val = max(bb + w for bb, w in zip(bb_vals, walk_vals)) if bb_vals else 1
         ax.set_xlim(0, max_val * 1.18)
 
+        # Track per-section colors for the legend (representative pair)
+        return tc_list[0] if tc_list else PALETTE['text'], wc_list[0] if wc_list else PALETTE['text_muted']
+
     # ------- Draw hitter section -------
-    _draw_section(ax_hit, sorted_hitters, 'hitter', 'pa')
-    ax_hit.set_xlabel('Estimated Total Bases', fontsize=12, labelpad=8)
+    rep_bb_color, rep_walk_color = _draw_section(ax_hit, sorted_hitters, 'pa')
+    ax_hit.set_xlabel('Estimated Total Bases', fontsize=12, labelpad=8,
+                      color=PALETTE['text'])
 
-    # ------- Titles anchored to axes (no floating fig.text gap) -------
+    # Dedicated title strip — matches Run Distribution and Spray Chart.
+    # Reserves its own axes at the top of the figure with title, divider
+    # rule, and subtitle row below.
+    fig_h = fig.get_size_inches()[1]
+    strip_height_frac = max(0.10, min(0.16, 1.5 / fig_h))
+    tax = title_axes(fig, height_frac=strip_height_frac, top_pad=0.015)
     subtitle = (
-        f'Actual Score: {away_team} {away_score} - {home_team} {home_score}  ({formatted_date})    '
-        f'Deserve-to-Win: {away_team} {percentages["away"]}% - {home_team} '
-        f'{percentages["home"]}%, Tie {percentages["tie"]}%'
+        f'Actual: {away_team} {away_score} - {home_team} {home_score}   '
+        f'({formatted_date})    DTW: {away_team} {percentages["away"]}% • '
+        f'{home_team} {percentages["home"]}% • Tie {percentages["tie"]}%'
     )
-    fig.suptitle('Player Contributions by Estimated Total Bases',
-                 fontsize=16, fontweight='bold', x=0.01, ha='left', y=0.98)
-    fig.text(0.01, 0.955, subtitle, fontsize=11, color='#555555', va='top')
+    draw_title_block(tax, 'Player Contributions by Estimated Total Bases',
+                     [subtitle], title_size=22, subtitle_size=12)
 
-    ax_hit.set_title('Hitting — Estimated Bases', fontsize=13, fontweight='bold',
-                    loc='left', color='#555555', pad=8)
+    ax_hit.set_title('Hitting  —  Estimated Bases', fontsize=13, fontweight='bold',
+                    loc='left', color=PALETTE['text_muted'], pad=8,
+                    fontfamily=heading_font())
 
     # ------- Draw pitcher section -------
     if has_pitchers and ax_pitch is not None:
-        _draw_section(ax_pitch, sorted_pitchers, 'pitcher', 'bf')
-        ax_pitch.set_xlabel('Estimated Total Bases Allowed', fontsize=12, labelpad=8)
-        ax_pitch.set_title('Pitching — Bases Allowed  (different scale)',
-                          fontsize=13, fontweight='bold', loc='left', color='#555555', pad=8)
+        _draw_section(ax_pitch, sorted_pitchers, 'bf')
+        ax_pitch.set_xlabel('Estimated Total Bases Allowed', fontsize=12, labelpad=8,
+                            color=PALETTE['text'])
+        ax_pitch.set_title('Pitching  —  Bases Allowed  (different scale)',
+                          fontsize=13, fontweight='bold', loc='left',
+                          color=PALETTE['text_muted'], pad=8,
+                          fontfamily=heading_font())
 
-    # Legend on hitter axis
+    # Legend swatches use the first hitter's actual team-color pair so the
+    # legend reflects the bars rather than generic greys.
     legend_patches = [
-        patches.Patch(facecolor='#444444', edgecolor='black', linewidth=0.5, label='Batted Balls'),
-        patches.Patch(facecolor='#AAAAAA', edgecolor='black', linewidth=0.5, label='Walks'),
+        patches.Patch(facecolor=rep_bb_color, edgecolor='none',
+                      label='Batted Balls (estimated bases)'),
+        patches.Patch(facecolor=rep_walk_color, edgecolor='none',
+                      label='Walks (1 base each)'),
     ]
     ax_hit.legend(handles=legend_patches, loc='lower right', fontsize=10,
-                 frameon=True, framealpha=0.9, edgecolor='black')
+                 frameon=False)
 
-    # Save
     os.makedirs(images_dir, exist_ok=True)
     filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{percentages["away"]}-{percentages["home"]}_player_contributions.png'
     filepath = os.path.join(images_dir, filename)
-    plt.savefig(filepath, bbox_inches='tight', dpi=200,
-                facecolor='white', edgecolor='none')
-    plt.close()
-    _apply_watermark(filepath)
+    finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
 
 
 # =============================================================================
@@ -1164,19 +1164,22 @@ def draw_baseball_field(ax, venue_name='default'):
     Grass fills only to the fence line.
     """
     fence_x, fence_y, dims, smooth_angles, smooth_distances = get_stadium_fence_curve(venue_name)
-    
-    grass_color = '#90EE90'
-    dirt_color = '#D2B48C'
-    line_color = '#FFFFFF'
-    
+
+    # Vivid field colors — the cream figure background is subtle enough
+    # that the field can keep its natural saturation and still read well.
+    grass_color = '#9FCB8A'
+    dirt_color  = '#D2B48C'
+    line_color  = '#FFFFFF'
+    grass_edge  = '#3F8741'
+
     # Create outfield grass polygon (follows fence curve)
     grass_vertices = [(0, 0)]
     for x, y in zip(fence_x, fence_y):
         grass_vertices.append((x, y))
     grass_vertices.append((0, 0))
-    
-    grass_polygon = Polygon(grass_vertices, facecolor=grass_color, 
-                           edgecolor='#228B22', linewidth=2, alpha=0.6, zorder=1)
+
+    grass_polygon = Polygon(grass_vertices, facecolor=grass_color,
+                           edgecolor=grass_edge, linewidth=2, alpha=0.6, zorder=1)
     ax.add_patch(grass_polygon)
     
     # Infield dirt — real grass-dirt arc is ~95ft from home plate
@@ -1212,7 +1215,7 @@ def draw_baseball_field(ax, venue_name='default'):
         ax.plot([0, x_end], [0, y_end], color=line_color, linewidth=2, alpha=0.8, zorder=3)
 
     # Fence line
-    ax.plot(fence_x, fence_y, color='#333333', linewidth=3, zorder=4)
+    ax.plot(fence_x, fence_y, color='#3F3A33', linewidth=2.5, zorder=4)
 
     # Distance labels just outside the fence
     label_positions = [
@@ -1228,7 +1231,7 @@ def draw_baseball_field(ax, venue_name='default'):
         label_x = label_dist * np.cos(angle_rad)
         label_y = label_dist * np.sin(angle_rad)
         ax.text(label_x, label_y, f"{dist_ft}'", ha=ha, va='bottom',
-                fontsize=9, color='#444444', fontweight='bold', zorder=5)
+                fontsize=11, color='#3F3A33', fontweight='bold', zorder=5)
     
     # Home plate — real proportions: 17" front, 8.5" sides, 12" back edges
     # Scaled so half-width = 2.5 plot units; back depth = sqrt(12²-8.5²)/8.5 * 2.5
@@ -1262,7 +1265,7 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit):
     axis_limit : float
         Upper y-axis limit.
     """
-    top_bbs = sorted(team_bbs, key=lambda b: b['xbases'], reverse=True)[:3]
+    top_bbs = sorted(team_bbs, key=lambda b: b['xbases'], reverse=True)[:5]
     top_bbs = [bb for bb in top_bbs if bb['last_name']]
 
     if not top_bbs:
@@ -1346,12 +1349,12 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit):
         ax.annotate(
             bb['last_name'], (bx, by),
             textcoords='offset points', xytext=(dx_pt, dy_pt),
-            fontsize=8, fontweight='bold', ha=ha, va=va,
-            color='#222222', zorder=11,
-            bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
-                      edgecolor='#aaaaaa', alpha=0.85, linewidth=0.5),
-            arrowprops=dict(arrowstyle='-', color='#999999',
-                            linewidth=0.7, shrinkA=0, shrinkB=6),
+            fontsize=9, fontweight='bold', ha=ha, va=va,
+            color='#1A1A1A', zorder=11,
+            bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
+                      edgecolor='#999999', alpha=0.92, linewidth=0.6),
+            arrowprops=dict(arrowstyle='-', color='#888888',
+                            linewidth=0.8, shrinkA=0, shrinkB=6),
         )
 
 
@@ -1388,25 +1391,27 @@ def spray_chart(home_outcomes, away_outcomes,
     Returns:
         str: Path to saved image file
     """
-    plt.style.use('seaborn-v0_8-whitegrid')
-    plt.close('all')
+    apply_base_style()
 
     if pipeline is None:
         pipeline = _get_model()
-    
+
     percentages = {
         'away': f"{away_win_percentage:.0f}",
         'home': f"{home_win_percentage:.0f}",
         'tie': f"{tie_percentage:.0f}"
     }
-    
+
     home_logo_name = get_logo_team_name(home_team)
     away_logo_name = get_logo_team_name(away_team)
     home_display_name = get_display_team_name(home_team)
     away_display_name = get_display_team_name(away_team)
-    
-    fig, (ax_away, ax_home) = plt.subplots(1, 2, figsize=(16, 7.5), dpi=150)
-    plt.subplots_adjust(left=0.02, right=0.98, top=0.80, bottom=0.03, wspace=0.02)
+
+    fig, (ax_away, ax_home) = plt.subplots(1, 2, figsize=(16, 9.5), dpi=150)
+    fig.patch.set_facecolor(PALETTE['bg'])
+    for ax in (ax_away, ax_home):
+        ax.set_facecolor(PALETTE['bg'])
+    plt.subplots_adjust(left=0.015, right=0.985, top=0.78, bottom=0.05, wspace=0.0)
     
     # Process outcomes
     batted_balls = {'home': [], 'away': []}
@@ -1501,12 +1506,13 @@ def spray_chart(home_outcomes, away_outcomes,
                 )
                 ax.add_patch(ring)
             else:
-                # Fallback: filled circle with team color + outcome ring
-                fill_color = team_colors.get(display_name, ('#666666', '#666666'))[0]
+                # Fallback: filled circle with team color + outcome ring.
+                # 1.2px white stroke separates overlapping dots cleanly.
+                fill_color = get_team_color(team_colors, display_name)
                 dot = plt.Circle(
                     (bb['x'], bb['y']), radius=4.0,
                     facecolor=fill_color, edgecolor='white',
-                    linewidth=1.0, alpha=0.85, zorder=10
+                    linewidth=1.2, alpha=0.9, zorder=10
                 )
                 ax.add_patch(dot)
                 ring = plt.Circle(
@@ -1527,45 +1533,52 @@ def spray_chart(home_outcomes, away_outcomes,
         bip_count = len(batted_balls[team_key])
         walk_count = walk_counts[team_key]
         ax.set_title(f"{display_name}\n{bip_count} BIP  •  {walk_count} BB/HBP",
-                     fontsize=14, fontweight='bold', pad=4)
+                     fontsize=16, fontweight='bold', pad=8,
+                     color=PALETTE['text'], fontfamily=heading_font())
 
-    title_line1 = "Batted Ball Spray Chart"
-    title_line2 = (
-        f"Actual: {away_display_name} {away_score} - {home_display_name} {home_score}  ({formatted_date})    "
-        f"DTW: {away_display_name} {percentages['away']}% - "
-        f"{home_display_name} {percentages['home']}%, Tie {percentages['tie']}%"
+    # Dedicated title strip — title, divider rule, then subtitle row.
+    # Outcome legend is mounted to the right edge of the same strip so
+    # everything reads as one cohesive header (no more colliding with
+    # the watermark or the field).
+    tax = title_axes(fig, height_frac=0.16, top_pad=0.02)
+    subtitle = (
+        f"Actual: {away_display_name} {away_score} - {home_display_name} {home_score}   "
+        f"({formatted_date})    DTW: {away_display_name} {percentages['away']}% • "
+        f"{home_display_name} {percentages['home']}% • Tie {percentages['tie']}%"
     )
-    fig.text(0.5, 0.97, title_line1,
-             fontsize=15, fontweight='bold', ha='center', va='top')
-    fig.text(0.5, 0.935, title_line2,
-             fontsize=11, color='#333333', ha='center', va='top')
+    draw_title_block(tax, "Batted Ball Spray Chart", [subtitle],
+                     title_size=22, subtitle_size=12)
 
     from matplotlib.lines import Line2D
     legend_items = [
-        ('Out', '#808080'),
-        ('Single', '#FFA500'),
-        ('XBH', '#FF6347'),
-        ('HR', '#DC143C')
+        ('Out', PALETTE['out']),
+        ('Single', PALETTE['single']),
+        ('XBH', PALETTE['xbh']),
+        ('HR', PALETTE['hr'])
     ]
     legend_handles = [
         Line2D([0], [0], marker='o', color='w', markerfacecolor='none',
-               markeredgecolor=color, markeredgewidth=2.5, markersize=11, label=label)
+               markeredgecolor=color, markeredgewidth=2.5, markersize=12, label=label)
         for label, color in legend_items
     ]
-    fig.legend(handles=legend_handles, loc='upper center', ncol=4,
+    # Center the legend over the full chart area (between both fields)
+    # via figure-level coordinates, not the title strip. y=0.83 sits just
+    # below the title strip and above the subplots.
+    fig.legend(handles=legend_handles, loc='center', ncol=4,
                fontsize=11, frameon=False, title='Expected Outcome',
                title_fontproperties={'weight': 'bold', 'size': 11},
-               bbox_to_anchor=(0.5, 0.895))
+               bbox_to_anchor=(0.5, 0.83))
 
-    fig.text(0.5, 0.02, 'Stadium dimensions are estimated for this visual',
-             fontsize=9, fontstyle='italic', color='gray', ha='center', va='bottom')
+    fig.text(0.5, 0.015, 'Stadium dimensions are estimated for this visual',
+             fontsize=9, fontstyle='italic', color=PALETTE['text_muted'],
+             ha='center', va='bottom')
 
     os.makedirs(images_dir, exist_ok=True)
     filename = (f"{away_display_name}_{home_display_name}_{away_score}-{home_score}--"
                 f"{percentages['away']}-{percentages['home']}_spray.png")
     filepath = os.path.join(images_dir, filename)
 
-    plt.savefig(filepath, dpi=200, facecolor='white', edgecolor='none',
+    fig.savefig(filepath, dpi=200, facecolor=PALETTE['bg'], edgecolor='none',
                 bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
     _apply_watermark(filepath)
