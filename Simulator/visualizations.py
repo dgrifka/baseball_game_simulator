@@ -5,7 +5,8 @@ from matplotlib.patches import Rectangle
 import matplotlib.patches as patches
 from matplotlib.patches import Polygon
 from scipy.interpolate import griddata
-from matplotlib.colors import LinearSegmentedColormap, to_rgb
+from matplotlib.colors import LinearSegmentedColormap, Normalize, to_rgb
+from matplotlib.cm import ScalarMappable
 import matplotlib.colors as colors
 import pandas as pd
 import numpy as np
@@ -1091,24 +1092,31 @@ def calculate_expected_bases_for_spray(outcome_dict, pipeline):
         return 0.5
 
 
+# Continuous Estimated Bases colormap, anchored at PALETTE values so the
+# spray chart's ring colors stay consistent with the rest of the chart family.
+# Anchors: out (xbases=0) -> single (1) -> xbh (2) -> hr (4).
+# Alpha fades in from fully transparent at xbases=0 so out-quality balls
+# essentially disappear, letting hit-quality contact pop against the field.
+ESTIMATED_BASES_CMAP = LinearSegmentedColormap.from_list(
+    'estimated_bases',
+    [
+        (0.00, (*to_rgb(PALETTE['out']),    0.00)),  # transparent at 0
+        (0.25, (*to_rgb(PALETTE['single']), 0.55)),  # 1B at xbases=1
+        (0.50, (*to_rgb(PALETTE['xbh']),    0.75)),  # 2B at xbases=2
+        (1.00, (*to_rgb(PALETTE['hr']),     0.90)),  # HR at xbases=4
+    ],
+    N=256,
+)
+ESTIMATED_BASES_NORM = Normalize(vmin=0.0, vmax=4.0)
+
+
 def get_expected_bases_color(xbases):
+    """Return RGBA from the continuous Estimated Bases colormap.
+
+    Anchored at PALETTE: out (xbases=0) -> single (1) -> xbh (2) -> hr (4).
+    Inputs outside [0, 4] are clipped by Normalize.
     """
-    Get color for expected bases value.
-    
-    4-category color scheme:
-    - Out: < 0.5 expected bases (gray)
-    - Single: 0.5 - 1.5 expected bases (orange)
-    - XBH: 1.5 - 3.0 expected bases (tomato)
-    - HR: > 3.0 expected bases (crimson)
-    """
-    if xbases < 0.5:
-        return '#808080'  # Gray - Out
-    elif xbases < 1.5:
-        return '#FFA500'  # Orange - Single
-    elif xbases < 3.0:
-        return '#FF6347'  # Tomato - XBH
-    else:
-        return '#DC143C'  # Crimson - HR
+    return ESTIMATED_BASES_CMAP(ESTIMATED_BASES_NORM(xbases))
 
 
 def get_stadium_fence_curve(venue_name):
@@ -1248,12 +1256,20 @@ def draw_baseball_field(ax, venue_name='default'):
     ax.add_patch(home_plate)
 
 
-def _place_spray_labels(ax, team_bbs, x_extent, axis_limit):
-    """Place labels for the top 3 batted balls with smart positioning.
+def _place_spray_labels(ax, team_bbs, x_extent, axis_limit,
+                        min_xbases=None, max_labels=10, fallback_top=3):
+    """Place batted-ball labels with smart collision-avoiding placement.
 
     Scores 8 candidate offsets per label to avoid overlaps with other labels,
-    stay inside axis bounds, and prefer positions below the marker.  Draws a
+    stay inside axis bounds, and prefer positions below the marker. Draws a
     thin gray connecting line from the label to the batted ball marker.
+
+    Selection rule:
+      - If ``min_xbases`` is set, label every ball with ``xbases >= min_xbases``
+        (capped at ``max_labels`` highest-xbases balls to prevent label hell on
+        slug-fests). If nothing clears the threshold, fall back to the top
+        ``fallback_top`` by xbases so quiet games still get callouts.
+      - If ``min_xbases`` is None, label the top 5 by xbases (legacy behavior).
 
     Parameters
     ----------
@@ -1264,8 +1280,24 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit):
         Half-width of the x-axis (symmetric about 0).
     axis_limit : float
         Upper y-axis limit.
+    min_xbases : float or None
+        Threshold for inclusion. None preserves legacy top-5 behavior.
+    max_labels : int
+        Cap on labels when ``min_xbases`` is used.
+    fallback_top : int
+        Number of top-xbases balls to label if nothing clears ``min_xbases``.
     """
-    top_bbs = sorted(team_bbs, key=lambda b: b['xbases'], reverse=True)[:5]
+    sorted_bbs = sorted(team_bbs, key=lambda b: b['xbases'], reverse=True)
+
+    if min_xbases is not None:
+        threshold_hits = [bb for bb in sorted_bbs if bb['xbases'] >= min_xbases]
+        if threshold_hits:
+            top_bbs = threshold_hits[:max_labels]
+        else:
+            top_bbs = sorted_bbs[:fallback_top]
+    else:
+        top_bbs = sorted_bbs[:5]
+
     top_bbs = [bb for bb in top_bbs if bb['last_name']]
 
     if not top_bbs:
@@ -1307,14 +1339,18 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit):
 
             score = 0.0
 
-            # --- Overlap penalty (steep) ---
+            # --- Overlap penalty (moderate) ---
+            # Loosened from the original 200/40 weights so denser games
+            # (10+ qualifying labels) place callouts even when no
+            # collision-free position exists. Slight overlap is preferable
+            # to silently dropping labels.
             for px, py in placed:
                 dist = max(abs(cx - px) / label_half_w,
                            abs(cy - py) / label_half_h)
                 if dist < 1.0:
-                    score -= 200 * (1.0 - dist)
-                elif dist < 1.8:
-                    score -= 40 * (1.8 - dist)
+                    score -= 90 * (1.0 - dist)
+                elif dist < 1.6:
+                    score -= 18 * (1.6 - dist)
 
             # --- Boundary penalty ---
             margin_x = x_extent * 0.05
@@ -1499,10 +1535,14 @@ def spray_chart(home_outcomes, away_outcomes,
                 ab = AnnotationBbox(img, (bb['x'], bb['y']), frameon=False, zorder=10)
                 ax.add_artist(ab)
 
+                # Subtle continuous-color halo around the logo. The cmap
+                # carries alpha (transparent at xbases=0 -> opaque at HR),
+                # so outs effectively disappear and hits pop. No explicit
+                # alpha on the patch — that would override the cmap's alpha.
                 ring = plt.Circle(
                     (bb['x'], bb['y']), radius=5.5,
                     fill=False, edgecolor=color,
-                    linewidth=2.5, alpha=0.9, zorder=9
+                    linewidth=1.6, zorder=9
                 )
                 ax.add_patch(ring)
             else:
@@ -1518,12 +1558,15 @@ def spray_chart(home_outcomes, away_outcomes,
                 ring = plt.Circle(
                     (bb['x'], bb['y']), radius=5.5,
                     fill=False, edgecolor=color,
-                    linewidth=2.5, alpha=0.9, zorder=9
+                    linewidth=1.6, zorder=9
                 )
                 ax.add_patch(ring)
 
-        # Label top 3 batted balls by expected bases with smart placement
-        _place_spray_labels(ax, batted_balls[team_key], x_extent, axis_limit)
+        # Label every hit-quality ball (xbases >= 1.0 — well-struck singles
+        # and better), capped at 10 to prevent overlap on slug-fests. Quiet
+        # games fall back to top 3 by xbases so something still gets named.
+        _place_spray_labels(ax, batted_balls[team_key], x_extent, axis_limit,
+                            min_xbases=1.0, max_labels=10, fallback_top=3)
 
         ax.set_xlim(-x_extent, x_extent)
         ax.set_ylim(-3, axis_limit)
@@ -1549,25 +1592,31 @@ def spray_chart(home_outcomes, away_outcomes,
     draw_title_block(tax, "Batted Ball Spray Chart", [subtitle],
                      title_size=22, subtitle_size=12)
 
-    from matplotlib.lines import Line2D
-    legend_items = [
-        ('Out', PALETTE['out']),
-        ('Single', PALETTE['single']),
-        ('XBH', PALETTE['xbh']),
-        ('HR', PALETTE['hr'])
-    ]
-    legend_handles = [
-        Line2D([0], [0], marker='o', color='w', markerfacecolor='none',
-               markeredgecolor=color, markeredgewidth=2.5, markersize=12, label=label)
-        for label, color in legend_items
-    ]
-    # Center the legend over the full chart area (between both fields)
-    # via figure-level coordinates, not the title strip. y=0.83 sits just
-    # below the title strip and above the subplots.
-    fig.legend(handles=legend_handles, loc='center', ncol=4,
-               fontsize=11, frameon=False, title='Expected Outcome',
-               title_fontproperties={'weight': 'bold', 'size': 11},
-               bbox_to_anchor=(0.5, 0.83))
+    # Continuous Estimated Bases legend — horizontal colorbar inset.
+    # Centered at fig x=0.5 in the same vertical band the old discrete
+    # legend lived in (below the title strip, above the subplots).
+    cbar_ax = fig.add_axes([0.35, 0.808, 0.30, 0.018])
+    sm = ScalarMappable(norm=ESTIMATED_BASES_NORM, cmap=ESTIMATED_BASES_CMAP)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+    cbar.set_ticks([0, 1, 2, 3, 4])
+    cbar.set_ticklabels(['0', '1', '2', '3', '4'])
+    cbar.ax.tick_params(labelsize=10, length=0, pad=3, colors=PALETTE['text'])
+    cbar.outline.set_visible(False)
+
+    fig.text(0.5, 0.852, 'Estimated Bases',
+             fontsize=11, fontweight='bold', ha='center', va='bottom',
+             color=PALETTE['text'], fontfamily=heading_font())
+
+    # Outcome subtitle row beneath the numeric ticks (Out / 1B / 2B / 3B / HR).
+    # Five evenly-spaced x positions matching cbar tick centers.
+    for x_frac, outcome_label in zip(
+        [0.35, 0.425, 0.50, 0.575, 0.65],
+        ['Out', '1B', '2B', '3B', 'HR']
+    ):
+        fig.text(x_frac, 0.778, outcome_label,
+                 fontsize=8.5, ha='center', va='top',
+                 color=PALETTE['text_muted'], fontstyle='italic')
 
     fig.text(0.5, 0.015, 'Stadium dimensions are estimated for this visual',
              fontsize=9, fontstyle='italic', color=PALETTE['text_muted'],
