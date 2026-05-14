@@ -1337,14 +1337,18 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit,
 
             score = 0.0
 
-            # --- Overlap penalty (steep) ---
+            # --- Overlap penalty (moderate) ---
+            # Loosened from the original 200/40 weights so denser games
+            # (10+ qualifying labels) place callouts even when no
+            # collision-free position exists. Slight overlap is preferable
+            # to silently dropping labels.
             for px, py in placed:
                 dist = max(abs(cx - px) / label_half_w,
                            abs(cy - py) / label_half_h)
                 if dist < 1.0:
-                    score -= 200 * (1.0 - dist)
-                elif dist < 1.8:
-                    score -= 40 * (1.8 - dist)
+                    score -= 90 * (1.0 - dist)
+                elif dist < 1.6:
+                    score -= 18 * (1.6 - dist)
 
             # --- Boundary penalty ---
             margin_x = x_extent * 0.05
@@ -1556,10 +1560,11 @@ def spray_chart(home_outcomes, away_outcomes,
                 )
                 ax.add_patch(ring)
 
-        # Label every XBH-or-better ball (xbases >= 1.5), capped at 10 to
-        # prevent overlap on slug-fests. Quiet games fall back to top 3.
+        # Label every hit-quality ball (xbases >= 1.0 — well-struck singles
+        # and better), capped at 10 to prevent overlap on slug-fests. Quiet
+        # games fall back to top 3 by xbases so something still gets named.
         _place_spray_labels(ax, batted_balls[team_key], x_extent, axis_limit,
-                            min_xbases=1.5, max_labels=10, fallback_top=3)
+                            min_xbases=1.0, max_labels=10, fallback_top=3)
 
         ax.set_xlim(-x_extent, x_extent)
         ax.set_ylim(-3, axis_limit)
