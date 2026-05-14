@@ -1095,13 +1095,15 @@ def calculate_expected_bases_for_spray(outcome_dict, pipeline):
 # Continuous Estimated Bases colormap, anchored at PALETTE values so the
 # spray chart's ring colors stay consistent with the rest of the chart family.
 # Anchors: out (xbases=0) -> single (1) -> xbh (2) -> hr (4).
+# Alpha fades in from fully transparent at xbases=0 so out-quality balls
+# essentially disappear, letting hit-quality contact pop against the field.
 ESTIMATED_BASES_CMAP = LinearSegmentedColormap.from_list(
     'estimated_bases',
     [
-        (0.00, PALETTE['out']),     # xbases=0 (out)
-        (0.25, PALETTE['single']),  # xbases=1 (1B)
-        (0.50, PALETTE['xbh']),     # xbases=2 (2B anchor)
-        (1.00, PALETTE['hr']),      # xbases=4 (HR)
+        (0.00, (*to_rgb(PALETTE['out']),    0.00)),  # transparent at 0
+        (0.25, (*to_rgb(PALETTE['single']), 0.55)),  # 1B at xbases=1
+        (0.50, (*to_rgb(PALETTE['xbh']),    0.75)),  # 2B at xbases=2
+        (1.00, (*to_rgb(PALETTE['hr']),     0.90)),  # HR at xbases=4
     ],
     N=256,
 )
@@ -1533,14 +1535,14 @@ def spray_chart(home_outcomes, away_outcomes,
                 ab = AnnotationBbox(img, (bb['x'], bb['y']), frameon=False, zorder=10)
                 ax.add_artist(ab)
 
-                # Subtle continuous-color halo around the logo. Lighter than
-                # the previous 2.5/0.9 ring so the color reads as a tint
-                # rather than a bold outline; the saturated end of the cmap
-                # still carries weight for HRs.
+                # Subtle continuous-color halo around the logo. The cmap
+                # carries alpha (transparent at xbases=0 -> opaque at HR),
+                # so outs effectively disappear and hits pop. No explicit
+                # alpha on the patch — that would override the cmap's alpha.
                 ring = plt.Circle(
                     (bb['x'], bb['y']), radius=5.5,
                     fill=False, edgecolor=color,
-                    linewidth=1.6, alpha=0.75, zorder=9
+                    linewidth=1.6, zorder=9
                 )
                 ax.add_patch(ring)
             else:
@@ -1556,7 +1558,7 @@ def spray_chart(home_outcomes, away_outcomes,
                 ring = plt.Circle(
                     (bb['x'], bb['y']), radius=5.5,
                     fill=False, edgecolor=color,
-                    linewidth=1.6, alpha=0.75, zorder=9
+                    linewidth=1.6, zorder=9
                 )
                 ax.add_patch(ring)
 
