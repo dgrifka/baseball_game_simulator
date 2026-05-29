@@ -383,6 +383,57 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
     return total_team_outcomes.sort_values(by='Estimated Bases', ascending=False).head(15).reset_index(drop=True)
 
 
+def outcomes_by_inning(game_data, steals_and_pickoffs, home_or_away):
+    """
+    Like outcomes(), but iterates game_data in chronological order and tags every
+    outcome with its real inning. Returns a list of (outcome_data, inning) tuples,
+    stably sorted by inning. Covers strikeouts, walks, and batted balls only
+    (steals/pickoffs excluded, matching create_detailed_outcomes_df). Used by the
+    per-inning win-probability simulator; does NOT replace outcomes().
+    """
+    df = game_data.copy()
+    df = df[df['isTopInning'] == (home_or_away == 'away')]
+    # steals_and_pickoffs intentionally unused — steals/pickoffs excluded by design
+
+    tagged = []  # (sort_key_index, inning, outcome_data)
+    for order_idx, (_, row) in enumerate(df.iterrows()):
+        inning = row.get('inning')
+        if inning is None or pd.isna(inning):
+            continue
+        inning = int(inning)
+        event_type = row.get('eventType')
+        launch_speed = row.get('hitData.launchSpeed')
+
+        # 'out' with no launch data → non-contact out (strikeout-like); contact outs (sac fly, fielder's choice) have launch data and fall through to the batted-ball branch
+        if event_type == 'out' and pd.isna(launch_speed):
+            outcome_data = "strikeout"
+        elif event_type == 'walk':
+            outcome_data = "walk"
+        elif not pd.isna(launch_speed):
+            outcome_data = {
+                'launch_speed': launch_speed,
+                'launch_angle': row.get('hitData.launchAngle'),
+                'total_distance': row.get('hitData.totalDistance'),
+                'venue_name': row.get('venue.name'),
+                'coord_x': row.get('hitData.coordinates.coordX'),
+                'coord_y': row.get('hitData.coordinates.coordY'),
+                'bat_side': row.get('batSide.code'),
+                'pitcher_hand': row.get('pitchHand.code'),
+                'pitcher_id': row.get('pitcher.id'),
+                'play_id': row.get('playId'),
+                'inning': inning,
+                'is_top_inning': row.get('isTopInning'),
+            }
+        else:
+            continue  # HBP, interference, etc. — not modeled (mirrors outcomes())
+
+        tagged.append((order_idx, inning, outcome_data))
+
+    # Stable sort by inning; order_idx preserves within-inning chronological order.
+    tagged.sort(key=lambda t: (t[1], t[0]))
+    return [(outcome_data, inning) for _, inning, outcome_data in tagged]
+
+
 # =============================================================================
 # BASERUNNING
 # =============================================================================
