@@ -616,6 +616,61 @@ def simulate_game(outcomes_list, prob_cache):
     return runs
 
 
+def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
+    """
+    Simulate one team's game respecting real innings.
+
+    Args:
+        outcomes_with_inning (list): (outcome_data, inning) tuples from outcomes_by_inning,
+            sorted by inning (within-inning chronological).
+        prob_cache (dict): same key/value scheme as simulator()'s cache.
+        n_innings (int): number of inning buckets (max inning across both teams).
+
+    Returns:
+        np.ndarray of shape (n_innings,): CUMULATIVE deserved runs through each inning.
+    """
+    runs_by_inning = np.zeros(n_innings, dtype=float)
+    bases = [False, False, False]
+    prev_inning = None
+
+    for outcome, inning in outcomes_with_inning:
+        if inning != prev_inning:
+            bases = [False, False, False]  # new half-inning for this team
+            prev_inning = inning
+        i = inning - 1
+        if i < 0 or i >= n_innings:
+            raise IndexError(
+                f"simulate_game_by_inning: outcome in inning {inning} exceeds n_innings={n_innings}"
+            )
+
+        if outcome == "strikeout":
+            continue  # out: no runs, bases unchanged
+        elif outcome == "walk":
+            runs_by_inning[i] += advance_runner(bases, is_walk=True)
+        elif isinstance(outcome, dict):
+            cache_key = (outcome['launch_speed'], outcome['launch_angle'],
+                         outcome['venue_name'], outcome.get('coord_x'),
+                         outcome.get('coord_y'), outcome.get('bat_side'))
+            probabilities = prob_cache.get(cache_key)
+            if probabilities is None:
+                continue
+            rv = random.random()
+            if rv < probabilities[0]:
+                pass  # out
+            elif rv < probabilities[0] + probabilities[1]:
+                runs_by_inning[i] += advance_runner(bases, 1)
+            elif rv < probabilities[0] + probabilities[1] + probabilities[2]:
+                runs_by_inning[i] += advance_runner(bases, 2)
+            elif rv < probabilities[0] + probabilities[1] + probabilities[2] + probabilities[3]:
+                runs_by_inning[i] += advance_runner(bases, 3)
+            else:
+                runs_by_inning[i] += advance_runner(bases, 4)
+        # NOTE: stolen_base/pickoff strings are intentionally not handled — outcomes_by_inning
+        # excludes them by design. Any unrecognized outcome is silently skipped.
+
+    return np.cumsum(runs_by_inning)
+
+
 def simulator(num_simulations, home_outcomes, away_outcomes):
     """
     Run multiple game simulations with pre-computed probabilities.
