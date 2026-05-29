@@ -756,3 +756,56 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     tie_percentage = ties / num_simulations * 100
     
     return home_runs_scored, away_runs_scored, home_win_percentage, away_win_percentage, tie_percentage
+
+
+def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn):
+    """
+    Per-inning deserved win probability via one nested batch of sims.
+
+    Args:
+        num_simulations (int)
+        home_outcomes_inn, away_outcomes_inn (list): (outcome_data, inning) tuples
+            from outcomes_by_inning.
+
+    Returns:
+        (innings, home_pct, away_pct, tie_pct):
+            innings: list[int] 1..n_innings
+            *_pct: list[float] length n_innings, percentages per inning boundary.
+            A simulation that is level on cumulative deserved runs at inning N
+            (including a 0-0 start) counts toward tie_pct for that inning — so
+            home_pct/away_pct are 'currently ahead through inning N', and the tie
+            share is the genuinely-undecided mass (large early, shrinking as the
+            game resolves).
+    """
+    all_innings = [inn for _, inn in home_outcomes_inn] + [inn for _, inn in away_outcomes_inn]
+    n_innings = max(all_innings) if all_innings else 1
+
+    # Build prob cache (duplicate of simulator()'s loop, with HR tail correction).
+    prob_cache = {}
+    for outcome, _ in list(home_outcomes_inn) + list(away_outcomes_inn):
+        if isinstance(outcome, dict):
+            cache_key = (outcome['launch_speed'], outcome['launch_angle'],
+                         outcome['venue_name'], outcome.get('coord_x'),
+                         outcome.get('coord_y'), outcome.get('bat_side'))
+            if cache_key not in prob_cache:
+                features = prepare_batted_ball_features(
+                    launch_speed=outcome['launch_speed'],
+                    launch_angle=outcome['launch_angle'],
+                    venue_name=outcome['venue_name'],
+                    coord_x=outcome.get('coord_x'),
+                    coord_y=outcome.get('coord_y'),
+                    bat_side=outcome.get('bat_side'),
+                )
+                probs = pipeline.predict_proba(features)[0]
+                prob_cache[cache_key] = _apply_hr_tail_correction(probs, outcome['launch_speed'])
+
+    home_cum = np.zeros((num_simulations, n_innings), dtype=float)
+    away_cum = np.zeros((num_simulations, n_innings), dtype=float)
+    for s in range(num_simulations):
+        home_cum[s] = simulate_game_by_inning(home_outcomes_inn, prob_cache, n_innings)
+        away_cum[s] = simulate_game_by_inning(away_outcomes_inn, prob_cache, n_innings)
+
+    home_pct = (np.sum(home_cum > away_cum, axis=0) / num_simulations * 100).tolist()
+    away_pct = (np.sum(home_cum < away_cum, axis=0) / num_simulations * 100).tolist()
+    tie_pct = (np.sum(home_cum == away_cum, axis=0) / num_simulations * 100).tolist()
+    return list(range(1, n_innings + 1)), home_pct, away_pct, tie_pct
