@@ -1,17 +1,18 @@
 {
   "model_name": "MLB Batted Ball Outcome Classifier",
   "model_type": "CalibratedClassifierCV(GradientBoostingClassifier)",
-  "created_date": "2026-05-14",
+  "created_date": "2026-06-05",
   "training_samples": 125778,
   "calibration_samples": 126517,
-  "test_samples": 31916,
+  "test_samples": 46898,
   "seasons": [
     2024,
     2025,
     2026
   ],
-  "accuracy": 0.8247,
-  "log_loss": 0.4455,
+  "accuracy": 0.825,
+  "log_loss": 0.4469,
+  "feature_set": "F3",
   "features": {
     "numeric": [
       "hitData_launchSpeed",
@@ -28,12 +29,15 @@
       "oppo_hard",
       "spray_ev_interaction",
       "pulled_ground_ball",
-      "oppo_line_drive"
+      "oppo_line_drive",
+      "altitude_ft",
+      "wall_distance_ft",
+      "carry_ft",
+      "over_fence_margin"
     ],
     "categorical": [
       "launch_angle_category",
-      "spray_direction",
-      "venue_id"
+      "spray_direction"
     ]
   },
   "classes": {
@@ -46,69 +50,69 @@
   "tail_metrics": {
     "hr_rmse_by_ev_bin": {
       "85-90": {
-        "count": 1472,
-        "actual_hr_rate": 0.0,
-        "model_hr_rate": 0.0016,
-        "gap": -0.0016
+        "count": 2208,
+        "actual_hr_rate": 0.0005,
+        "model_hr_rate": 0.0027,
+        "gap": -0.0023
       },
       "90-95": {
-        "count": 1931,
-        "actual_hr_rate": 0.0088,
-        "model_hr_rate": 0.0098,
-        "gap": -0.001
+        "count": 2902,
+        "actual_hr_rate": 0.0096,
+        "model_hr_rate": 0.014,
+        "gap": -0.0043
       },
       "95-100": {
-        "count": 2255,
-        "actual_hr_rate": 0.0816,
-        "model_hr_rate": 0.079,
-        "gap": 0.0026
+        "count": 3384,
+        "actual_hr_rate": 0.0866,
+        "model_hr_rate": 0.0808,
+        "gap": 0.0058
       },
       "100-105": {
-        "count": 2055,
-        "actual_hr_rate": 0.2409,
-        "model_hr_rate": 0.2348,
-        "gap": 0.0061
+        "count": 3017,
+        "actual_hr_rate": 0.2469,
+        "model_hr_rate": 0.247,
+        "gap": -0.0
       },
       "105-110": {
-        "count": 1077,
-        "actual_hr_rate": 0.4513,
-        "model_hr_rate": 0.4409,
-        "gap": 0.0103
+        "count": 1552,
+        "actual_hr_rate": 0.471,
+        "model_hr_rate": 0.4522,
+        "gap": 0.0188
       },
       "110-115": {
-        "count": 223,
-        "actual_hr_rate": 0.5426,
-        "model_hr_rate": 0.5029,
-        "gap": 0.0397
+        "count": 311,
+        "actual_hr_rate": 0.5788,
+        "model_hr_rate": 0.5345,
+        "gap": 0.0443
       },
       "115-120": {
-        "count": 12,
-        "actual_hr_rate": 0.5,
-        "model_hr_rate": 0.5481,
-        "gap": -0.0481
+        "count": 15,
+        "actual_hr_rate": 0.4667,
+        "model_hr_rate": 0.5185,
+        "gap": -0.0518
       }
     },
-    "max_estimated_bases": 3.8763,
+    "max_estimated_bases": 3.9018,
     "extreme_calibration": {
       "0.85-0.90": {
-        "count": 179,
-        "actual": 0.9385,
+        "count": 306,
+        "actual": 0.9641,
         "predicted": 0.8753
       },
       "0.90-0.95": {
-        "count": 108,
-        "actual": 0.9907,
-        "predicted": 0.9211
+        "count": 207,
+        "actual": 0.9903,
+        "predicted": 0.9194
       },
       "0.95-1.00": {
-        "count": 7,
+        "count": 15,
         "actual": 1.0,
-        "predicted": 0.9536
+        "predicted": 0.9567
       }
     },
-    "venue_logloss_mean": 0.4459,
+    "venue_logloss_mean": 0.4472,
     "flagged_venues": {},
-    "crps_total_bases": 0.1776
+    "crps_total_bases": 0.1783
   },
   "hyperparameters": {
     "n_estimators": 100,
@@ -125,7 +129,7 @@
     "Calibrated with CalibratedClassifierCV (sigmoid)",
     "Split mode: season-forward",
     "Spray angle adjusted for batter handedness (negative = pull side)",
-    "venue_id used instead of venue_name for stability",
-    "18 features: 15 numeric + 3 categorical"
+    "venue_id replaced by park-geometry features (altitude/wall_distance/carry/over_fence_margin)",
+    "21 features: 19 numeric + 2 categorical (feature_set=F3)"
   ]
 }
