@@ -3,6 +3,8 @@ Feature engineering functions for MLB batted ball outcome prediction.
 Used by both model training (Base_Model.ipynb) and inference (game_simulator.py).
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -151,6 +153,163 @@ def is_barrel(launch_speed, launch_angle):
 
 
 # =============================================================================
+# PARK GEOMETRY + CARRY PHYSICS
+# =============================================================================
+#
+# These features encode stadium geometry (outfield-wall distance at the ball's
+# spray angle, park altitude) and a drag-adjusted carry estimate, all derivable
+# at inference from {EV, launch_angle, coord_x, coord_y, bat_side, venue_id}.
+# They replace the old `venue_id` one-hot blob in the F3 model. Training and
+# inference both call this same function, so they produce identical feature
+# values (no train/serve skew).
+
+# hc-units -> feet (non-corner-calibrated; matches Bill Petti R package).
+COORD_TO_FT = 2.495
+
+# League-median wall distance (feet) used as the fallback when a venue is not in
+# the park-wall table (e.g. neutral-site games, relocated parks) or the ray-cast
+# misses. Derived once as the median of wall_distance_ft over known-venue batted
+# balls across 2024-2026 (= 374.009 ft); a fixed constant so single-row inference
+# matches without needing a dataset-level median.
+LEAGUE_MEDIAN_WALL_FT = 374.0
+
+# --- drag-carry physics constants --------------------------------------------
+_MASS = 0.145          # kg
+_CD = 0.30             # drag coefficient
+_AREA = 0.00426        # m^2 ball cross-section
+_G = 9.81              # m/s^2
+_RHO0 = 1.225          # kg/m^3 air density at sea level
+_SCALE_HEIGHT = 8500.0  # m, exponential atmosphere scale height
+_MPH_TO_MS = 0.44704
+_FT_PER_M = 3.28084
+_FT_TO_M = 0.3048
+_CONTACT_HEIGHT_M = 1.0  # contact point height
+_DT = 0.005            # integration timestep (s)
+_MAX_STEPS = 4000      # 20 s ceiling — far beyond any real fly ball
+
+# Magnus lift is OFF: the Phase-2 bake-off showed it does NOT improve log-loss,
+# ECE, or the HR tail. The shipped carry is drag-only.
+_USE_LIFT = False
+
+
+def _load_walls(path):
+    """Return {venue_id(str): Nx2 ndarray of (x, y) wall vertices in hc units}."""
+    w = pd.read_csv(path, dtype={"venue_id": str})
+    w = w.sort_values(["venue_id", "point_order"])
+    return {vid: g[["x", "y"]].to_numpy() for vid, g in w.groupby("venue_id")}
+
+
+def _load_altitudes(path):
+    """Return {venue_id(str): elevation_ft(float)}."""
+    a = pd.read_csv(path, dtype={"venue_id": str})
+    return dict(zip(a["venue_id"], a["elevation_ft"].astype(float)))
+
+
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+try:
+    _WALLS = _load_walls(os.path.join(_DATA_DIR, "mlb_park_walls.csv"))
+    _ALTITUDES = _load_altitudes(os.path.join(_DATA_DIR, "park_altitudes.csv"))
+except (FileNotFoundError, OSError):
+    # Graceful degradation: without the CSVs, geo features fall back to the
+    # league-median wall / zero altitude (carry still computes). The model's
+    # ColumnTransformer selects by name, so this only affects the geo columns.
+    _WALLS = {}
+    _ALTITUDES = {}
+
+
+def _ray_polygon_distance(pts, angle_deg):
+    """Cast a ray from home plate at `angle_deg`; return distance (hc units) to
+    the nearest wall-polygon intersection, or None.
+
+    Ray: P(t) = HOME + t * (sin(theta), -cos(theta)), t >= 0 (0deg -> CF,
+    +angle -> right field, matching calculate_spray_angle).
+    """
+    th = np.radians(angle_deg)
+    dx, dy = np.sin(th), -np.cos(th)
+    closed = np.vstack([pts, pts[0]])
+    best = None
+    for i in range(len(closed) - 1):
+        x1, y1 = closed[i]
+        x2, y2 = closed[i + 1]
+        ex, ey = x2 - x1, y2 - y1
+        denom = dx * (-ey) - dy * (-ex)
+        if abs(denom) < 1e-9:
+            continue
+        t = ((x1 - HOME_PLATE_X) * (-ey) - (y1 - HOME_PLATE_Y) * (-ex)) / denom
+        u = (dx * (y1 - HOME_PLATE_Y) - dy * (x1 - HOME_PLATE_X)) / denom
+        if t >= 0 and -1e-9 <= u <= 1 + 1e-9:
+            if best is None or t < best:
+                best = t
+    return best
+
+
+def wall_distance_at_spray(venue_id, spray_angle_deg):
+    """Distance (FEET) from home plate to the outfield wall at `spray_angle_deg`
+    for `venue_id`. Falls back to LEAGUE_MEDIAN_WALL_FT for unknown venues or
+    ray-cast misses (so the feature never produces NaN).
+
+    The ray-cast uses spray rounded to 1 decimal, matching the training-side
+    feature builder's per-(venue, rounded-spray) cache.
+    """
+    pts = _WALLS.get(str(venue_id))
+    if pts is None:
+        return LEAGUE_MEDIAN_WALL_FT
+    d_hc = _ray_polygon_distance(pts, round(float(spray_angle_deg), 1))
+    if d_hc is None:
+        return LEAGUE_MEDIAN_WALL_FT
+    return d_hc * COORD_TO_FT
+
+
+def _drag_carry_scalar(launch_speed_mph, launch_angle_deg, elevation_ft):
+    """Single ball: drag-adjusted carry distance in feet (Euler integration)."""
+    if not np.isfinite(launch_speed_mph) or not np.isfinite(launch_angle_deg):
+        return np.nan
+    elevation_m = elevation_ft * _FT_TO_M
+    rho = _RHO0 * np.exp(-elevation_m / _SCALE_HEIGHT)
+    k = 0.5 * rho * _CD * _AREA
+
+    v0 = launch_speed_mph * _MPH_TO_MS
+    theta = np.radians(launch_angle_deg)
+    vx = v0 * np.cos(theta)
+    vy = v0 * np.sin(theta)
+    x = 0.0
+    y = _CONTACT_HEIGHT_M
+
+    for _ in range(_MAX_STEPS):
+        speed = np.hypot(vx, vy)
+        ax = -(k / _MASS) * speed * vx
+        ay = -_G - (k / _MASS) * speed * vy
+        if _USE_LIFT and speed > 1e-9:
+            S = (0.0366 * 37.0) / speed
+            Cl = 1.0 / (2.32 + 0.40 / S)
+            k_lift = 0.5 * rho * Cl * _AREA * speed * speed
+            ux, uy = vx / speed, vy / speed
+            ax += (k_lift / _MASS) * (-uy)
+            ay += (k_lift / _MASS) * (ux)
+        x_new = x + vx * _DT
+        y_new = y + vy * _DT
+        if y_new <= 0.0:
+            frac = y / (y - y_new) if (y - y_new) != 0 else 0.0
+            x = x + (x_new - x) * frac
+            return x * _FT_PER_M
+        x, y = x_new, y_new
+        vx += ax * _DT
+        vy += ay * _DT
+    return x * _FT_PER_M
+
+
+def drag_carry(launch_speed_mph, launch_angle_deg, elevation_ft=0.0):
+    """Drag-adjusted projectile carry distance in FEET (drag-only; lift off).
+
+    Strictly increasing in launch_speed at fixed angle and increasing with
+    elevation (thinner air -> more carry). Scalar in, scalar out.
+    """
+    return _drag_carry_scalar(
+        float(launch_speed_mph), float(launch_angle_deg), float(elevation_ft)
+    )
+
+
+# =============================================================================
 # MAIN FEATURE CREATION FUNCTION
 # =============================================================================
 
@@ -200,6 +359,14 @@ def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y,
     angle_rad = np.radians(launch_angle)
     hr_distance_proxy = launch_speed * np.sin(angle_rad)
 
+    # Park-geometry + carry features (F3 model). venue_id is kept in the output
+    # below as well so the legacy 18-feature model keeps working — each model's
+    # ColumnTransformer selects only the columns it was trained on.
+    altitude_ft = float(_ALTITUDES.get(str(venue_id), 0.0))
+    wall_distance_ft = wall_distance_at_spray(venue_id, spray_angle)
+    carry_ft = drag_carry(launch_speed, launch_angle, altitude_ft)
+    over_fence_margin = carry_ft - wall_distance_ft
+
     # Create DataFrame matching model's expected feature order
     return pd.DataFrame({
         # Numeric features (order must match training)
@@ -218,6 +385,11 @@ def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y,
         'spray_ev_interaction': [spray_ev_interaction],
         'pulled_ground_ball': [pulled_ground_ball],
         'oppo_line_drive': [oppo_line_drive],
+        # Park-geometry + carry features (F3 model)
+        'altitude_ft': [altitude_ft],
+        'wall_distance_ft': [wall_distance_ft],
+        'carry_ft': [carry_ft],
+        'over_fence_margin': [over_fence_margin],
         # Categorical features
         'launch_angle_category': [launch_category],
         'spray_direction': [spray_direction],
