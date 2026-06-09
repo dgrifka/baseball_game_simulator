@@ -26,7 +26,7 @@ venue_names = ['Oriole Park at Camden Yards', 'Great American Ball Park',
        'Fenway Park', 'George M. Steinbrenner Field',
        # Neutral-site venues
        'Alfredo Harp Helu Stadium', 'Estadio Alfredo Harp Helu',
-       'Bowman Field', 'Muncy Bank Ballpark',
+       'Bowman Field', 'Muncy Bank Ballpark', 'Journey Bank Ballpark',
        'Field of Dreams', 'London Stadium', 'Rickwood Field']
 
 ## Colors and Logo
@@ -150,6 +150,7 @@ VENUE_NAME_TO_ID = {
     # Neutral-site venues (use generic venue for venue-neutral predictions)
     'Bowman Field': 'neutral',
     'Muncy Bank Ballpark': 'neutral',
+    'Journey Bank Ballpark': 'neutral',       # Little League Classic (renamed from Muncy Bank)
     'Field of Dreams': 'neutral',
     'London Stadium': 'neutral',
     'Rickwood Field': 'neutral',
@@ -172,6 +173,7 @@ NEUTRAL_SITE_VENUES = {
     'Field of Dreams',                # Field of Dreams game (Dyersville, Iowa)
     'London Stadium',                 # London Series
     'Muncy Bank Ballpark',            # alternate Bowman Field name
+    'Journey Bank Ballpark',          # current Little League Classic name (Williamsport)
     'Rickwood Field',                 # Birmingham, Alabama tribute game
 }
 
