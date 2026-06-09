@@ -142,12 +142,12 @@ VENUE_NAME_TO_ID = {
     'George M. Steinbrenner Field': '3313',  # → Yankee Stadium
     'Sutter Health Park': '2529',             # Sacramento (Athletics home, 2025+)
     'Las Vegas Ballpark': '5355',             # Las Vegas (Athletics home series, ~3010 ft alt)
+    'Estadio Alfredo Harp Helu': '5340',      # Mexico City Series (~7349 ft alt — own geometry)
+    'Alfredo Harp Helu Stadium': '5340',      # alternate name for venue 5340
     'Daikin Park': '2392',                    # → Minute Maid Park
     'Rate Field': '4',                        # → Guaranteed Rate Field
     'UNIQLO FIELD AT DODGER STADIUM': '22',  # → Dodger Stadium
     # Neutral-site venues (use generic venue for venue-neutral predictions)
-    'Alfredo Harp Helu Stadium': 'neutral',
-    'Estadio Alfredo Harp Helu': 'neutral',
     'Bowman Field': 'neutral',
     'Muncy Bank Ballpark': 'neutral',
     'Field of Dreams': 'neutral',
@@ -167,8 +167,7 @@ VALID_VENUE_IDS = {int(vid) for vid in VENUE_NAME_TO_ID.values() if vid != 'neut
 
 # Neutral-site venues (non-MLB parks used for special events)
 NEUTRAL_SITE_VENUES = {
-    'Alfredo Harp Helu Stadium',     # Mexico City Series
-    'Estadio Alfredo Harp Helu',     # alternate name
+    # Mexico City (Estadio Alfredo Harp Helu, id 5340) now has its own geometry — see VENUE_NAME_TO_ID
     'Bowman Field',                   # Little League Classic
     'Field of Dreams',                # Field of Dreams game (Dyersville, Iowa)
     'London Stadium',                 # London Series
@@ -1760,6 +1759,34 @@ STADIUM_DIMENSIONS = {
         (45, 340),     # RF foul pole
     ],
 
+    'Estadio Alfredo Harp Helu': [  # Mexico City Series (~7349 ft alt; ~325/400 symmetric)
+        (-45.0, 325),    # LF foul pole
+        (-41.25, 332),
+        (-37.5, 340),
+        (-33.75, 348),
+        (-30.0, 355),
+        (-26.25, 362),
+        (-22.5, 370),    # LCF power alley
+        (-18.75, 375),
+        (-15.0, 380),
+        (-11.25, 385),
+        (-7.5, 390),
+        (-3.75, 395),
+        (0.0, 400),      # CF
+        (3.75, 395),
+        (7.5, 390),
+        (11.25, 385),
+        (15.0, 380),
+        (18.75, 375),
+        (22.5, 370),     # RCF power alley
+        (26.25, 362),
+        (30.0, 355),
+        (33.75, 348),
+        (37.5, 340),
+        (41.25, 332),
+        (45.0, 325),     # RF foul pole
+    ],
+
     # ----- Venue aliases -----
 
     # Daikin Park → same dimensions as Minute Maid Park
@@ -1771,6 +1798,7 @@ STADIUM_DIMENSIONS = {
 STADIUM_DIMENSIONS['Daikin Park'] = STADIUM_DIMENSIONS['Minute Maid Park']
 STADIUM_DIMENSIONS['Rate Field'] = STADIUM_DIMENSIONS['Guaranteed Rate Field']
 STADIUM_DIMENSIONS['George M. Steinbrenner Field'] = STADIUM_DIMENSIONS['Yankee Stadium']
+STADIUM_DIMENSIONS['Alfredo Harp Helu Stadium'] = STADIUM_DIMENSIONS['Estadio Alfredo Harp Helu']
 
 DEFAULT_STADIUM_DIMENSIONS = [
     (-45, 330), (-35, 352), (-22.5, 375), (-15, 385), (-7, 395),
