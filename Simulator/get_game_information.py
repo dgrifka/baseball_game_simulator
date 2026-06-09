@@ -90,7 +90,7 @@ def fetch_games(days_ago, all_columns=False):
     # Handle stadium name mapping (normalize display names for VENUE_NAME_TO_ID lookup)
     stadium_mapping = {
         'George M. Steinbrenner Field': 'Yankee Stadium',
-        'Sutter Health Park': 'Oakland Coliseum',
+        # Sutter Health Park now has its own id 2529 geometry (was proxied to Oakland Coliseum)
         'Daikin Park': 'Minute Maid Park',
         'Rate Field': 'Guaranteed Rate Field',
         'UNIQLO FIELD AT DODGER STADIUM': 'Dodger Stadium',
