@@ -17,6 +17,7 @@ venue_names = ['Oriole Park at Camden Yards', 'Great American Ball Park',
        'Tropicana Field',
        'Kauffman Stadium', 'Rate Field', 'loanDepot park',
        'Daikin Park', 'Globe Life Field', 'Sutter Health Park',
+       'Las Vegas Ballpark',
        'Chase Field', 'T-Mobile Park', 'Citi Field', 'Citizens Bank Park',
        'Wrigley Field', 'Nationals Park', 'American Family Field',
        'Target Field', 'Busch Stadium', 'Yankee Stadium', 'Comerica Park',
@@ -140,6 +141,7 @@ VENUE_NAME_TO_ID = {
     # Temporary/alternate venues (map to similar parks)
     'George M. Steinbrenner Field': '3313',  # → Yankee Stadium
     'Sutter Health Park': '2529',             # Sacramento (Athletics home, 2025+)
+    'Las Vegas Ballpark': '5355',             # Las Vegas (Athletics home series, ~3010 ft alt)
     'Daikin Park': '2392',                    # → Minute Maid Park
     'Rate Field': '4',                        # → Guaranteed Rate Field
     'UNIQLO FIELD AT DODGER STADIUM': '22',  # → Dodger Stadium
@@ -1728,6 +1730,34 @@ STADIUM_DIMENSIONS = {
         (33.5, 330),
         (35.0, 328),
         (45, 325),     # RF foul pole
+    ],
+
+    'Las Vegas Ballpark': [  # A's home series 2026 (Las Vegas, ~3010 ft alt)
+        (-45, 340),    # LF foul pole
+        (-41.25, 347),
+        (-37.5, 353),
+        (-33.75, 360),
+        (-30, 367),
+        (-26.25, 373),
+        (-22.5, 380),   # LCF power alley
+        (-18.75, 386),
+        (-15, 392),
+        (-11.25, 398),
+        (-7.5, 403),
+        (-3.75, 409),
+        (0, 415),    # CF (official: 415)
+        (3.75, 409),
+        (7.5, 403),
+        (11.25, 398),
+        (15, 392),
+        (18.75, 386),
+        (22.5, 380),   # RCF power alley
+        (26.25, 373),
+        (30, 367),
+        (33.75, 360),
+        (37.5, 353),
+        (41.25, 347),
+        (45, 340),     # RF foul pole
     ],
 
     # ----- Venue aliases -----
