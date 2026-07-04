@@ -385,22 +385,35 @@ def outcome_rankings(home_detailed_df, away_detailed_df):
 
 def outcomes_by_inning(game_data, steals_and_pickoffs, home_or_away):
     """
-    Like outcomes(), but iterates game_data in chronological order and tags every
-    outcome with its real inning. Returns a list of (outcome_data, inning) tuples,
-    stably sorted by inning. Covers strikeouts, walks, and batted balls only
-    (steals/pickoffs excluded, matching create_detailed_outcomes_df). Used by the
-    per-inning win-probability simulator; does NOT replace outcomes().
+    Like outcomes(), but iterates game_data AND steals_and_pickoffs in chronological
+    order and tags every outcome (batting AND baserunning) with its real inning.
+    Returns a list of (outcome_data, inning) tuples, stably sorted by inning and,
+    within an inning, by at-bat number (ab_num) — with a stolen_base/pickoff event
+    sorting BEFORE the plate-appearance outcome sharing its ab_num, since a
+    baserunning event is attempted mid-at-bat, before that at-bat resolves. Falls
+    back to encounter order when ab_num is unavailable (matches v1's stable
+    ordering). Covers strikeouts, walks, batted balls, stolen bases, and pickoffs.
+    Used by the per-inning win-probability simulator; does NOT replace outcomes().
     """
     df = game_data.copy()
     df = df[df['isTopInning'] == (home_or_away == 'away')]
-    # steals_and_pickoffs intentionally unused — steals/pickoffs excluded by design
 
-    tagged = []  # (sort_key_index, inning, outcome_data)
+    if home_or_away == 'home':
+        baserunning_events = steals_and_pickoffs[steals_and_pickoffs['isTopInning'] == False]
+    else:
+        baserunning_events = steals_and_pickoffs[steals_and_pickoffs['isTopInning'] == True]
+
+    # (inning, ab_num, is_pa, order_idx, outcome_data) — is_pa=0 for baserunning
+    # events so they sort before a same-ab_num plate-appearance outcome (is_pa=1).
+    tagged = []
     for order_idx, (_, row) in enumerate(df.iterrows()):
         inning = row.get('inning')
         if inning is None or pd.isna(inning):
             continue
         inning = int(inning)
+        ab_num = row.get('ab_num')
+        if pd.isna(ab_num):
+            ab_num = order_idx
         event_type = row.get('eventType')
         launch_speed = row.get('hitData.launchSpeed')
 
@@ -427,11 +440,22 @@ def outcomes_by_inning(game_data, steals_and_pickoffs, home_or_away):
         else:
             continue  # HBP, interference, etc. — not modeled (mirrors outcomes())
 
-        tagged.append((order_idx, inning, outcome_data))
+        tagged.append((inning, ab_num, 1, order_idx, outcome_data))
 
-    # Stable sort by inning; order_idx preserves within-inning chronological order.
-    tagged.sort(key=lambda t: (t[1], t[0]))
-    return [(outcome_data, inning) for _, inning, outcome_data in tagged]
+    if not baserunning_events.empty:
+        for order_idx, (_, row) in enumerate(baserunning_events.iterrows()):
+            inning = row.get('inning')
+            if inning is None or pd.isna(inning):
+                continue
+            inning = int(inning)
+            ab_num = row.get('ab_num')
+            if pd.isna(ab_num):
+                ab_num = order_idx
+            tagged.append((inning, ab_num, 0, order_idx, row['play']))
+
+    # Stable sort: inning, then ab_num, then baserunning (0) before PA (1) at a tie.
+    tagged.sort(key=lambda t: (t[0], t[1], t[2]))
+    return [(outcome_data, inning) for inning, _, _, _, outcome_data in tagged]
 
 
 # =============================================================================
@@ -622,7 +646,8 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
 
     Args:
         outcomes_with_inning (list): (outcome_data, inning) tuples from outcomes_by_inning,
-            sorted by inning (within-inning chronological).
+            sorted by inning (within-inning chronological, baserunning events
+            interleaved before the same-at-bat plate-appearance outcome).
         prob_cache (dict): same key/value scheme as simulator()'s cache.
         n_innings (int): number of inning buckets (max inning across both teams).
 
@@ -647,6 +672,15 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
             continue  # out: no runs, bases unchanged
         elif outcome == "walk":
             runs_by_inning[i] += advance_runner(bases, is_walk=True)
+        elif outcome == "stolen_base":
+            if any(bases):
+                runs_by_inning[i] += attempt_steal(bases)
+        elif outcome == "pickoff":
+            # The headline simulate_game() also charges an out here; this
+            # inning-structured sim has no out counter (bases only reset at
+            # half-inning boundaries), so a pickoff just removes the lead runner.
+            if any(bases):
+                attempt_pickoff(bases)
         elif isinstance(outcome, dict):
             cache_key = (outcome['launch_speed'], outcome['launch_angle'],
                          outcome['venue_name'], outcome.get('coord_x'),
@@ -665,8 +699,7 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
                 runs_by_inning[i] += advance_runner(bases, 3)
             else:
                 runs_by_inning[i] += advance_runner(bases, 4)
-        # NOTE: stolen_base/pickoff strings are intentionally not handled — outcomes_by_inning
-        # excludes them by design. Any unrecognized outcome is silently skipped.
+        # Any other unrecognized outcome is silently skipped.
 
     return np.cumsum(runs_by_inning)
 
@@ -758,46 +791,52 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     return home_runs_scored, away_runs_scored, home_win_percentage, away_win_percentage, tie_percentage
 
 
-def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn):
+def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, prob_cache=None):
     """
-    Per-inning deserved win probability via one nested batch of sims.
+    Per-inning deserved-run trajectories via one nested batch of sims.
 
     Args:
         num_simulations (int)
         home_outcomes_inn, away_outcomes_inn (list): (outcome_data, inning) tuples
             from outcomes_by_inning.
+        prob_cache (dict, optional): pre-computed probabilities keyed the same way
+            as simulator()'s cache. If None (default), built here exactly as
+            simulator() does (same cache-key tuple, prepare_batted_ball_features,
+            HR tail correction). If provided, used as-is — callers that already
+            built an identical cache for simulator() should pass it in to avoid
+            duplicate predict_proba calls.
 
     Returns:
-        (innings, home_pct, away_pct, tie_pct):
+        (innings, home_cum, away_cum):
             innings: list[int] 1..n_innings
-            *_pct: list[float] length n_innings, percentages per inning boundary.
-            A simulation that is level on cumulative deserved runs at inning N
-            (including a 0-0 start) counts toward tie_pct for that inning — so
-            home_pct/away_pct are 'currently ahead through inning N', and the tie
-            share is the genuinely-undecided mass (large early, shrinking as the
-            game resolves).
+            home_cum, away_cum: np.ndarray of shape (num_simulations, n_innings) —
+                CUMULATIVE deserved runs per simulation through each inning boundary.
+        Collapsing these into win/tie percentages (and the tie-counting convention
+        for a simulation level on cumulative runs at inning N) is the caller's
+        responsibility.
     """
     all_innings = [inn for _, inn in home_outcomes_inn] + [inn for _, inn in away_outcomes_inn]
     n_innings = max(all_innings) if all_innings else 1
 
-    # Build prob cache (duplicate of simulator()'s loop, with HR tail correction).
-    prob_cache = {}
-    for outcome, _ in list(home_outcomes_inn) + list(away_outcomes_inn):
-        if isinstance(outcome, dict):
-            cache_key = (outcome['launch_speed'], outcome['launch_angle'],
-                         outcome['venue_name'], outcome.get('coord_x'),
-                         outcome.get('coord_y'), outcome.get('bat_side'))
-            if cache_key not in prob_cache:
-                features = prepare_batted_ball_features(
-                    launch_speed=outcome['launch_speed'],
-                    launch_angle=outcome['launch_angle'],
-                    venue_name=outcome['venue_name'],
-                    coord_x=outcome.get('coord_x'),
-                    coord_y=outcome.get('coord_y'),
-                    bat_side=outcome.get('bat_side'),
-                )
-                probs = pipeline.predict_proba(features)[0]
-                prob_cache[cache_key] = _apply_hr_tail_correction(probs, outcome['launch_speed'])
+    if prob_cache is None:
+        # Build prob cache (duplicate of simulator()'s loop, with HR tail correction).
+        prob_cache = {}
+        for outcome, _ in list(home_outcomes_inn) + list(away_outcomes_inn):
+            if isinstance(outcome, dict):
+                cache_key = (outcome['launch_speed'], outcome['launch_angle'],
+                             outcome['venue_name'], outcome.get('coord_x'),
+                             outcome.get('coord_y'), outcome.get('bat_side'))
+                if cache_key not in prob_cache:
+                    features = prepare_batted_ball_features(
+                        launch_speed=outcome['launch_speed'],
+                        launch_angle=outcome['launch_angle'],
+                        venue_name=outcome['venue_name'],
+                        coord_x=outcome.get('coord_x'),
+                        coord_y=outcome.get('coord_y'),
+                        bat_side=outcome.get('bat_side'),
+                    )
+                    probs = pipeline.predict_proba(features)[0]
+                    prob_cache[cache_key] = _apply_hr_tail_correction(probs, outcome['launch_speed'])
 
     home_cum = np.zeros((num_simulations, n_innings), dtype=float)
     away_cum = np.zeros((num_simulations, n_innings), dtype=float)
@@ -805,7 +844,4 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn):
         home_cum[s] = simulate_game_by_inning(home_outcomes_inn, prob_cache, n_innings)
         away_cum[s] = simulate_game_by_inning(away_outcomes_inn, prob_cache, n_innings)
 
-    home_pct = (np.sum(home_cum > away_cum, axis=0) / num_simulations * 100).tolist()
-    away_pct = (np.sum(home_cum < away_cum, axis=0) / num_simulations * 100).tolist()
-    tie_pct = (np.sum(home_cum == away_cum, axis=0) / num_simulations * 100).tolist()
-    return list(range(1, n_innings + 1)), home_pct, away_pct, tie_pct
+    return list(range(1, n_innings + 1)), home_cum, away_cum
