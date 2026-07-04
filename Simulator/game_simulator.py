@@ -3,7 +3,9 @@ MLB game simulation engine.
 Simulates batted ball outcomes using a gradient boosting model trained on Statcast data.
 """
 
+import itertools
 import random
+import warnings
 import joblib
 import pandas as pd
 import numpy as np
@@ -390,10 +392,22 @@ def outcomes_by_inning(game_data, steals_and_pickoffs, home_or_away):
     Returns a list of (outcome_data, inning) tuples, stably sorted by inning and,
     within an inning, by at-bat number (ab_num) — with a stolen_base/pickoff event
     sorting BEFORE the plate-appearance outcome sharing its ab_num, since a
-    baserunning event is attempted mid-at-bat, before that at-bat resolves. Falls
-    back to encounter order when ab_num is unavailable (matches v1's stable
-    ordering). Covers strikeouts, walks, batted balls, stolen bases, and pickoffs.
-    Used by the per-inning win-probability simulator; does NOT replace outcomes().
+    baserunning event is attempted mid-at-bat, before that at-bat resolves.
+
+    ab_num is expected to always be present in production data. If a row's
+    ab_num is missing/NaN, this raises a RuntimeWarning (via warnings.warn) and
+    substitutes a synthetic ab_num drawn from a single counter SHARED across
+    both the plate-appearance loop and the baserunning loop below — not two
+    independently-reset counters — so synthetic values can never collide
+    between the two event types. Synthetic values increase monotonically in
+    the order rows are encountered: all plate-appearance rows (in game_data
+    order) first, then all baserunning rows (in steals_and_pickoffs order).
+    This guarantees a deterministic, collision-free sort, but it is only an
+    approximation of true chronological order — it does NOT reconstruct real
+    interleaving between plate appearances and baserunning events when ab_num
+    is unavailable for both. Covers strikeouts, walks, batted balls, stolen
+    bases, and pickoffs. Used by the per-inning win-probability simulator;
+    does NOT replace outcomes().
     """
     df = game_data.copy()
     df = df[df['isTopInning'] == (home_or_away == 'away')]
@@ -403,17 +417,29 @@ def outcomes_by_inning(game_data, steals_and_pickoffs, home_or_away):
     else:
         baserunning_events = steals_and_pickoffs[steals_and_pickoffs['isTopInning'] == True]
 
-    # (inning, ab_num, is_pa, order_idx, outcome_data) — is_pa=0 for baserunning
-    # events so they sort before a same-ab_num plate-appearance outcome (is_pa=1).
+    # (inning, ab_num, is_pa, outcome_data) — is_pa=0 for baserunning events so
+    # they sort before a same-ab_num plate-appearance outcome (is_pa=1).
+    # `fallback_ab_num` is a single counter shared by BOTH loops below so a
+    # synthetic ab_num (substituted only when the real ab_num is missing) can
+    # never collide between a plate-appearance row and a baserunning row.
     tagged = []
-    for order_idx, (_, row) in enumerate(df.iterrows()):
+    fallback_ab_num = itertools.count()
+    for _, row in df.iterrows():
         inning = row.get('inning')
         if inning is None or pd.isna(inning):
             continue
         inning = int(inning)
         ab_num = row.get('ab_num')
         if pd.isna(ab_num):
-            ab_num = order_idx
+            warnings.warn(
+                f"outcomes_by_inning: plate-appearance row missing ab_num "
+                f"(inning {inning}) — substituting a synthetic ab_num from a "
+                f"shared fallback counter; production data should always "
+                f"have ab_num.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            ab_num = next(fallback_ab_num)
         event_type = row.get('eventType')
         launch_speed = row.get('hitData.launchSpeed')
 
@@ -440,22 +466,29 @@ def outcomes_by_inning(game_data, steals_and_pickoffs, home_or_away):
         else:
             continue  # HBP, interference, etc. — not modeled (mirrors outcomes())
 
-        tagged.append((inning, ab_num, 1, order_idx, outcome_data))
+        tagged.append((inning, ab_num, 1, outcome_data))
 
-    if not baserunning_events.empty:
-        for order_idx, (_, row) in enumerate(baserunning_events.iterrows()):
-            inning = row.get('inning')
-            if inning is None or pd.isna(inning):
-                continue
-            inning = int(inning)
-            ab_num = row.get('ab_num')
-            if pd.isna(ab_num):
-                ab_num = order_idx
-            tagged.append((inning, ab_num, 0, order_idx, row['play']))
+    for _, row in baserunning_events.iterrows():
+        inning = row.get('inning')
+        if inning is None or pd.isna(inning):
+            continue
+        inning = int(inning)
+        ab_num = row.get('ab_num')
+        if pd.isna(ab_num):
+            warnings.warn(
+                f"outcomes_by_inning: baserunning row missing ab_num "
+                f"(inning {inning}) — substituting a synthetic ab_num from a "
+                f"shared fallback counter; production data should always "
+                f"have ab_num.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            ab_num = next(fallback_ab_num)
+        tagged.append((inning, ab_num, 0, row['play']))
 
     # Stable sort: inning, then ab_num, then baserunning (0) before PA (1) at a tie.
     tagged.sort(key=lambda t: (t[0], t[1], t[2]))
-    return [(outcome_data, inning) for inning, _, _, _, outcome_data in tagged]
+    return [(outcome_data, inning) for inning, _, _, outcome_data in tagged]
 
 
 # =============================================================================
