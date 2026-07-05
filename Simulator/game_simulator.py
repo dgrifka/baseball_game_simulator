@@ -609,31 +609,121 @@ def advance_runner(bases, count=1, is_walk=False):
 # SIMULATION ENGINE
 # =============================================================================
 
-def simulate_game(outcomes_list, prob_cache):
+def _inject_error_reaches(sampled, error_reaches, error_rng):
+    """
+    Flip up to `error_reaches` sampled batted-ball outs to singles, in place.
+
+    Implements the spec's reached-on-error injection: each actual ROE in the
+    real game converts one uniformly-chosen simulated out into a gifted single.
+    Only entries of the form ('bbe', 0) are eligible — strikeouts are never
+    flipped (a batter-ROE is a ball in play by definition). If fewer eligible
+    outs exist than error_reaches, flips all of them (shortfall is skipped).
+
+    Args:
+        sampled (list): phase-1 sampled outcomes; BBE entries are ('bbe', b)
+            with b in 0..4, non-BBE entries are the event strings.
+        error_reaches (int): number of flips to attempt.
+        error_rng (random.Random): dedicated RNG stream (NOT the global one) so
+            with/without-injection runs share identical phase-1 draws.
+
+    Returns:
+        int: number of flips performed.
+    """
+    if not error_reaches:
+        return 0
+    out_ix = [i for i, s in enumerate(sampled) if s == ('bbe', 0)]
+    n_flips = min(error_reaches, len(out_ix))
+    for i in error_rng.sample(out_ix, n_flips):
+        sampled[i] = ('bbe', 1)
+    return n_flips
+
+
+def simulate_game(outcomes_list, prob_cache, error_reaches=0, error_rng=None):
     """
     Simulate one game using pre-computed probabilities.
-    
+
+    Two-phase structure:
+      Phase 1 (sampling): permute the outcome indices and draw each event's
+        result (strikeout/walk/stolen_base/pickoff pass through unchanged;
+        batted-ball events resolve one `random.random()` draw against the
+        cached cumulative CDF into a `('bbe', b)` tuple, b in 0..4). Cache
+        misses are skipped, exactly as before.
+      Phase 2 (error injection): if `error_reaches` > 0, flip up to that many
+        sampled outs to singles via `_inject_error_reaches`, using the
+        caller-supplied `error_rng` so the phase-1 draws are unaffected and
+        reproducible across paired with/without-injection runs.
+      Phase 3 (state machine): walk the (possibly modified) sampled sequence
+        through the same out/base-state logic as before, unchanged.
+
+    At the defaults (error_reaches=0, error_rng=None) this reproduces the
+    prior single-phase implementation's *distribution* exactly, though not
+    bit-for-bit identical draw-for-draw — the two-phase split changes the
+    order in which `random.random()` is consumed relative to
+    `np.random.permutation`.
+
     Args:
         outcomes_list (list): List of outcome data
         prob_cache (dict): Pre-computed probabilities keyed by outcome
-    
+        error_reaches (int): number of simulated outs to flip to singles via
+            reached-on-error injection. Default 0 (no injection).
+        error_rng (random.Random): dedicated RNG stream for error injection.
+            Required (non-None) whenever error_reaches > 0.
+
     Returns:
         int: Runs scored in simulated game
     """
+    if error_reaches > 0 and error_rng is None:
+        raise ValueError("error_reaches requires an explicit error_rng")
+
+    n_outcomes = len(outcomes_list)
+    indices = np.random.permutation(n_outcomes)
+
+    # Phase 1: sampling
+    sampled = []
+    for idx in indices:
+        outcome = outcomes_list[idx]
+
+        if outcome in ("strikeout", "walk", "stolen_base", "pickoff"):
+            sampled.append(outcome)
+        elif isinstance(outcome, (dict, tuple)):
+            if isinstance(outcome, dict):
+                cache_key = (outcome['launch_speed'], outcome['launch_angle'],
+                             outcome['venue_name'], outcome.get('coord_x'),
+                             outcome.get('coord_y'), outcome.get('bat_side'))
+            else:
+                cache_key = outcome
+
+            probabilities = prob_cache.get(cache_key)
+            if probabilities is None:
+                continue
+
+            random_value = random.random()
+
+            if random_value < probabilities[0]:
+                sampled.append(('bbe', 0))
+            elif random_value < probabilities[0] + probabilities[1]:
+                sampled.append(('bbe', 1))
+            elif random_value < probabilities[0] + probabilities[1] + probabilities[2]:
+                sampled.append(('bbe', 2))
+            elif random_value < probabilities[0] + probabilities[1] + probabilities[2] + probabilities[3]:
+                sampled.append(('bbe', 3))
+            else:
+                sampled.append(('bbe', 4))
+
+    # Phase 2: error injection
+    if error_reaches > 0:
+        _inject_error_reaches(sampled, error_reaches, error_rng)
+
+    # Phase 3: state machine
     outs = 0
     runs = 0
     bases = [False, False, False]
-    
-    n_outcomes = len(outcomes_list)
-    indices = np.random.permutation(n_outcomes)
-    
-    for idx in indices:
+
+    for outcome in sampled:
         if outs == 3:
             outs = 0
             bases = [False, False, False]
-        
-        outcome = outcomes_list[idx]
-        
+
         if outcome == "strikeout":
             outs += 1
         elif outcome == "walk":
@@ -644,32 +734,13 @@ def simulate_game(outcomes_list, prob_cache):
         elif outcome == "pickoff":
             if any(bases):
                 outs += attempt_pickoff(bases)
-        elif isinstance(outcome, (dict, tuple)):
-            # Get cache key
-            if isinstance(outcome, dict):
-                cache_key = (outcome['launch_speed'], outcome['launch_angle'],
-                             outcome['venue_name'], outcome.get('coord_x'),
-                             outcome.get('coord_y'), outcome.get('bat_side'))
-            else:
-                cache_key = outcome
-            
-            probabilities = prob_cache.get(cache_key)
-            if probabilities is None:
-                continue
-                
-            random_value = random.random()
-            
-            if random_value < probabilities[0]:
+        elif isinstance(outcome, tuple) and outcome[0] == 'bbe':
+            b = outcome[1]
+            if b == 0:
                 outs += 1
-            elif random_value < probabilities[0] + probabilities[1]:
-                runs += advance_runner(bases, 1)
-            elif random_value < probabilities[0] + probabilities[1] + probabilities[2]:
-                runs += advance_runner(bases, 2)
-            elif random_value < probabilities[0] + probabilities[1] + probabilities[2] + probabilities[3]:
-                runs += advance_runner(bases, 3)
             else:
-                runs += advance_runner(bases, 4)
-    
+                runs += advance_runner(bases, b)
+
     return runs
 
 
@@ -737,15 +808,23 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
     return np.cumsum(runs_by_inning)
 
 
-def simulator(num_simulations, home_outcomes, away_outcomes):
+def simulator(num_simulations, home_outcomes, away_outcomes,
+              home_error_reaches=0, away_error_reaches=0, error_seed=None):
     """
     Run multiple game simulations with pre-computed probabilities.
-    
+
     Args:
         num_simulations (int): Number of games to simulate
         home_outcomes (list): List of home team batting outcomes
         away_outcomes (list): List of away team batting outcomes
-        
+        home_error_reaches (int): number of reached-on-error injections to
+            apply to the home team's simulated outs per game. Default 0
+            (no injection — preserves existing behavior for external callers).
+        away_error_reaches (int): same as home_error_reaches, for the away team.
+        error_seed (int): seed for the shared error-injection RNG stream used
+            by both teams' `simulate_game` calls. Only consulted when at least
+            one of home_error_reaches/away_error_reaches is nonzero.
+
     Returns:
         tuple: (home_runs_array, away_runs_array, home_win_pct, away_win_pct, tie_pct)
     """
@@ -800,17 +879,21 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     # Initialize arrays for results
     home_runs_scored = np.zeros(num_simulations, dtype=int)
     away_runs_scored = np.zeros(num_simulations, dtype=int)
-    
+
+    error_rng = random.Random(error_seed) if (home_error_reaches or away_error_reaches) else None
+
     # Run simulations with progress bar
-    for i in tqdm(range(num_simulations), 
-                  desc="Simulating games", 
+    for i in tqdm(range(num_simulations),
+                  desc="Simulating games",
                   unit="sim",
                   position=0,
                   leave=True,
                   ncols=80,
                   ascii=True):
-        home_runs_scored[i] = simulate_game(home_outcomes_clean, prob_cache)
-        away_runs_scored[i] = simulate_game(away_outcomes_clean, prob_cache)
+        home_runs_scored[i] = simulate_game(home_outcomes_clean, prob_cache,
+                                             home_error_reaches, error_rng)
+        away_runs_scored[i] = simulate_game(away_outcomes_clean, prob_cache,
+                                             away_error_reaches, error_rng)
     
     # Calculate win percentages
     home_wins = np.sum(home_runs_scored > away_runs_scored)
