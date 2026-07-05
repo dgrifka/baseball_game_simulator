@@ -805,9 +805,9 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings,
 
     At the defaults (error_innings=None, error_rng=None) this reproduces the
     prior single-phase implementation's *distribution* exactly, though not
-    bit-for-bit identical draw-for-draw — the two-phase split changes the
-    order in which `random.random()` is consumed relative to
-    `np.random.permutation`.
+    bit-for-bit identical draw-for-draw — the two-phase split moves all
+    batted-ball CDF draws ahead of the advance_runner/attempt_steal draws,
+    changing the order in which `random.random()` is consumed.
 
     Args:
         outcomes_with_inning (list): (outcome_data, inning) tuples from outcomes_by_inning,
