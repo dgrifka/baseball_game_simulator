@@ -744,9 +744,67 @@ def simulate_game(outcomes_list, prob_cache, error_reaches=0, error_rng=None):
     return runs
 
 
-def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
+def _inject_error_reaches_by_inning(sampled, error_innings, error_rng):
+    """
+    Inning-constrained variant of _inject_error_reaches, in place.
+
+    `sampled` entries are (event, inning) pairs from simulate_game_by_inning's
+    phase 1; event is ('bbe', b) or a non-BBE event string. For each inning in
+    `error_innings` (one entry per actual ROE; duplicates allowed), flip one
+    uniformly-chosen ('bbe', 0) event in that inning to ('bbe', 1). An inning
+    with no remaining eligible out skips that injection (spec: shortfall skip).
+
+    Args:
+        sampled (list): phase-1 sampled (event, inning) pairs.
+        error_innings (list[int]): inning number per actual ROE to inject.
+        error_rng (random.Random): dedicated RNG stream (NOT the global one) so
+            with/without-injection runs share identical phase-1 draws.
+
+    Returns:
+        int: number of flips performed.
+    """
+    flips = 0
+    for err_inning in error_innings:
+        out_ix = [i for i, (ev, inn) in enumerate(sampled)
+                  if inn == err_inning and ev == ('bbe', 0)]
+        if not out_ix:
+            continue
+        i = error_rng.choice(out_ix)
+        sampled[i] = (('bbe', 1), sampled[i][1])
+        flips += 1
+    return flips
+
+
+def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings,
+                             error_innings=None, error_rng=None):
     """
     Simulate one team's game respecting real innings.
+
+    Three-phase structure (mirrors simulate_game's two-phase split, adapted to
+    the inning-structured sim's real-sequence-no-permutation semantics):
+      Phase 1 (sampling): walk `outcomes_with_inning` IN ORDER (no permutation
+        — this sim preserves the real event sequence), building `sampled` as
+        (event, inning) pairs. Non-BBE outcomes pass through unchanged; dict
+        BBEs draw one `random.random()` against the cached cumulative CDF into
+        a `('bbe', b)` tuple, b in 0..4 (cache miss → skip, as before). The
+        inning-bounds check happens here, once, with the same message as
+        before.
+      Phase 2 (error injection): if `error_innings` is truthy, flip one
+        uniformly-chosen ('bbe', 0) event per listed inning to ('bbe', 1) via
+        `_inject_error_reaches_by_inning`, using the caller-supplied
+        `error_rng` so phase-1 draws are unaffected and reproducible across
+        paired with/without-injection runs. Flips are constrained to the
+        inning they're listed for — an error in inning 2 cannot alter inning
+        1's outcome.
+      Phase 3 (state machine): walk the (possibly modified) (event, inning)
+        pairs through the same out/base-state logic as before, unchanged:
+        bases reset on inning change, strikeout is a no-op (no out counter
+        exists in this sim), walk/steal/pickoff as before, ('bbe', 0) is a
+        no-op (out), ('bbe', b>0) advances runners and credits
+        runs_by_inning[inning-1].
+
+    At the defaults (error_innings=None, error_rng=None) this reproduces the
+    prior implementation's behavior unchanged.
 
     Args:
         outcomes_with_inning (list): (outcome_data, inning) tuples from outcomes_by_inning,
@@ -754,23 +812,61 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
             interleaved before the same-at-bat plate-appearance outcome).
         prob_cache (dict): same key/value scheme as simulator()'s cache.
         n_innings (int): number of inning buckets (max inning across both teams).
+        error_innings (list[int]): inning number per actual ROE to inject for
+            this team. Default None (no injection).
+        error_rng (random.Random): dedicated RNG stream for error injection.
+            Required (non-None) whenever error_innings is truthy.
 
     Returns:
         np.ndarray of shape (n_innings,): CUMULATIVE deserved runs through each inning.
     """
-    runs_by_inning = np.zeros(n_innings, dtype=float)
-    bases = [False, False, False]
-    prev_inning = None
+    if error_innings and error_rng is None:
+        raise ValueError("error_innings requires an explicit error_rng")
 
+    # Phase 1: sampling (real sequence, no permutation)
+    sampled = []
     for outcome, inning in outcomes_with_inning:
-        if inning != prev_inning:
-            bases = [False, False, False]  # new half-inning for this team
-            prev_inning = inning
         i = inning - 1
         if i < 0 or i >= n_innings:
             raise IndexError(
                 f"simulate_game_by_inning: outcome in inning {inning} exceeds n_innings={n_innings}"
             )
+
+        if isinstance(outcome, dict):
+            cache_key = (outcome['launch_speed'], outcome['launch_angle'],
+                         outcome['venue_name'], outcome.get('coord_x'),
+                         outcome.get('coord_y'), outcome.get('bat_side'))
+            probabilities = prob_cache.get(cache_key)
+            if probabilities is None:
+                continue
+            rv = random.random()
+            if rv < probabilities[0]:
+                sampled.append((('bbe', 0), inning))
+            elif rv < probabilities[0] + probabilities[1]:
+                sampled.append((('bbe', 1), inning))
+            elif rv < probabilities[0] + probabilities[1] + probabilities[2]:
+                sampled.append((('bbe', 2), inning))
+            elif rv < probabilities[0] + probabilities[1] + probabilities[2] + probabilities[3]:
+                sampled.append((('bbe', 3), inning))
+            else:
+                sampled.append((('bbe', 4), inning))
+        else:
+            sampled.append((outcome, inning))
+
+    # Phase 2: error injection
+    if error_innings:
+        _inject_error_reaches_by_inning(sampled, error_innings, error_rng)
+
+    # Phase 3: state machine
+    runs_by_inning = np.zeros(n_innings, dtype=float)
+    bases = [False, False, False]
+    prev_inning = None
+
+    for outcome, inning in sampled:
+        if inning != prev_inning:
+            bases = [False, False, False]  # new half-inning for this team
+            prev_inning = inning
+        i = inning - 1
 
         if outcome == "strikeout":
             continue  # out: no runs, bases unchanged
@@ -785,24 +881,12 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
             # half-inning boundaries), so a pickoff just removes the lead runner.
             if any(bases):
                 attempt_pickoff(bases)
-        elif isinstance(outcome, dict):
-            cache_key = (outcome['launch_speed'], outcome['launch_angle'],
-                         outcome['venue_name'], outcome.get('coord_x'),
-                         outcome.get('coord_y'), outcome.get('bat_side'))
-            probabilities = prob_cache.get(cache_key)
-            if probabilities is None:
-                continue
-            rv = random.random()
-            if rv < probabilities[0]:
+        elif isinstance(outcome, tuple) and outcome[0] == 'bbe':
+            b = outcome[1]
+            if b == 0:
                 pass  # out
-            elif rv < probabilities[0] + probabilities[1]:
-                runs_by_inning[i] += advance_runner(bases, 1)
-            elif rv < probabilities[0] + probabilities[1] + probabilities[2]:
-                runs_by_inning[i] += advance_runner(bases, 2)
-            elif rv < probabilities[0] + probabilities[1] + probabilities[2] + probabilities[3]:
-                runs_by_inning[i] += advance_runner(bases, 3)
             else:
-                runs_by_inning[i] += advance_runner(bases, 4)
+                runs_by_inning[i] += advance_runner(bases, b)
         # Any other unrecognized outcome is silently skipped.
 
     return np.cumsum(runs_by_inning)
@@ -907,7 +991,8 @@ def simulator(num_simulations, home_outcomes, away_outcomes,
     return home_runs_scored, away_runs_scored, home_win_percentage, away_win_percentage, tie_percentage
 
 
-def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, prob_cache=None):
+def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, prob_cache=None,
+                         home_error_innings=None, away_error_innings=None, error_seed=None):
     """
     Per-inning deserved-run trajectories via one nested batch of sims.
 
@@ -921,6 +1006,16 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
             HR tail correction). If provided, used as-is — callers that already
             built an identical cache for simulator() should pass it in to avoid
             duplicate predict_proba calls.
+        home_error_innings (list[int]): inning number per actual ROE to inject
+            for the home team, passed through to simulate_game_by_inning each
+            sim. Default None (no injection — preserves existing behavior for
+            external callers).
+        away_error_innings (list[int]): same as home_error_innings, for the
+            away team.
+        error_seed (int): seed for the shared error-injection RNG stream used
+            by both teams' `simulate_game_by_inning` calls, built once before
+            the sim loop. Only consulted when at least one of
+            home_error_innings/away_error_innings is truthy.
 
     Returns:
         (innings, home_cum, away_cum):
@@ -956,8 +1051,13 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
 
     home_cum = np.zeros((num_simulations, n_innings), dtype=float)
     away_cum = np.zeros((num_simulations, n_innings), dtype=float)
+
+    error_rng = random.Random(error_seed) if (home_error_innings or away_error_innings) else None
+
     for s in range(num_simulations):
-        home_cum[s] = simulate_game_by_inning(home_outcomes_inn, prob_cache, n_innings)
-        away_cum[s] = simulate_game_by_inning(away_outcomes_inn, prob_cache, n_innings)
+        home_cum[s] = simulate_game_by_inning(home_outcomes_inn, prob_cache, n_innings,
+                                               home_error_innings, error_rng)
+        away_cum[s] = simulate_game_by_inning(away_outcomes_inn, prob_cache, n_innings,
+                                               away_error_innings, error_rng)
 
     return list(range(1, n_innings + 1)), home_cum, away_cum
