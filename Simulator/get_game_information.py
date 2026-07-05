@@ -251,5 +251,53 @@ def get_game_info(game_id, all_columns=False):
         
         cols_available_nb = [c for c in cols_needed if c in non_batted_balls.columns]
         non_batted_balls = non_batted_balls[cols_available_nb]
-    
+
     return total_pbp_filtered, total_pbp, steals_and_pickoffs
+
+
+def get_reached_on_error_events(total_pbp):
+    """
+    Extract reached-on-error (ROE) plate appearances from raw play-by-play.
+
+    Args:
+        total_pbp (pd.DataFrame): the UNFILTERED play-by-play frame returned as the
+            second element of get_game_info() — raw eventType values preserved,
+            multiple rows per ab_num (one per play event).
+
+    Returns:
+        list[dict]: one entry per ROE plate appearance, each
+            {'batting_side': 'away'|'home', 'inning': int}
+            ('away' when isTopInning is True — the away team bats in the top half).
+            Empty list when the game had no ROE (or required columns are missing).
+    """
+    # Defensive: check for None or missing required columns
+    if total_pbp is None or total_pbp.empty:
+        return []
+
+    required_columns = {'ab_num', 'eventType', 'isTopInning', 'inning'}
+    if not required_columns.issubset(set(total_pbp.columns)):
+        return []
+
+    # Dedup on ab_num keeping last (mirrors get_game_info filtering logic at line 226)
+    deduped = total_pbp.drop_duplicates(subset='ab_num', keep='last')
+
+    # Filter for field_error events
+    roe_events = deduped[deduped['eventType'] == 'field_error']
+
+    if roe_events.empty:
+        return []
+
+    # Build result list: extract batting_side and inning for each ROE
+    result = []
+    for _, row in roe_events.iterrows():
+        batting_side = 'away' if row['isTopInning'] else 'home'
+        inning = int(row['inning'])
+        result.append({
+            'batting_side': batting_side,
+            'inning': inning
+        })
+
+    # Sort by inning ascending for deterministic output
+    result.sort(key=lambda x: x['inning'])
+
+    return result
