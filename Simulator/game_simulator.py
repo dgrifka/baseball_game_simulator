@@ -24,6 +24,15 @@ from Model.feature_engineering import (
 # The GBC model under-predicts HR probability at 100+ mph (validated on 32k batted
 # balls from 2025: ~1.04x at 100-105 mph, ~1.10x at 105+ mph). We apply a
 # conservative half-correction to the HR probability and redistribute from out_prob.
+#
+# SCOPE — simulation only, by design. The correction is applied in simulator()
+# and simulator_by_inning() (the win% draws), but deliberately NOT in
+# calculate_total_bases(), which produces the estimated_bases / *_prob values
+# shown in the Estimated Bases table AND exported downstream as the data
+# standard (batted-balls parquet → player evaluations, luck ledgers, weekly
+# content). Applying it there would change the scoring scale mid-season and
+# desync new rows from historical data; doing so requires a deliberate
+# decision plus a full historical re-score of the exported parquets.
 HR_TAIL_CORRECTIONS = {
     (100, 105): 1.02,  # actual/model ratio ~1.04, apply half
     (105, 200): 1.05,  # actual/model ratio ~1.10, apply half
@@ -203,10 +212,15 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
 def calculate_total_bases(outcomes_list):
     """
     Calculate expected bases and outcome probabilities for each batting/baserunning event.
-    
+
+    Uses RAW model probabilities — no HR_TAIL_CORRECTIONS — on purpose. This
+    output is the scoring standard for all estimated-bases data products
+    (display table, S3 batted-balls export, player evaluations). See the
+    HR_TAIL_CORRECTIONS comment at the top of this module before changing.
+
     Args:
         outcomes_list (list): List of outcome tuples from outcomes()
-        
+
     Returns:
         pd.DataFrame: Detailed stats including launch data, probabilities, and estimated bases
     """
