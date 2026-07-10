@@ -1,0 +1,14 @@
+# Core dependencies for the simulation engine + visualizations.
+# scikit-learn is pinned: Model/batted_ball_model.pkl is a pickled sklearn
+# Pipeline (StandardScaler + OneHotEncoder + GBC inside CalibratedClassifierCV)
+# and unpickling across sklearn versions is not guaranteed.
+pandas==2.2.2
+numpy==2.0.2
+matplotlib==3.10.0
+scipy==1.16.3
+scikit-learn==1.6.1
+joblib>=1.4
+requests==2.32.4
+pytz==2024.2
+tqdm==4.67.1
+pillow==11.3.0
