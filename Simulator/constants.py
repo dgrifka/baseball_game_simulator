@@ -1827,3 +1827,82 @@ TEAM_DISPLAY_MAP = {
     'Sox': 'Red Sox',
     'D-backs': 'D-backs',
 }
+
+
+# ---------------------------------------------------------------------------
+# Chart palette + plain logo URLs — single source of truth for BOTH repos.
+#
+# baseball_simulator_model re-exports team_palette as TEAM_COLORS (all of its
+# chart modules) and espn_logo_urls as ESPN_LOGO_URLS (team rankings charts).
+# Edit colors/logos HERE, never in the private repo.
+#
+# Distinct from team_colors above: that dict is (primary_hex, Pantone) and
+# feeds this repo's own visualizations (run_dist etc.); team_palette is the
+# curated [primary_hex, secondary_hex] chart palette (Apr 2026 styling refresh).
+# ---------------------------------------------------------------------------
+team_palette = {
+    'D-backs': ['#A71930', '#E3D4AD'],
+    'Braves': ['#CE1141', '#13274F'],
+    'Orioles': ['#DF4601', '#000000'],
+    'Red Sox': ['#BD3039', '#0C2340'],
+    'Cubs': ['#0E3386', '#CC3433'],
+    'White Sox': ['#27251F', '#C4CED4'],
+    'Reds': ['#C6011F', '#000000'],
+    'Guardians': ['#00385D', '#E50022'],
+    'Rockies': ['#33006F', '#C4CED4'],
+    'Tigers': ['#0C2340', '#FA4616'],
+    'Astros': ['#002D62', '#EB6E1F'],
+    'Royals': ['#004687', '#BD9B60'],
+    'Angels': ['#BA0021', '#003263'],
+    'Dodgers': ['#005A9C', '#EF3E42'],
+    'Marlins': ['#00A3E0', '#EF3340'],
+    'Brewers': ['#0A2351', '#B6922E'],
+    'Twins': ['#002B5C', '#D31145'],
+    'Mets': ['#002D72', '#FF5910'],
+    'Yankees': ['#003087', '#E4002C'],
+    'Athletics': ['#003831', '#EFB21E'],
+    'Phillies': ['#E81828', '#002D72'],
+    'Pirates': ['#27251F', '#FDB827'],
+    'Padres': ['#2F241D', '#FFC425'],
+    'Giants': ['#FD5A1E', '#27251F'],
+    'Mariners': ['#0C2C56', '#005C5C'],
+    'Cardinals': ['#C41E3A', '#0C2340'],
+    'Rays': ['#092C5C', '#8FBCE6'],
+    'Rangers': ['#003278', '#C0111F'],
+    'Blue Jays': ['#134A8E', '#1D2D5C'],
+    'Nationals': ['#AB0003', '#14225A']
+}
+
+# Plain (non-scoreboard) ESPN logo PNGs, keyed by short team name.
+espn_logo_urls = {
+    'D-backs': 'https://a.espncdn.com/i/teamlogos/mlb/500/ari.png',
+    'Braves': 'https://a.espncdn.com/i/teamlogos/mlb/500/atl.png',
+    'Orioles': 'https://a.espncdn.com/i/teamlogos/mlb/500/bal.png',
+    'Red Sox': 'https://a.espncdn.com/i/teamlogos/mlb/500/bos.png',
+    'Cubs': 'https://a.espncdn.com/i/teamlogos/mlb/500/chc.png',
+    'White Sox': 'https://a.espncdn.com/i/teamlogos/mlb/500/chw.png',
+    'Reds': 'https://a.espncdn.com/i/teamlogos/mlb/500/cin.png',
+    'Guardians': 'https://a.espncdn.com/i/teamlogos/mlb/500/cle.png',
+    'Rockies': 'https://a.espncdn.com/i/teamlogos/mlb/500/col.png',
+    'Tigers': 'https://a.espncdn.com/i/teamlogos/mlb/500/det.png',
+    'Astros': 'https://a.espncdn.com/i/teamlogos/mlb/500/hou.png',
+    'Royals': 'https://a.espncdn.com/i/teamlogos/mlb/500/kc.png',
+    'Angels': 'https://a.espncdn.com/i/teamlogos/mlb/500/laa.png',
+    'Dodgers': 'https://a.espncdn.com/i/teamlogos/mlb/500/lad.png',
+    'Marlins': 'https://a.espncdn.com/i/teamlogos/mlb/500/mia.png',
+    'Brewers': 'https://a.espncdn.com/i/teamlogos/mlb/500/mil.png',
+    'Twins': 'https://a.espncdn.com/i/teamlogos/mlb/500/min.png',
+    'Mets': 'https://a.espncdn.com/i/teamlogos/mlb/500/nym.png',
+    'Yankees': 'https://a.espncdn.com/i/teamlogos/mlb/500/nyy.png',
+    'Athletics': 'https://a.espncdn.com/i/teamlogos/mlb/500/oak.png',
+    'Phillies': 'https://a.espncdn.com/i/teamlogos/mlb/500/phi.png',
+    'Pirates': 'https://a.espncdn.com/i/teamlogos/mlb/500/pit.png',
+    'Padres': 'https://a.espncdn.com/i/teamlogos/mlb/500/sd.png',
+    'Giants': 'https://a.espncdn.com/i/teamlogos/mlb/500/sf.png',
+    'Mariners': 'https://a.espncdn.com/i/teamlogos/mlb/500/sea.png',
+    'Cardinals': 'https://a.espncdn.com/i/teamlogos/mlb/500/stl.png',
+    'Rays': 'https://a.espncdn.com/i/teamlogos/mlb/500/tb.png',
+    'Rangers': 'https://a.espncdn.com/i/teamlogos/mlb/500/tex.png',
+    'Blue Jays': 'https://a.espncdn.com/i/teamlogos/mlb/500/tor.png',
+    'Nationals': 'https://a.espncdn.com/i/teamlogos/mlb/500/wsh.png',
+}
