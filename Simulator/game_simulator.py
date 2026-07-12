@@ -12,6 +12,7 @@ import numpy as np
 from tqdm import tqdm
 
 from Simulator.constants import team_colors, VENUE_NAME_TO_ID, DEFAULT_VENUE_ID
+from Simulator import vector_engine
 from Model.feature_engineering import (
     create_features_for_prediction,
     create_features_for_prediction_fallback
@@ -550,6 +551,14 @@ def attempt_pickoff(bases):
     return 1
 
 
+# Probabilistic runner-advancement rates (halfway between original rules and
+# MLB averages). Module constants so the vectorized engine reads the same
+# numbers the scalar code uses — edit here, nowhere else.
+SINGLE_ADV_FROM_2ND_P = 0.56    # runner on 2nd takes home on a single
+SINGLE_ADV_FROM_1ST_P = 0.265   # runner on 1st takes 3rd on a single (no runner on 2nd)
+DOUBLE_ADV_FROM_1ST_P = 0.675   # runner on 1st scores on a double
+
+
 def advance_runner(bases, count=1, is_walk=False):
     """
     Calculate runs scored and update base runners after a hit/walk.
@@ -594,13 +603,13 @@ def advance_runner(bases, count=1, is_walk=False):
             if original_bases[i]:
                 advancement = count
                 
-                # Probabilistic advancements (halfway between original rules and MLB averages)
+                # Probabilistic advancements (rates defined above advance_runner)
                 if count == 1 and i == 1:  # Single with runner on 2nd
-                    advancement = 2 if random.random() < 0.56 else 1
+                    advancement = 2 if random.random() < SINGLE_ADV_FROM_2ND_P else 1
                 elif count == 1 and i == 0 and not original_bases[1]:
-                    advancement = 2 if random.random() < 0.265 else 1
+                    advancement = 2 if random.random() < SINGLE_ADV_FROM_1ST_P else 1
                 elif count == 2 and i == 0:  # Double with runner on 1st
-                    advancement = 3 if random.random() < 0.675 else 2
+                    advancement = 3 if random.random() < DOUBLE_ADV_FROM_1ST_P else 2
                 
                 new_position = i + advancement
                 if new_position >= 3:
@@ -622,6 +631,42 @@ def advance_runner(bases, count=1, is_walk=False):
 # =============================================================================
 # SIMULATION ENGINE
 # =============================================================================
+# simulate_game / simulate_game_by_inning are the scalar REFERENCE
+# implementations. Production runs the vectorized engine (vector_engine.py),
+# whose transition tables are built from these functions at import time —
+# behavior is defined here, executed there. DTW_SCALAR_SIM=1 forces the
+# scalar loops (escape hatch).
+
+def _outcome_cache_key(outcome):
+    """The cache-key tuple shared by the prob cache and both engines."""
+    return (outcome['launch_speed'], outcome['launch_angle'],
+            outcome['venue_name'], outcome.get('coord_x'),
+            outcome.get('coord_y'), outcome.get('bat_side'))
+
+
+def _use_scalar_sim():
+    return _os.environ.get('DTW_SCALAR_SIM', '') == '1'
+
+
+_transition_tables = None
+
+
+def _get_transition_tables():
+    """Build (once) the vector engine's tables from the scalar functions above."""
+    global _transition_tables
+    if _transition_tables is None:
+        branch_probs = {}
+        for s in range(8):
+            if s & 2:                # runner on 2nd: single draws the 0.56 rule
+                branch_probs[(s, 1)] = SINGLE_ADV_FROM_2ND_P
+            elif s & 1:              # runner on 1st, none on 2nd: the 0.265 rule
+                branch_probs[(s, 1)] = SINGLE_ADV_FROM_1ST_P
+            if s & 1:                # runner on 1st: double draws the 0.675 rule
+                branch_probs[(s, 2)] = DOUBLE_ADV_FROM_1ST_P
+        _transition_tables = vector_engine.build_transition_tables(
+            advance_runner, attempt_steal, attempt_pickoff, branch_probs)
+    return _transition_tables
+
 
 def simulate_game(outcomes_list, prob_cache):
     """
@@ -811,21 +856,32 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
                 )
                 prob_cache[cache_key] = pipeline.predict_proba(features)[0]
     
-    # Initialize arrays for results
-    home_runs_scored = np.zeros(num_simulations, dtype=int)
-    away_runs_scored = np.zeros(num_simulations, dtype=int)
-    
-    # Run simulations with progress bar
-    for i in tqdm(range(num_simulations), 
-                  desc="Simulating games", 
-                  unit="sim",
-                  position=0,
-                  leave=True,
-                  ncols=80,
-                  ascii=True):
-        home_runs_scored[i] = simulate_game(home_outcomes_clean, prob_cache)
-        away_runs_scored[i] = simulate_game(away_outcomes_clean, prob_cache)
-    
+    if _use_scalar_sim():
+        # Reference path (DTW_SCALAR_SIM=1): the original per-sim loop.
+        home_runs_scored = np.zeros(num_simulations, dtype=int)
+        away_runs_scored = np.zeros(num_simulations, dtype=int)
+        for i in tqdm(range(num_simulations),
+                      desc="Simulating games",
+                      unit="sim",
+                      position=0,
+                      leave=True,
+                      ncols=80,
+                      ascii=True):
+            home_runs_scored[i] = simulate_game(home_outcomes_clean, prob_cache)
+            away_runs_scored[i] = simulate_game(away_outcomes_clean, prob_cache)
+    else:
+        rng = np.random.default_rng()
+        tables = _get_transition_tables()
+        home_ev, home_cdf = vector_engine.translate_outcomes(
+            home_outcomes_clean, prob_cache, _outcome_cache_key)
+        away_ev, away_cdf = vector_engine.translate_outcomes(
+            away_outcomes_clean, prob_cache, _outcome_cache_key)
+        home_runs_scored = vector_engine.simulate_games_vectorized(
+            home_ev, home_cdf, tables, num_simulations, rng).astype(int)
+        away_runs_scored = vector_engine.simulate_games_vectorized(
+            away_ev, away_cdf, tables, num_simulations, rng).astype(int)
+
+
     # Calculate win percentages
     home_wins = np.sum(home_runs_scored > away_runs_scored)
     away_wins = np.sum(home_runs_scored < away_runs_scored)
@@ -885,10 +941,25 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
                     probs = pipeline.predict_proba(features)[0]
                     prob_cache[cache_key] = _apply_hr_tail_correction(probs, outcome['launch_speed'])
 
-    home_cum = np.zeros((num_simulations, n_innings), dtype=float)
-    away_cum = np.zeros((num_simulations, n_innings), dtype=float)
-    for s in range(num_simulations):
-        home_cum[s] = simulate_game_by_inning(home_outcomes_inn, prob_cache, n_innings)
-        away_cum[s] = simulate_game_by_inning(away_outcomes_inn, prob_cache, n_innings)
+    if _use_scalar_sim():
+        # Reference path (DTW_SCALAR_SIM=1): the original per-sim loop.
+        home_cum = np.zeros((num_simulations, n_innings), dtype=float)
+        away_cum = np.zeros((num_simulations, n_innings), dtype=float)
+        for s in range(num_simulations):
+            home_cum[s] = simulate_game_by_inning(home_outcomes_inn, prob_cache, n_innings)
+            away_cum[s] = simulate_game_by_inning(away_outcomes_inn, prob_cache, n_innings)
+    else:
+        rng = np.random.default_rng()
+        tables = _get_transition_tables()
+        home_ev, home_cdf, home_inns = vector_engine.translate_outcomes(
+            [o for o, _ in home_outcomes_inn], prob_cache, _outcome_cache_key,
+            innings=[inn for _, inn in home_outcomes_inn])
+        away_ev, away_cdf, away_inns = vector_engine.translate_outcomes(
+            [o for o, _ in away_outcomes_inn], prob_cache, _outcome_cache_key,
+            innings=[inn for _, inn in away_outcomes_inn])
+        home_cum = vector_engine.simulate_games_by_inning_vectorized(
+            home_ev, home_cdf, home_inns, tables, num_simulations, n_innings, rng)
+        away_cum = vector_engine.simulate_games_by_inning_vectorized(
+            away_ev, away_cdf, away_inns, tables, num_simulations, n_innings, rng)
 
     return list(range(1, n_innings + 1)), home_cum, away_cum
