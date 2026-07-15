@@ -166,6 +166,24 @@ DEFAULT_VENUE_ID = GENERIC_VENUE_ID
 # Stable set of MLB venue IDs — immune to stadium name changes
 VALID_VENUE_IDS = {int(vid) for vid in VENUE_NAME_TO_ID.values() if vid != 'neutral'}
 
+# Inverse of VENUE_NAME_TO_ID: venue id -> canonical display name. Used to
+# canonicalize venue.name FROM the numeric id (which is immune to sponsor
+# renames like "UNIQLO Field at Dodger Stadium"), so downstream geometry
+# lookups (STADIUM_DIMENSIONS below) always hit the exact dict key.
+# VENUE_NAME_TO_ID has multiple name aliases mapping to the same id (e.g.
+# both 'Yankee Stadium' and 'George M. Steinbrenner Field' -> '3313'); this
+# is built first-wins in dict iteration order, so it picks the FIRST name
+# listed per id — which is always the canonical (non-alias) entry, matching
+# the corresponding STADIUM_DIMENSIONS key.
+VENUE_ID_TO_NAME = {}
+for _venue_name, _venue_id in VENUE_NAME_TO_ID.items():
+    if _venue_id == 'neutral':
+        continue
+    _venue_id_int = int(_venue_id)
+    if _venue_id_int not in VENUE_ID_TO_NAME:
+        VENUE_ID_TO_NAME[_venue_id_int] = _venue_name
+del _venue_name, _venue_id, _venue_id_int
+
 # Neutral-site venues (non-MLB parks used for special events)
 NEUTRAL_SITE_VENUES = {
     # Mexico City (Estadio Alfredo Harp Helu, id 5340) now has its own geometry — see VENUE_NAME_TO_ID

@@ -13,7 +13,7 @@ import datetime
 from Simulator.constants import (
     base_url, league, season, endpoint,
     team_ver, schedule_ver, game_ver, venue_names,
-    VENUE_NAME_TO_ID, DEFAULT_VENUE_ID, VALID_VENUE_IDS, NEUTRAL_SITE_VENUES
+    VENUE_NAME_TO_ID, VENUE_ID_TO_NAME, DEFAULT_VENUE_ID, VALID_VENUE_IDS, NEUTRAL_SITE_VENUES
 )
 
 def response_code(base_url, ver, endpoint):
@@ -87,19 +87,22 @@ def fetch_games(days_ago, all_columns=False):
         (is_known_venue | is_neutral)
     ].reset_index(drop=True))
 
-    # Handle stadium name mapping (normalize display names for VENUE_NAME_TO_ID lookup)
-    stadium_mapping = {
-        'George M. Steinbrenner Field': 'Yankee Stadium',
-        # Sutter Health Park now has its own id 2529 geometry (was proxied to Oakland Coliseum)
-        'Daikin Park': 'Minute Maid Park',
-        'Rate Field': 'Guaranteed Rate Field',
-        'UNIQLO FIELD AT DODGER STADIUM': 'Dodger Stadium',
-    }
-    filtered_games_df['venue.name'] = filtered_games_df['venue.name'].replace(stadium_mapping)
-    
-    # Add venue_id column using the mapping
-    filtered_games_df['venue.id'] = filtered_games_df['venue.name'].map(VENUE_NAME_TO_ID)
-    filtered_games_df['venue.id'] = filtered_games_df['venue.id'].fillna(DEFAULT_VENUE_ID)
+    # Canonicalize name/id together, keyed off the numeric venue.id (stable
+    # across sponsor renames like "UNIQLO Field at Dodger Stadium") rather
+    # than the case-sensitive venue name. This avoids re-deriving venue.id
+    # from a display name that a name-only mapping might not recognize.
+    is_known = filtered_games_df['venue.id'].isin(VALID_VENUE_IDS)
+    filtered_games_df['venue.id'] = filtered_games_df['venue.id'].astype(object)
+    known_ids = filtered_games_df.loc[is_known, 'venue.id'].astype(int)
+    filtered_games_df.loc[is_known, 'venue.name'] = known_ids.map(VENUE_ID_TO_NAME)
+    filtered_games_df.loc[is_known, 'venue.id'] = known_ids.astype(str)
+
+    # Neutral-site games: venue.id isn't a valid MLB park id, so fall back to
+    # name-based lookup (handles DEFAULT_VENUE_ID for anything unmapped).
+    unknown = ~is_known
+    filtered_games_df.loc[unknown, 'venue.id'] = (
+        filtered_games_df.loc[unknown, 'venue.name'].map(VENUE_NAME_TO_ID).fillna(DEFAULT_VENUE_ID)
+    )
     
     if not all_columns:
         filtered_games_df = filtered_games_df[[
