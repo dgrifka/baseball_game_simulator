@@ -16,8 +16,7 @@ advancement rules in advance_runner are mutually exclusive per state and hit
 type), so each event resolves to: classify (for batted balls), then one table
 lookup on (state, class, branch-bit).
 
-Design/validation: baseball_simulator_model
-docs/superpowers/specs/2026-07-12-vectorized-sim-core-design.md — exhaustive
+Design/validation: discussed in the private orchestration repo's documentation — exhaustive
 table-equivalence tests plus a null-calibrated 200-game replay gate.
 """
 

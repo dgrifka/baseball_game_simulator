@@ -1850,9 +1850,9 @@ TEAM_DISPLAY_MAP = {
 # ---------------------------------------------------------------------------
 # Chart palette + plain logo URLs — single source of truth for BOTH repos.
 #
-# baseball_simulator_model re-exports team_palette as TEAM_COLORS (all of its
+# The private orchestration repo re-exports team_palette as TEAM_COLORS (all of its
 # chart modules) and espn_logo_urls as ESPN_LOGO_URLS (team rankings charts).
-# Edit colors/logos HERE, never in the private repo.
+# Edit colors/logos HERE, never in the private orchestration repo.
 #
 # Distinct from team_colors above: that dict is (primary_hex, Pantone) and
 # feeds this repo's own visualizations (run_dist etc.); team_palette is the
