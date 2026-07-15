@@ -144,7 +144,6 @@ baseball_game_simulator/
 │       └── park_altitudes.csv    # Stadium altitudes
 │
 ├── Simulator/
-│   ├── best_batted_balls.py      # Analyzes lucky/unlucky outcomes (retired)
 │   ├── constants.py              # Configuration and venue mappings
 │   ├── game_simulator.py         # Core simulation engine (incl. per-inning sim)
 │   ├── get_game_information.py   # MLB Stats API data retrieval
