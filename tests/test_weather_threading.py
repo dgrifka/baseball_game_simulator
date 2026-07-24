@@ -76,3 +76,14 @@ def test_prepare_features_accepts_temp():
 def test_prepare_features_default_temp():
     df = prepare_batted_ball_features(101.0, 22.0, "Wrigley Field")
     assert df["temp_f"].iloc[0] == pytest.approx(70.0)
+
+
+def test_prepare_features_nan_bat_side_coerced_not_raised():
+    import numpy as np
+    df = prepare_batted_ball_features(101.0, 22.0, "Wrigley Field",
+                                      coord_x=120.0, coord_y=95.0,
+                                      bat_side=np.nan)
+    r_df = prepare_batted_ball_features(101.0, 22.0, "Wrigley Field",
+                                        coord_x=120.0, coord_y=95.0,
+                                        bat_side="R")
+    assert df["carry_ft_spin"].iloc[0] == r_df["carry_ft_spin"].iloc[0]

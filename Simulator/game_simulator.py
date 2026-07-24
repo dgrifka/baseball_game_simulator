@@ -130,7 +130,7 @@ def prepare_batted_ball_features(launch_speed, launch_angle, venue_name,
             launch_angle=launch_angle,
             coord_x=coord_x,
             coord_y=coord_y,
-            bat_side=bat_side,
+            bat_side='R' if pd.isna(bat_side) else bat_side,
             venue_id=venue_id,
             temp_f=temp_f,
             roof_closed=roof_closed
