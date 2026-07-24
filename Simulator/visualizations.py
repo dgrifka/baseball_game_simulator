@@ -779,7 +779,9 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                             venue_name=outcome_data.get('venue_name', 'Unknown'),
                             coord_x=outcome_data.get('coord_x'),
                             coord_y=outcome_data.get('coord_y'),
-                            bat_side=outcome_data.get('bat_side')
+                            bat_side=outcome_data.get('bat_side'),
+                            temp_f=outcome_data.get('temp_f'),
+                            roof_closed=outcome_data.get('roof_closed', False)
                         )
                         probs = pipeline.predict_proba(features)[0]
                         estimated_bases = probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4
@@ -1084,7 +1086,9 @@ def calculate_expected_bases_for_spray(outcome_dict, pipeline):
             venue_name=outcome_dict['venue_name'],
             coord_x=outcome_dict.get('coord_x'),
             coord_y=outcome_dict.get('coord_y'),
-            bat_side=outcome_dict.get('bat_side')
+            bat_side=outcome_dict.get('bat_side'),
+            temp_f=outcome_dict.get('temp_f'),
+            roof_closed=outcome_dict.get('roof_closed', False)
         )
         probs = pipeline.predict_proba(features)[0]
         return probs[1]*1 + probs[2]*2 + probs[3]*3 + probs[4]*4

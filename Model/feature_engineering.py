@@ -3,10 +3,13 @@ Feature engineering functions for MLB batted ball outcome prediction.
 Used by both model training (Base_Model.ipynb) and inference (game_simulator.py).
 """
 
+import math
 import os
 
 import numpy as np
 import pandas as pd
+
+from Model.bbe_physics import nathan_spin, spin_aware_carry
 
 # =============================================================================
 # CONSTANTS
@@ -310,17 +313,51 @@ def drag_carry(launch_speed_mph, launch_angle_deg, elevation_ft=0.0):
 
 
 # =============================================================================
+# GAME-TIME TEMPERATURE GUARD (shared by training, re-score, and live scoring)
+# =============================================================================
+
+ROOF_CLOSED_CONDITIONS = {"Dome", "Roof Closed"}
+_ROOF_PLAUSIBLE_RANGE = (50.0, 95.0)   # indoor readings outside this are garbage
+_TEMP_CLIP_RANGE = (35.0, 105.0)       # open-air plausibility clip
+_TEMP_DEFAULT = 70.0                   # legacy fixed value (temp_f=70 == no-temp physics)
+_ROOF_INDOOR_TEMP = 72.0               # canonical climate-controlled reading
+
+
+def is_roof_closed(condition):
+    """True when the weather `condition` string means climate-controlled air."""
+    return condition in ROOF_CLOSED_CONDITIONS
+
+
+def sanitize_temp(temp_f, roof_closed=False):
+    """Return a plausible game-time temperature (F) for the carry physics.
+
+    NaN/None -> 70.0; roof-closed readings outside [50, 95] -> 72.0 (the API
+    sometimes reports outdoor temp for closed-roof games, e.g. Chase 2022
+    106-109F, and 0F for two 2024 dome games); everything else clipped to
+    [35, 105].
+    """
+    if temp_f is None:
+        return _TEMP_DEFAULT
+    t = float(temp_f)
+    if math.isnan(t):
+        return _TEMP_DEFAULT
+    if roof_closed and not (_ROOF_PLAUSIBLE_RANGE[0] <= t <= _ROOF_PLAUSIBLE_RANGE[1]):
+        return _ROOF_INDOOR_TEMP
+    return float(min(max(t, _TEMP_CLIP_RANGE[0]), _TEMP_CLIP_RANGE[1]))
+
+
+# =============================================================================
 # MAIN FEATURE CREATION FUNCTION
 # =============================================================================
 
-def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y, 
-                                    bat_side, venue_id):
+def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y,
+                                    bat_side, venue_id, temp_f=70.0, roof_closed=False):
     """
     Create all required features for model prediction.
-    
+
     This is the main function used by game_simulator.py to prepare data
     for the batted ball outcome model.
-    
+
     Args:
         launch_speed (float): Exit velocity in mph
         launch_angle (float): Launch angle in degrees
@@ -328,7 +365,9 @@ def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y,
         coord_y (float): hitData.coordinates.coordY
         bat_side (str): 'L' or 'R' for batter handedness
         venue_id (str): Stadium venue ID (as string)
-    
+        temp_f (float): Game-time temperature in Fahrenheit (default 70.0)
+        roof_closed (bool): Whether the stadium roof is closed (default False)
+
     Returns:
         pd.DataFrame: Single-row DataFrame with all features for model prediction
     """
@@ -367,6 +406,16 @@ def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y,
     carry_ft = drag_carry(launch_speed, launch_angle, altitude_ft)
     over_fence_margin = carry_ft - wall_distance_ft
 
+    # Spin + temperature carry features (F6 model). Additive: older models'
+    # ColumnTransformers select by name and ignore these.
+    temp_f_safe = sanitize_temp(temp_f, roof_closed)
+    backspin_rpm, sidespin_rpm = nathan_spin(launch_angle, spray_angle_adj, bat_side)
+    carry_ft_spin = spin_aware_carry(
+        launch_speed, launch_angle, spray_angle_adj, bat_side, altitude_ft)
+    carry_ft_spin_temp = spin_aware_carry(
+        launch_speed, launch_angle, spray_angle_adj, bat_side, altitude_ft,
+        temp_f_safe)
+
     # Create DataFrame matching model's expected feature order
     return pd.DataFrame({
         # Numeric features (order must match training)
@@ -390,6 +439,14 @@ def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y,
         'wall_distance_ft': [wall_distance_ft],
         'carry_ft': [carry_ft],
         'over_fence_margin': [over_fence_margin],
+        # Spin + temperature carry features (F6 model)
+        'carry_ft_spin': [carry_ft_spin],
+        'over_fence_margin_spin': [carry_ft_spin - wall_distance_ft],
+        'total_spin_rpm': [float(np.sqrt(backspin_rpm ** 2 + sidespin_rpm ** 2))],
+        'sidespin_abs_rpm': [abs(sidespin_rpm)],
+        'carry_ft_spin_temp': [carry_ft_spin_temp],
+        'over_fence_margin_spin_temp': [carry_ft_spin_temp - wall_distance_ft],
+        'temp_f': [temp_f_safe],
         # Categorical features
         'launch_angle_category': [launch_category],
         'spray_direction': [spray_direction],
@@ -397,16 +454,19 @@ def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y,
     })
 
 
-def create_features_for_prediction_fallback(launch_speed, launch_angle, venue_id):
+def create_features_for_prediction_fallback(launch_speed, launch_angle, venue_id,
+                                             temp_f=70.0, roof_closed=False):
     """
     Fallback feature creation when spray angle data is unavailable.
     Uses average/neutral spray values.
-    
+
     Args:
         launch_speed (float): Exit velocity in mph
         launch_angle (float): Launch angle in degrees
         venue_id (str): Stadium venue ID (as string)
-    
+        temp_f (float): Game-time temperature in Fahrenheit (default 70.0)
+        roof_closed (bool): Whether the stadium roof is closed (default False)
+
     Returns:
         pd.DataFrame: Single-row DataFrame with all features for model prediction
     """
@@ -417,5 +477,7 @@ def create_features_for_prediction_fallback(launch_speed, launch_angle, venue_id
         coord_x=HOME_PLATE_X,  # Center = 0 spray angle
         coord_y=HOME_PLATE_Y - 100,  # Into outfield
         bat_side='R',  # Doesn't matter for center
-        venue_id=venue_id
+        venue_id=venue_id,
+        temp_f=temp_f,
+        roof_closed=roof_closed
     )
