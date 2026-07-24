@@ -167,7 +167,22 @@ def secondary_play_type(non_batted, play):
     non_batted_play['play'] = play
     
     return non_batted_play
-    
+
+
+def parse_weather(game):
+    """Extract (temp_f, condition) from a v1.1 live-feed payload's
+    gameData.weather. Missing/unparseable temp -> NaN (the feature guard
+    downstream defaults NaN to 70F). Zero extra API calls — the payload is
+    already fetched for play-by-play."""
+    weather = (game.get('gameData') or {}).get('weather') or {}
+    condition = weather.get('condition')
+    try:
+        temp_f = float(weather.get('temp'))
+    except (TypeError, ValueError):
+        temp_f = float('nan')
+    return temp_f, condition
+
+
 def get_game_info(game_id, all_columns=False):
     """
     Retrieves and processes detailed game play-by-play information.
@@ -209,7 +224,11 @@ def get_game_info(game_id, all_columns=False):
         total_pbp = col_pbp if total_pbp.empty else total_pbp.merge(col_pbp, on='ab_num', how='left')
     
     total_pbp['gamePk'] = game_id
-    
+
+    weather_temp_f, weather_condition = parse_weather(game)
+    total_pbp['weather_temp_f'] = weather_temp_f
+    total_pbp['weather_condition'] = weather_condition
+
     # Create copy for filtered batted balls
     total_pbp_filtered = total_pbp.copy()
     other_plays = ['walk', 'intent_walk', 'hit_by_pitch', 'strikeout']
@@ -247,6 +266,7 @@ def get_game_info(game_id, all_columns=False):
             "batSide.code",
             # Pitcher handedness for platoon analysis
             "pitchHand.code",
+            "weather_temp_f", "weather_condition",
         ]
         # Only keep columns that exist (some may be missing in edge cases)
         cols_available = [c for c in cols_needed if c in total_pbp_filtered.columns]

@@ -15,7 +15,8 @@ from Simulator.constants import team_colors, VENUE_NAME_TO_ID, DEFAULT_VENUE_ID
 from Simulator import vector_engine
 from Model.feature_engineering import (
     create_features_for_prediction,
-    create_features_for_prediction_fallback
+    create_features_for_prediction_fallback,
+    is_roof_closed
 )
 
 # =============================================================================
@@ -93,11 +94,12 @@ def get_venue_id(venue_name):
     return VENUE_NAME_TO_ID.get(venue_name, DEFAULT_VENUE_ID)
 
 
-def prepare_batted_ball_features(launch_speed, launch_angle, venue_name, 
-                                  coord_x=None, coord_y=None, bat_side=None):
+def prepare_batted_ball_features(launch_speed, launch_angle, venue_name,
+                                  coord_x=None, coord_y=None, bat_side=None,
+                                  temp_f=None, roof_closed=False):
     """
     Prepare features for model prediction, handling missing spray data gracefully.
-    
+
     Args:
         launch_speed (float): Exit velocity in mph
         launch_angle (float): Launch angle in degrees
@@ -105,21 +107,23 @@ def prepare_batted_ball_features(launch_speed, launch_angle, venue_name,
         coord_x (float, optional): Hit coordinates X
         coord_y (float, optional): Hit coordinates Y
         bat_side (str, optional): 'L' or 'R' for batter handedness
-    
+        temp_f (float, optional): Game-time temperature in Fahrenheit
+        roof_closed (bool): True when the venue's roof was closed for the game
+
     Returns:
         pd.DataFrame: Features ready for model prediction
     """
     venue_id = get_venue_id(venue_name)
-    
+
     # Check if we have spray angle data
     has_spray_data = (
-        coord_x is not None and 
-        coord_y is not None and 
+        coord_x is not None and
+        coord_y is not None and
         bat_side is not None and
-        not pd.isna(coord_x) and 
+        not pd.isna(coord_x) and
         not pd.isna(coord_y)
     )
-    
+
     if has_spray_data:
         return create_features_for_prediction(
             launch_speed=launch_speed,
@@ -127,14 +131,18 @@ def prepare_batted_ball_features(launch_speed, launch_angle, venue_name,
             coord_x=coord_x,
             coord_y=coord_y,
             bat_side=bat_side,
-            venue_id=venue_id
+            venue_id=venue_id,
+            temp_f=temp_f,
+            roof_closed=roof_closed
         )
     else:
         # Fallback: use neutral spray angle
         return create_features_for_prediction_fallback(
             launch_speed=launch_speed,
             launch_angle=launch_angle,
-            venue_id=venue_id
+            venue_id=venue_id,
+            temp_f=temp_f,
+            roof_closed=roof_closed
         )
 
 
@@ -199,6 +207,8 @@ def outcomes(game_data, steals_and_pickoffs, home_or_away):
             'play_id': row.get('playId'),
             'inning': row.get('inning'),
             'is_top_inning': row.get('isTopInning'),
+            'temp_f': row.get('weather_temp_f'),
+            'roof_closed': bool(is_roof_closed(row.get('weather_condition'))),
         }
         outcomes_list.append((batted_ball_data, row['eventType'], row['batter.fullName'], pitcher_name))
 
@@ -269,10 +279,12 @@ def calculate_total_bases(outcomes_list):
                 venue_name=stadium,
                 coord_x=outcome.get('coord_x'),
                 coord_y=outcome.get('coord_y'),
-                bat_side=outcome.get('bat_side')
+                bat_side=outcome.get('bat_side'),
+                temp_f=outcome.get('temp_f'),
+                roof_closed=outcome.get('roof_closed', False)
             )
             probabilities = pipeline.predict_proba(features)[0]
-            
+
             bases = (
                 probabilities[1] * 1 +
                 probabilities[2] * 2 +
@@ -479,6 +491,8 @@ def outcomes_by_inning(game_data, steals_and_pickoffs, home_or_away):
                 'play_id': row.get('playId'),
                 'inning': inning,
                 'is_top_inning': row.get('isTopInning'),
+                'temp_f': row.get('weather_temp_f'),
+                'roof_closed': bool(is_roof_closed(row.get('weather_condition'))),
             }
         else:
             continue  # HBP, interference, etc. — not modeled (mirrors outcomes())
@@ -842,7 +856,9 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
                     venue_name=outcome['venue_name'],
                     coord_x=outcome.get('coord_x'),
                     coord_y=outcome.get('coord_y'),
-                    bat_side=outcome.get('bat_side')
+                    bat_side=outcome.get('bat_side'),
+                    temp_f=outcome.get('temp_f'),
+                    roof_closed=outcome.get('roof_closed', False)
                 )
                 probs = pipeline.predict_proba(features)[0]
                 prob_cache[cache_key] = _apply_hr_tail_correction(probs, outcome['launch_speed'])
@@ -939,6 +955,8 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
                         coord_x=outcome.get('coord_x'),
                         coord_y=outcome.get('coord_y'),
                         bat_side=outcome.get('bat_side'),
+                        temp_f=outcome.get('temp_f'),
+                        roof_closed=outcome.get('roof_closed', False),
                     )
                     probs = pipeline.predict_proba(features)[0]
                     prob_cache[cache_key] = _apply_hr_tail_correction(probs, outcome['launch_speed'])
