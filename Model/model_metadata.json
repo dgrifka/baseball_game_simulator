@@ -1,18 +1,19 @@
 {
   "model_name": "MLB Batted Ball Outcome Classifier",
-  "model_type": "CalibratedClassifierCV(GradientBoostingClassifier)",
-  "created_date": "2026-06-05",
+  "model_type": "CalibratedClassifierCV(HistGradientBoostingClassifier)",
+  "created_date": "2026-07-24",
   "training_samples": 125778,
-  "calibration_samples": 126517,
-  "test_samples": 46898,
+  "calibration_samples": 126774,
+  "test_samples": 78602,
   "seasons": [
     2024,
     2025,
     2026
   ],
-  "accuracy": 0.825,
-  "log_loss": 0.4469,
-  "feature_set": "F3",
+  "accuracy": 0.826,
+  "log_loss": 0.4388,
+  "feature_set": "F6",
+  "estimator": "histgbc",
   "features": {
     "numeric": [
       "hitData_launchSpeed",
@@ -33,7 +34,14 @@
       "altitude_ft",
       "wall_distance_ft",
       "carry_ft",
-      "over_fence_margin"
+      "over_fence_margin",
+      "carry_ft_spin",
+      "over_fence_margin_spin",
+      "total_spin_rpm",
+      "sidespin_abs_rpm",
+      "carry_ft_spin_temp",
+      "over_fence_margin_spin_temp",
+      "temp_f"
     ],
     "categorical": [
       "launch_angle_category",
@@ -50,86 +58,92 @@
   "tail_metrics": {
     "hr_rmse_by_ev_bin": {
       "85-90": {
-        "count": 2208,
-        "actual_hr_rate": 0.0005,
-        "model_hr_rate": 0.0027,
-        "gap": -0.0023
+        "count": 3735,
+        "actual_hr_rate": 0.0011,
+        "model_hr_rate": 0.0016,
+        "gap": -0.0005
       },
       "90-95": {
-        "count": 2902,
-        "actual_hr_rate": 0.0096,
-        "model_hr_rate": 0.014,
-        "gap": -0.0043
+        "count": 4974,
+        "actual_hr_rate": 0.0133,
+        "model_hr_rate": 0.0136,
+        "gap": -0.0003
       },
       "95-100": {
-        "count": 3384,
-        "actual_hr_rate": 0.0866,
-        "model_hr_rate": 0.0808,
-        "gap": 0.0058
+        "count": 5670,
+        "actual_hr_rate": 0.0968,
+        "model_hr_rate": 0.0823,
+        "gap": 0.0145
       },
       "100-105": {
-        "count": 3017,
-        "actual_hr_rate": 0.2469,
-        "model_hr_rate": 0.247,
-        "gap": -0.0
+        "count": 5063,
+        "actual_hr_rate": 0.283,
+        "model_hr_rate": 0.2667,
+        "gap": 0.0163
       },
       "105-110": {
-        "count": 1552,
-        "actual_hr_rate": 0.471,
-        "model_hr_rate": 0.4522,
-        "gap": 0.0188
+        "count": 2521,
+        "actual_hr_rate": 0.499,
+        "model_hr_rate": 0.4819,
+        "gap": 0.0172
       },
       "110-115": {
-        "count": 311,
-        "actual_hr_rate": 0.5788,
-        "model_hr_rate": 0.5345,
-        "gap": 0.0443
+        "count": 467,
+        "actual_hr_rate": 0.5824,
+        "model_hr_rate": 0.5584,
+        "gap": 0.024
       },
       "115-120": {
-        "count": 15,
-        "actual_hr_rate": 0.4667,
-        "model_hr_rate": 0.5185,
-        "gap": -0.0518
+        "count": 20,
+        "actual_hr_rate": 0.45,
+        "model_hr_rate": 0.5245,
+        "gap": -0.0745
       }
     },
-    "max_estimated_bases": 3.9018,
+    "max_estimated_bases": 3.9601,
     "extreme_calibration": {
       "0.85-0.90": {
-        "count": 306,
-        "actual": 0.9641,
-        "predicted": 0.8753
+        "count": 406,
+        "actual": 0.9483,
+        "predicted": 0.8765
       },
       "0.90-0.95": {
-        "count": 207,
-        "actual": 0.9903,
-        "predicted": 0.9194
+        "count": 589,
+        "actual": 0.9728,
+        "predicted": 0.9273
       },
       "0.95-1.00": {
-        "count": 15,
+        "count": 458,
         "actual": 1.0,
-        "predicted": 0.9567
+        "predicted": 0.9637
       }
     },
-    "venue_logloss_mean": 0.4472,
-    "flagged_venues": {},
-    "crps_total_bases": 0.1783
+    "venue_logloss_mean": 0.4493,
+    "flagged_venues": {
+      "5340": 0.5499,
+      "5355": 0.6465
+    },
+    "crps_total_bases": 0.1738
   },
   "hyperparameters": {
-    "n_estimators": 100,
-    "max_depth": 6,
-    "learning_rate": 0.15,
-    "min_samples_split": 50,
-    "min_samples_leaf": 20
+    "learning_rate": 0.06786521399275376,
+    "max_leaf_nodes": 31,
+    "min_samples_leaf": 195,
+    "l2_regularization": 3.7366677629315164,
+    "max_iter": 500,
+    "early_stopping": true,
+    "validation_fraction": 0.1,
+    "n_iter_no_change": 20
   },
   "calibration_method": "sigmoid",
   "split_mode": "season-forward",
   "notes": [
     "Trained from S3 batted ball parquet data",
-    "sklearn Pipeline: StandardScaler + OneHotEncoder + GBC",
+    "sklearn Pipeline: passthrough + OrdinalEncoder + HistGBC (native categoricals)",
     "Calibrated with CalibratedClassifierCV (sigmoid)",
     "Split mode: season-forward",
     "Spray angle adjusted for batter handedness (negative = pull side)",
     "venue_id replaced by park-geometry features (altitude/wall_distance/carry/over_fence_margin)",
-    "21 features: 19 numeric + 2 categorical (feature_set=F3)"
+    "28 features: 26 numeric + 2 categorical (feature_set=F6)"
   ]
 }
