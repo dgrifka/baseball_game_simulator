@@ -5,3 +5,10 @@ __pycache__/
 .headshot_cache/
 Research/venue_effects_images/
 test_images/
+
+# Local AI-assistant context — deliberately not published with the public repo.
+CLAUDE.md
+CLAUDE.local.md
+.remember/
+.superpowers/
+.worktrees/
