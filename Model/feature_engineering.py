@@ -15,7 +15,17 @@ from Model.bbe_physics import nathan_spin, spin_aware_carry
 # CONSTANTS
 # =============================================================================
 
-# MLB coordinate system: home plate location
+# MLB coordinate system: home plate location.
+#
+# FROZEN — model feature input for every shipped feature set (<= F6). Spray
+# angle, spray_direction and the F6 spin/carry features are all measured from
+# this vertex, so changing it invalidates the trained models: it would require
+# the full retrain + bake-off validation cycle, together with a matching change
+# to COORD_TO_FT and the wall polygons. This vertex was fitted for coordinate
+# *distance*, not angle, and is measurably off as an angular vertex; the charts
+# therefore render from a separately calibrated vertex
+# (Simulator.visualizations.calculate_spray_angle_calibrated). See
+# Documentation/spray_angle_calibration.md.
 HOME_PLATE_X = 125.42
 HOME_PLATE_Y = 199.02
 
