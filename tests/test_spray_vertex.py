@@ -12,6 +12,7 @@ Two vertices coexist on purpose:
 These tests pin both: a silent swap of the frozen vertex would invalidate the
 model without any other test noticing.
 """
+import importlib
 import os
 
 import numpy as np
@@ -31,6 +32,24 @@ from Simulator.visualizations import (
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PARQUET_2024 = os.path.join(_REPO_ROOT, "Data", "batted_balls",
                              "batted_balls_2024.parquet")
+
+
+def _parquet_readable():
+    """Both the file and a pandas parquet engine have to be present.
+
+    CI installs requirements.txt, which carries neither pyarrow nor fastparquet
+    (nothing in the production path reads parquet), so the file being committed
+    is not enough — without an engine pandas raises ImportError at read time.
+    """
+    if not os.path.exists(_PARQUET_2024):
+        return False
+    for engine in ("pyarrow", "fastparquet"):
+        try:
+            importlib.import_module(engine)
+            return True
+        except ImportError:
+            continue
+    return False
 
 # A pulled ball for a right-handed batter: left of the frozen vertex, well into
 # the outfield.
@@ -69,8 +88,8 @@ def test_calibrated_angle_differs_from_frozen_angle():
     assert abs(frozen - calibrated) > 1.0
 
 
-@pytest.mark.skipif(not os.path.exists(_PARQUET_2024),
-                    reason="Data/batted_balls/batted_balls_2024.parquet not present")
+@pytest.mark.skipif(not _parquet_readable(),
+                    reason="2024 batted-ball parquet or a parquet engine is unavailable")
 def test_calibrated_vertex_keeps_home_runs_fair():
     """A home run cannot land foul, so |raw spray| > 45 deg is impossible by rule.
 
