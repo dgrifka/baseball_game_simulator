@@ -1,9 +1,8 @@
 """Tests for Model/bbe_physics.py — Nathan spin + temp-aware carry (F6 port).
 
-Pinned values generated from the private harness module
-(baseball_simulator_model/Content/bbe_physics.py) on 2026-07-24; the private
-repo's Gate 1 (Content/f6_deploy_gates.py) additionally proves exact parity
-on the full frozen 2026 frame."""
+Pinned values generated from the private orchestration repo's harness module
+on 2026-07-24; its Gate 1 additionally proves exact parity on the full frozen
+2026 frame."""
 import numpy as np
 import pytest
 
