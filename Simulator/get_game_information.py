@@ -3,34 +3,68 @@ MLB game information retrieval from Stats API.
 Fetches schedules, game details, and play-by-play data.
 """
 
+import logging
+
 import requests
 import pandas as pd
-import json
 from pandas import json_normalize
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import pytz
 import datetime
 
 from Simulator.constants import (
-    base_url, league, season, endpoint,
-    team_ver, schedule_ver, game_ver, venue_names,
+    base_url, league, endpoint,
+    team_ver, schedule_ver, game_ver,
     VENUE_NAME_TO_ID, VENUE_ID_TO_NAME, DEFAULT_VENUE_ID, VALID_VENUE_IDS, NEUTRAL_SITE_VENUES
 )
+
+logger = logging.getLogger(__name__)
+
+# Connect / read timeouts (seconds). Without these a hung MLB endpoint blocks
+# the whole pipeline indefinitely — the daily run has no outer watchdog.
+REQUEST_TIMEOUT = (5, 30)
+
+# One pooled Session for every call: keeps the TLS connection alive across the
+# ~100 requests a daily run makes, and carries the retry policy. Retries cover
+# the transient statuses the Stats API actually returns under load; 4xx is not
+# retried, it is raised.
+_retry = Retry(
+    total=3,
+    backoff_factor=0.5,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET"],
+)
+_session = requests.Session()
+_adapter = HTTPAdapter(max_retries=_retry)
+_session.mount("https://", _adapter)
+_session.mount("http://", _adapter)   # loopback test server + any plain-HTTP mirror
+
 
 def response_code(base_url, ver, endpoint):
     """
     Sends a GET request to the MLB Stats API endpoint and returns JSON response.
 
+    Uses the module-level pooled session: connect/read timeouts, retry with
+    exponential backoff on 429/5xx, and `raise_for_status()` so an HTTP failure
+    surfaces here instead of as a JSON decode error further downstream.
+
     Args:
         base_url (str): Base MLB Stats API URL
         ver (str): API version number
         endpoint (str): API endpoint path
-    
+
     Returns:
         dict: Parsed JSON response data
+
+    Raises:
+        requests.HTTPError: on a 4xx/5xx that survived the retry policy.
+        requests.RequestException: on timeout or connection failure.
     """
     url = f'{base_url}{ver}/{endpoint}'
-    print(url)
-    response = requests.get(url)
+    logger.debug("GET %s", url)
+    response = _session.get(url, timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
     return response.json()
 
 def team_info():

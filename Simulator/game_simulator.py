@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-from Simulator.constants import team_colors, VENUE_NAME_TO_ID, DEFAULT_VENUE_ID
+from Simulator.constants import VENUE_NAME_TO_ID, DEFAULT_VENUE_ID
 from Simulator import vector_engine
 from Model.feature_engineering import (
     create_features_for_prediction,
