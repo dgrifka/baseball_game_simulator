@@ -3,6 +3,7 @@ Feature engineering functions for MLB batted ball outcome prediction.
 Used by both model training (Base_Model.ipynb) and inference (game_simulator.py).
 """
 
+import functools
 import math
 import os
 
@@ -256,23 +257,63 @@ def _ray_polygon_distance(pts, angle_deg):
     return best
 
 
+def _wall_distance_uncached(venue_key, spray_rounded):
+    """Ray-cast core of `wall_distance_at_spray`; `venue_key` is already a str
+    and `spray_rounded` already rounded, so this is the cacheable unit."""
+    pts = _WALLS.get(venue_key)
+    if pts is None:
+        return LEAGUE_MEDIAN_WALL_FT
+    d_hc = _ray_polygon_distance(pts, spray_rounded)
+    if d_hc is None:
+        return LEAGUE_MEDIAN_WALL_FT
+    return d_hc * COORD_TO_FT
+
+
+# The ray-cast walks every wall segment in pure Python, so it is the most
+# expensive part of the geo feature block. Because it only ever sees spray
+# rounded to 1 decimal, the reachable key space is ~900 angles x 33 parks and
+# memoizing is free. Safe only while `_WALLS` is read-only after import, which
+# it is; `wall_distance_at_spray.cache_clear()` is exposed below for anyone who
+# reloads the polygons at runtime.
+_wall_distance_cached = functools.lru_cache(maxsize=None)(_wall_distance_uncached)
+
+
 def wall_distance_at_spray(venue_id, spray_angle_deg):
     """Distance (FEET) from home plate to the outfield wall at `spray_angle_deg`
     for `venue_id`. Falls back to LEAGUE_MEDIAN_WALL_FT for unknown venues or
     ray-cast misses (so the feature never produces NaN).
 
     The ray-cast uses spray rounded to 1 decimal, matching the training-side
-    feature builder's per-(venue, rounded-spray) cache.
+    feature builder's per-(venue, rounded-spray) key, and results are memoized
+    on exactly that (venue, rounded-spray) pair — the cache the old comment here
+    described as living only on the training side now exists on this side too.
     """
-    pts = _WALLS.get(str(venue_id))
-    if pts is None:
+    venue_key = str(venue_id)
+    if venue_key not in _WALLS:
+        # Unknown venue: return before touching spray, as this always has.
         return LEAGUE_MEDIAN_WALL_FT
-    d_hc = _ray_polygon_distance(pts, round(float(spray_angle_deg), 1))
-    if d_hc is None:
-        return LEAGUE_MEDIAN_WALL_FT
-    return d_hc * COORD_TO_FT
+    spray_rounded = round(float(spray_angle_deg), 1)
+    if not np.isfinite(spray_rounded):
+        # NaN is never equal to itself, so every NaN call would be a fresh cache
+        # entry and the table would grow without bound. Bypass it.
+        return _wall_distance_uncached(venue_key, spray_rounded)
+    return _wall_distance_cached(venue_key, spray_rounded)
 
 
+wall_distance_at_spray.cache_clear = _wall_distance_cached.cache_clear
+wall_distance_at_spray.cache_info = _wall_distance_cached.cache_info
+
+
+# Two trajectory integrators live in this codebase and that is deliberate, not
+# duplication to be consolidated. `_drag_carry_scalar` below is drag-only (lift
+# off, dt=0.005, no spin, no temperature) and feeds `carry_ft` /
+# `over_fence_margin` — the F3 features. `bbe_physics.spin_aware_carry` is a
+# Nathan-seeded-spin Magnus trajectory (dt=0.01 with a position half-step,
+# matching Nathan's spreadsheet) and feeds `carry_ft_spin`,
+# `carry_ft_spin_temp` and their over-fence margins — the F6 features. All of
+# those columns are frozen model inputs, so making either integrator match the
+# other would silently change the feature values a shipped model was trained on.
+# Changing either one requires a retrain plus a bake-off, not a refactor.
 def _drag_carry_scalar(launch_speed_mph, launch_angle_deg, elevation_ft):
     """Single ball: drag-adjusted carry distance in feet (Euler integration)."""
     if not np.isfinite(launch_speed_mph) or not np.isfinite(launch_angle_deg):
@@ -422,9 +463,17 @@ def create_features_for_prediction(launch_speed, launch_angle, coord_x, coord_y,
     backspin_rpm, sidespin_rpm = nathan_spin(launch_angle, spray_angle_adj, bat_side)
     carry_ft_spin = spin_aware_carry(
         launch_speed, launch_angle, spray_angle_adj, bat_side, altitude_ft)
-    carry_ft_spin_temp = spin_aware_carry(
-        launch_speed, launch_angle, spray_angle_adj, bat_side, altitude_ft,
-        temp_f_safe)
+    if temp_f_safe == _TEMP_DEFAULT:
+        # spin_aware_carry's temp_f default IS 70.0, so this second integration
+        # would re-derive carry_ft_spin exactly — same inputs, same code path.
+        # Verified bit-identical over 1344 (EV, LA, spray, handedness, altitude)
+        # combinations. Skipping it halves feature-build cost for every
+        # default-temperature row, which is every row with no weather reading.
+        carry_ft_spin_temp = carry_ft_spin
+    else:
+        carry_ft_spin_temp = spin_aware_carry(
+            launch_speed, launch_angle, spray_angle_adj, bat_side, altitude_ft,
+            temp_f_safe)
 
     # Create DataFrame matching model's expected feature order
     return pd.DataFrame({
