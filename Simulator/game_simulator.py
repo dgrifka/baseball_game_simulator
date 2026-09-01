@@ -918,7 +918,38 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
     return np.cumsum(runs_by_inning)
 
 
-def simulator(num_simulations, home_outcomes, away_outcomes, prob_cache=None):
+def _draw_rng_seed(seed):
+    """Resolve the seed for a run's `np.random.Generator`.
+
+    With `seed=None` (production default) the seed is drawn from the GLOBAL
+    numpy stream rather than from OS entropy, so `np.random.seed(n)` before a
+    call now pins the vectorized engine too — previously `default_rng()` ignored
+    it and the vector path could not be reproduced from a test. Unseeded
+    globals still give a fresh stream every run, so production behavior is
+    unchanged.
+    """
+    if seed is not None:
+        return int(seed)
+    return int(np.random.randint(0, 2 ** 31 - 1))
+
+
+def _seed_scalar_globals(seed):
+    """Pin the globals the scalar reference path draws from.
+
+    `simulate_game` uses BOTH `np.random.permutation` (global numpy stream, for
+    the per-sim event order) and `random.random` (global Python stream, for
+    outcome and baserunning branches), so an explicit `seed=` has to set both
+    for the scalar path to be reproducible. No-op when `seed is None`, which
+    leaves a caller's own `random.seed` / `np.random.seed` untouched.
+    """
+    if seed is None:
+        return
+    random.seed(seed)
+    np.random.seed(seed)
+
+
+def simulator(num_simulations, home_outcomes, away_outcomes, prob_cache=None,
+              seed=None):
     """
     Run multiple game simulations with pre-computed probabilities.
 
@@ -930,10 +961,20 @@ def simulator(num_simulations, home_outcomes, away_outcomes, prob_cache=None):
             `_outcome_cache_key` does (mirrors simulator_by_inning). If None
             (default), built here via `_build_prob_cache`. Pass an existing
             cache to skip a second round of predict_proba work.
+        seed (int, optional): when given, makes this call reproducible on BOTH
+            engines — it seeds the scalar path's `random` / `np.random` globals
+            and is used directly as the vectorized engine's Generator seed.
+            Reproducibility is per-engine: the two engines consume randomness in
+            a different order, so the same seed does NOT make their per-game run
+            arrays equal (see tests/test_engine_parity.py). None (default)
+            leaves the globals alone and draws the Generator seed from the
+            global numpy stream, so `np.random.seed(n)` also pins a run.
 
     Returns:
         tuple: (home_runs_array, away_runs_array, home_win_pct, away_win_pct, tie_pct)
     """
+    _seed_scalar_globals(seed)
+
     # Clean up outcomes format
     home_outcomes_clean = []
     away_outcomes_clean = []
@@ -968,7 +1009,7 @@ def simulator(num_simulations, home_outcomes, away_outcomes, prob_cache=None):
             home_runs_scored[i] = simulate_game(home_outcomes_clean, prob_cache)
             away_runs_scored[i] = simulate_game(away_outcomes_clean, prob_cache)
     else:
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(_draw_rng_seed(seed))
         tables = _get_transition_tables()
         home_ev, home_cdf = vector_engine.translate_outcomes(
             home_outcomes_clean, prob_cache, _outcome_cache_key)
@@ -992,7 +1033,8 @@ def simulator(num_simulations, home_outcomes, away_outcomes, prob_cache=None):
     return home_runs_scored, away_runs_scored, home_win_percentage, away_win_percentage, tie_percentage
 
 
-def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, prob_cache=None):
+def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn,
+                        prob_cache=None, seed=None):
     """
     Per-inning deserved-run trajectories via one nested batch of sims.
 
@@ -1006,6 +1048,11 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
             caches are identical. If provided, used as-is — callers that already
             built an identical cache for simulator() should pass it in to avoid
             duplicate predict_proba calls.
+        seed (int, optional): same contract as simulator()'s — seeds the scalar
+            path's globals and the vectorized engine's Generator, making a run
+            reproducible on whichever engine executes it. None (default) leaves
+            the globals alone and derives the Generator seed from the global
+            numpy stream.
 
     Returns:
         (innings, home_cum, away_cum):
@@ -1016,6 +1063,8 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
         for a simulation level on cumulative runs at inning N) is the caller's
         responsibility.
     """
+    _seed_scalar_globals(seed)
+
     all_innings = [inn for _, inn in home_outcomes_inn] + [inn for _, inn in away_outcomes_inn]
     n_innings = max(all_innings) if all_innings else 1
 
@@ -1031,7 +1080,7 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
             home_cum[s] = simulate_game_by_inning(home_outcomes_inn, prob_cache, n_innings)
             away_cum[s] = simulate_game_by_inning(away_outcomes_inn, prob_cache, n_innings)
     else:
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(_draw_rng_seed(seed))
         tables = _get_transition_tables()
         home_ev, home_cdf, home_inns = vector_engine.translate_outcomes(
             [o for o, _ in home_outcomes_inn], prob_cache, _outcome_cache_key,
