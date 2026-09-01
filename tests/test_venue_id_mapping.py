@@ -74,7 +74,10 @@ def _fake_schedule():
 class TestUniqloVenueMapping:
     """The live ingestion path (Path A) must survive + canonicalize the UNIQLO row."""
 
-    @patch("Simulator.get_game_information.requests.get")
+    # Patches the pooled session, not `requests.get`: the API client owns a
+    # module-level requests.Session (timeouts + retry policy), so `requests.get`
+    # is never called and patching it would let a REAL schedule request through.
+    @patch("Simulator.get_game_information._session.get")
     def test_path_a_fetch_games_canonicalizes_uniqlo_row(self, mock_get):
         mock_response = MagicMock()
         mock_response.json.return_value = _fake_schedule()

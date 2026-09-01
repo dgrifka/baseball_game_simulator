@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-from Simulator.constants import team_colors, VENUE_NAME_TO_ID, DEFAULT_VENUE_ID
+from Simulator.constants import VENUE_NAME_TO_ID, DEFAULT_VENUE_ID
 from Simulator import vector_engine
 from Model.feature_engineering import (
     create_features_for_prediction,
@@ -80,6 +80,27 @@ def _apply_hr_tail_correction(probabilities, launch_speed):
             return probs
 
     return probabilities
+
+def _predict_batch(feature_frames):
+    """Score many single-row feature frames with ONE `predict_proba` call.
+
+    `feature_frames` is a list of the single-row DataFrames returned by
+    `prepare_batted_ball_features`. They always carry the same columns in the
+    same order (the fallback builder delegates to the full one), so the concat
+    is a pure row-stack and row i of the result corresponds to
+    `feature_frames[i]`.
+
+    One 80-row call is ~100x faster than 80 one-row calls and returns
+    bit-identical probabilities — the estimator is row-independent.
+
+    Returns:
+        np.ndarray of shape (len(feature_frames), 5), aligned to input order.
+    """
+    if not feature_frames:
+        return np.empty((0, 5), dtype=float)
+    X = pd.concat(feature_frames, ignore_index=True)
+    return pipeline.predict_proba(X)   # one call, rows aligned to input order
+
 
 def get_venue_id(venue_name):
     """
@@ -236,9 +257,46 @@ def calculate_total_bases(outcomes_list):
     Returns:
         pd.DataFrame: Detailed stats including launch data, probabilities, and estimated bases
     """
+    # Pass 1 — build the feature frame for every batted ball and score them all
+    # with a single predict_proba call. The branch chain below mirrors the
+    # scoring loop exactly, so `probs_by_position` covers precisely the items
+    # that used to call predict_proba, keyed by their position in the list.
+    feature_frames = []
+    frame_positions = []
+    for pos, item in enumerate(outcomes_list):
+        outcome = item[0]
+        if outcome == "strikeout" or outcome == "walk" \
+                or outcome == "stolen_base" or outcome == "pickoff":
+            continue
+        elif isinstance(outcome, dict):
+            frame = prepare_batted_ball_features(
+                launch_speed=outcome['launch_speed'],
+                launch_angle=outcome['launch_angle'],
+                venue_name=outcome['venue_name'],
+                coord_x=outcome.get('coord_x'),
+                coord_y=outcome.get('coord_y'),
+                bat_side=outcome.get('bat_side'),
+                temp_f=outcome.get('temp_f'),
+                roof_closed=outcome.get('roof_closed', False)
+            )
+        else:
+            # Legacy format: list [launch_speed, launch_angle, venue]
+            legacy_speed, legacy_angle, legacy_stadium = outcome
+            frame = prepare_batted_ball_features(
+                launch_speed=legacy_speed,
+                launch_angle=legacy_angle,
+                venue_name=legacy_stadium
+            )
+        feature_frames.append(frame)
+        frame_positions.append(pos)
+
+    batch_probs = _predict_batch(feature_frames)
+    probs_by_position = {pos: batch_probs[i]
+                         for i, pos in enumerate(frame_positions)}
+
     result_list = []
 
-    for item in outcomes_list:
+    for pos, item in enumerate(outcomes_list):
         # Support both 3-element (legacy) and 4-element (with pitcher) tuples
         if len(item) == 4:
             outcome, original_event_type, full_name, pitcher_name = item
@@ -271,19 +329,9 @@ def calculate_total_bases(outcomes_list):
             launch_angle = outcome['launch_angle']
             stadium = outcome['venue_name']
             event_type = "in_play"
-            
-            # Create features and predict
-            features = prepare_batted_ball_features(
-                launch_speed=launch_speed,
-                launch_angle=launch_angle,
-                venue_name=stadium,
-                coord_x=outcome.get('coord_x'),
-                coord_y=outcome.get('coord_y'),
-                bat_side=outcome.get('bat_side'),
-                temp_f=outcome.get('temp_f'),
-                roof_closed=outcome.get('roof_closed', False)
-            )
-            probabilities = pipeline.predict_proba(features)[0]
+
+            # Probabilities came from the single batched call above.
+            probabilities = probs_by_position[pos]
 
             bases = (
                 probabilities[1] * 1 +
@@ -295,14 +343,9 @@ def calculate_total_bases(outcomes_list):
             # Legacy format: list [launch_speed, launch_angle, venue]
             launch_speed, launch_angle, stadium = outcome
             event_type = "in_play"
-            
-            features = prepare_batted_ball_features(
-                launch_speed=launch_speed,
-                launch_angle=launch_angle,
-                venue_name=stadium
-            )
-            probabilities = pipeline.predict_proba(features)[0]
-            
+
+            probabilities = probs_by_position[pos]
+
             bases = (
                 probabilities[1] * 1 +
                 probabilities[2] * 2 +
@@ -660,6 +703,73 @@ def _outcome_cache_key(outcome):
             outcome.get('coord_y'), outcome.get('bat_side'))
 
 
+def _build_prob_cache(outcomes_iterable):
+    """Pre-compute the per-batted-ball probability vectors both engines draw from.
+
+    Keys are `_outcome_cache_key(outcome)` for dict outcomes and
+    `tuple(outcome)` for the legacy `[launch_speed, launch_angle, venue]` list
+    form. Each unique key is featurized once and the whole batch is scored with
+    a single `predict_proba` call.
+
+    Dict outcomes get HR_TAIL_CORRECTIONS applied — simulation-only, by design;
+    see the module-level comment. Legacy list outcomes keep raw probabilities,
+    matching the behavior this was extracted from.
+
+    Args:
+        outcomes_iterable: iterable of outcome data (strings for
+            strikeout/walk/stolen_base/pickoff are skipped).
+
+    Returns:
+        dict: cache_key -> np.ndarray of 5 probabilities.
+    """
+    keys = []
+    frames = []
+    speeds = []          # launch speed per key; None for the legacy list form
+    seen = set()
+
+    for outcome in outcomes_iterable:
+        if isinstance(outcome, dict):
+            cache_key = _outcome_cache_key(outcome)
+            if cache_key in seen:
+                continue
+            seen.add(cache_key)
+            frames.append(prepare_batted_ball_features(
+                launch_speed=outcome['launch_speed'],
+                launch_angle=outcome['launch_angle'],
+                venue_name=outcome['venue_name'],
+                coord_x=outcome.get('coord_x'),
+                coord_y=outcome.get('coord_y'),
+                bat_side=outcome.get('bat_side'),
+                temp_f=outcome.get('temp_f'),
+                roof_closed=outcome.get('roof_closed', False)
+            ))
+            keys.append(cache_key)
+            speeds.append(outcome['launch_speed'])
+        elif isinstance(outcome, list) and len(outcome) == 3:
+            cache_key = tuple(outcome)
+            if cache_key in seen:
+                continue
+            seen.add(cache_key)
+            launch_speed, launch_angle, stadium = outcome
+            frames.append(prepare_batted_ball_features(
+                launch_speed=launch_speed,
+                launch_angle=launch_angle,
+                venue_name=stadium
+            ))
+            keys.append(cache_key)
+            speeds.append(None)
+
+    batch = _predict_batch(frames)
+    prob_cache = {}
+    for i, cache_key in enumerate(keys):
+        probs = batch[i].copy()
+        prob_cache[cache_key] = (
+            probs if speeds[i] is None
+            else _apply_hr_tail_correction(probs, speeds[i])
+        )
+    return prob_cache
+
+
 def _use_scalar_sim():
     return _os.environ.get('DTW_SCALAR_SIM', '') == '1'
 
@@ -722,9 +832,7 @@ def simulate_game(outcomes_list, prob_cache):
         elif isinstance(outcome, (dict, tuple)):
             # Get cache key
             if isinstance(outcome, dict):
-                cache_key = (outcome['launch_speed'], outcome['launch_angle'],
-                             outcome['venue_name'], outcome.get('coord_x'),
-                             outcome.get('coord_y'), outcome.get('bat_side'))
+                cache_key = _outcome_cache_key(outcome)
             else:
                 cache_key = outcome
             
@@ -790,9 +898,7 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
             if any(bases):
                 attempt_pickoff(bases)
         elif isinstance(outcome, dict):
-            cache_key = (outcome['launch_speed'], outcome['launch_angle'],
-                         outcome['venue_name'], outcome.get('coord_x'),
-                         outcome.get('coord_y'), outcome.get('bat_side'))
+            cache_key = _outcome_cache_key(outcome)
             probabilities = prob_cache.get(cache_key)
             if probabilities is None:
                 continue
@@ -812,18 +918,63 @@ def simulate_game_by_inning(outcomes_with_inning, prob_cache, n_innings):
     return np.cumsum(runs_by_inning)
 
 
-def simulator(num_simulations, home_outcomes, away_outcomes):
+def _draw_rng_seed(seed):
+    """Resolve the seed for a run's `np.random.Generator`.
+
+    With `seed=None` (production default) the seed is drawn from the GLOBAL
+    numpy stream rather than from OS entropy, so `np.random.seed(n)` before a
+    call now pins the vectorized engine too — previously `default_rng()` ignored
+    it and the vector path could not be reproduced from a test. Unseeded
+    globals still give a fresh stream every run, so production behavior is
+    unchanged.
+    """
+    if seed is not None:
+        return int(seed)
+    return int(np.random.randint(0, 2 ** 31 - 1))
+
+
+def _seed_scalar_globals(seed):
+    """Pin the globals the scalar reference path draws from.
+
+    `simulate_game` uses BOTH `np.random.permutation` (global numpy stream, for
+    the per-sim event order) and `random.random` (global Python stream, for
+    outcome and baserunning branches), so an explicit `seed=` has to set both
+    for the scalar path to be reproducible. No-op when `seed is None`, which
+    leaves a caller's own `random.seed` / `np.random.seed` untouched.
+    """
+    if seed is None:
+        return
+    random.seed(seed)
+    np.random.seed(seed)
+
+
+def simulator(num_simulations, home_outcomes, away_outcomes, prob_cache=None,
+              seed=None):
     """
     Run multiple game simulations with pre-computed probabilities.
-    
+
     Args:
         num_simulations (int): Number of games to simulate
         home_outcomes (list): List of home team batting outcomes
         away_outcomes (list): List of away team batting outcomes
-        
+        prob_cache (dict, optional): pre-computed probabilities keyed as
+            `_outcome_cache_key` does (mirrors simulator_by_inning). If None
+            (default), built here via `_build_prob_cache`. Pass an existing
+            cache to skip a second round of predict_proba work.
+        seed (int, optional): when given, makes this call reproducible on BOTH
+            engines — it seeds the scalar path's `random` / `np.random` globals
+            and is used directly as the vectorized engine's Generator seed.
+            Reproducibility is per-engine: the two engines consume randomness in
+            a different order, so the same seed does NOT make their per-game run
+            arrays equal (see tests/test_engine_parity.py). None (default)
+            leaves the globals alone and draws the Generator seed from the
+            global numpy stream, so `np.random.seed(n)` also pins a run.
+
     Returns:
         tuple: (home_runs_array, away_runs_array, home_win_pct, away_win_pct, tie_pct)
     """
+    _seed_scalar_globals(seed)
+
     # Clean up outcomes format
     home_outcomes_clean = []
     away_outcomes_clean = []
@@ -841,39 +992,9 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
             away_outcomes_clean.append(outcome)
     
     # Pre-compute ALL probabilities ONCE before simulations
-    prob_cache = {}
-    all_outcomes = home_outcomes_clean + away_outcomes_clean
-    
-    for outcome in all_outcomes:
-        if isinstance(outcome, dict):
-            cache_key = (outcome['launch_speed'], outcome['launch_angle'],
-                         outcome['venue_name'], outcome.get('coord_x'),
-                         outcome.get('coord_y'), outcome.get('bat_side'))
-            if cache_key not in prob_cache:
-                features = prepare_batted_ball_features(
-                    launch_speed=outcome['launch_speed'],
-                    launch_angle=outcome['launch_angle'],
-                    venue_name=outcome['venue_name'],
-                    coord_x=outcome.get('coord_x'),
-                    coord_y=outcome.get('coord_y'),
-                    bat_side=outcome.get('bat_side'),
-                    temp_f=outcome.get('temp_f'),
-                    roof_closed=outcome.get('roof_closed', False)
-                )
-                probs = pipeline.predict_proba(features)[0]
-                prob_cache[cache_key] = _apply_hr_tail_correction(probs, outcome['launch_speed'])
-        elif isinstance(outcome, list) and len(outcome) == 3:
-            # Legacy format
-            cache_key = tuple(outcome)
-            if cache_key not in prob_cache:
-                launch_speed, launch_angle, stadium = outcome
-                features = prepare_batted_ball_features(
-                    launch_speed=launch_speed,
-                    launch_angle=launch_angle,
-                    venue_name=stadium
-                )
-                prob_cache[cache_key] = pipeline.predict_proba(features)[0]
-    
+    if prob_cache is None:
+        prob_cache = _build_prob_cache(home_outcomes_clean + away_outcomes_clean)
+
     if _use_scalar_sim():
         # Reference path (DTW_SCALAR_SIM=1): the original per-sim loop.
         home_runs_scored = np.zeros(num_simulations, dtype=int)
@@ -888,7 +1009,7 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
             home_runs_scored[i] = simulate_game(home_outcomes_clean, prob_cache)
             away_runs_scored[i] = simulate_game(away_outcomes_clean, prob_cache)
     else:
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(_draw_rng_seed(seed))
         tables = _get_transition_tables()
         home_ev, home_cdf = vector_engine.translate_outcomes(
             home_outcomes_clean, prob_cache, _outcome_cache_key)
@@ -912,7 +1033,8 @@ def simulator(num_simulations, home_outcomes, away_outcomes):
     return home_runs_scored, away_runs_scored, home_win_percentage, away_win_percentage, tie_percentage
 
 
-def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, prob_cache=None):
+def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn,
+                        prob_cache=None, seed=None):
     """
     Per-inning deserved-run trajectories via one nested batch of sims.
 
@@ -921,11 +1043,16 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
         home_outcomes_inn, away_outcomes_inn (list): (outcome_data, inning) tuples
             from outcomes_by_inning.
         prob_cache (dict, optional): pre-computed probabilities keyed the same way
-            as simulator()'s cache. If None (default), built here exactly as
-            simulator() does (same cache-key tuple, prepare_batted_ball_features,
-            HR tail correction). If provided, used as-is — callers that already
+            as simulator()'s cache. If None (default), built by the shared
+            `_build_prob_cache` — the same helper simulator() uses, so the two
+            caches are identical. If provided, used as-is — callers that already
             built an identical cache for simulator() should pass it in to avoid
             duplicate predict_proba calls.
+        seed (int, optional): same contract as simulator()'s — seeds the scalar
+            path's globals and the vectorized engine's Generator, making a run
+            reproducible on whichever engine executes it. None (default) leaves
+            the globals alone and derives the Generator seed from the global
+            numpy stream.
 
     Returns:
         (innings, home_cum, away_cum):
@@ -936,30 +1063,14 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
         for a simulation level on cumulative runs at inning N) is the caller's
         responsibility.
     """
+    _seed_scalar_globals(seed)
+
     all_innings = [inn for _, inn in home_outcomes_inn] + [inn for _, inn in away_outcomes_inn]
     n_innings = max(all_innings) if all_innings else 1
 
     if prob_cache is None:
-        # Build prob cache (duplicate of simulator()'s loop, with HR tail correction).
-        prob_cache = {}
-        for outcome, _ in list(home_outcomes_inn) + list(away_outcomes_inn):
-            if isinstance(outcome, dict):
-                cache_key = (outcome['launch_speed'], outcome['launch_angle'],
-                             outcome['venue_name'], outcome.get('coord_x'),
-                             outcome.get('coord_y'), outcome.get('bat_side'))
-                if cache_key not in prob_cache:
-                    features = prepare_batted_ball_features(
-                        launch_speed=outcome['launch_speed'],
-                        launch_angle=outcome['launch_angle'],
-                        venue_name=outcome['venue_name'],
-                        coord_x=outcome.get('coord_x'),
-                        coord_y=outcome.get('coord_y'),
-                        bat_side=outcome.get('bat_side'),
-                        temp_f=outcome.get('temp_f'),
-                        roof_closed=outcome.get('roof_closed', False),
-                    )
-                    probs = pipeline.predict_proba(features)[0]
-                    prob_cache[cache_key] = _apply_hr_tail_correction(probs, outcome['launch_speed'])
+        prob_cache = _build_prob_cache(
+            [o for o, _ in list(home_outcomes_inn) + list(away_outcomes_inn)])
 
     if _use_scalar_sim():
         # Reference path (DTW_SCALAR_SIM=1): the original per-sim loop.
@@ -969,7 +1080,7 @@ def simulator_by_inning(num_simulations, home_outcomes_inn, away_outcomes_inn, p
             home_cum[s] = simulate_game_by_inning(home_outcomes_inn, prob_cache, n_innings)
             away_cum[s] = simulate_game_by_inning(away_outcomes_inn, prob_cache, n_innings)
     else:
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(_draw_rng_seed(seed))
         tables = _get_transition_tables()
         home_ev, home_cdf, home_inns = vector_engine.translate_outcomes(
             [o for o, _ in home_outcomes_inn], prob_cache, _outcome_cache_key,
