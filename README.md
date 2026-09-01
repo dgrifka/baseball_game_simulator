@@ -9,15 +9,16 @@
 - [Installation](#installation)
 - [Development](#development)
 - [Model](#model)
+- [Future Ideas](#future-ideas)
 - [Assumptions](#assumptions)
 - [Reasons Actual vs Simulation Can Vary](#reasons-actual-vs-simulation-can-vary)
-- [Future Ideas](#future-ideas)
 - [2026 Additions](#2026-additions)
 - [2025 Additions](#2025-additions)
 - [Project Structure](#project-structure)
 - [Model Validation](#model-validation)
 - [Outputs](#outputs)
 - [Research](#research)
+- [License](#license)
 - [Contact](#contact)
 
 ## Description
@@ -35,9 +36,25 @@ This project uses a **two-repository structure** for security:
 | Repository | Visibility | Purpose |
 |------------|------------|---------|
 | [baseball_game_simulator](https://github.com/dgrifka/baseball_game_simulator) | Public | Core simulation engine, model, visualizations |
-| simulator_private | Private | Orchestration, social media posting, credentials, GitHub Actions |
+| private orchestration repo | Private | Orchestration, social media posting, credentials, GitHub Actions |
 
-The private repo imports functions from this public repo and handles posting to Twitter/Bluesky. This keeps API credentials secure while allowing the core simulation logic to be open source.
+```mermaid
+flowchart TD
+    A[MLB Stats API] --> B[get_game_information.py]
+    B --> C[feature_engineering.py]
+    D[bbe_physics.py] --> C
+    E[(Model/data park walls + altitudes)] --> C
+    C --> F[batted_ball_model.pkl<br/>calibrated HistGBC, F6]
+    F --> G{{per-ball outcome probabilities}}
+    G --> H[game_simulator.py<br/>scalar reference]
+    G --> I[vector_engine.py<br/>vectorized NumPy]
+    H -. builds transition tables at import .-> I
+    I --> J[visualizations.py]
+    H --> J
+    J --> K[private orchestration repo<br/>posts to Twitter / Bluesky]
+```
+
+The private orchestration repo imports functions from this public repo and handles posting to Twitter/Bluesky. This keeps API credentials secure while allowing the core simulation logic to be open source.
 
 ## Installation
 
@@ -64,7 +81,7 @@ pytest tests/ -q
 The suite covers the spin/carry physics, F6 feature construction, weather and
 batter-id threading, venue-id mapping, model-asset presence, and an import
 smoke test over every module the daily run depends on. The same command runs
-in CI (`.github/workflows/ci.yml`) on every push and pull request.
+in CI (`.github/workflows/ci.yml`) on pushes to `main` and every pull request.
 
 ## Model
 
@@ -128,9 +145,12 @@ exit velocities (100+ mph) during resampling only — the exported per-ball
 probabilities are always the raw calibrated model output. See the scope note
 in `Simulator/game_simulator.py`.
 
-For more details, see `Model/Spray_Angle_Model.ipynb`, `Model/bbe_physics.py`,
-`Model/train_model.py` in the private repo (S3-based retraining), and
-`Model/model_metadata.json`.
+For more details, see `Model/bbe_physics.py` (the spin and carry physics),
+`Model/model_metadata.json` (the shipped model's exact features and metrics),
+and `Documentation/spray_angle_calibration.md` (the two spray-angle vertices
+and why the model's is frozen). Retraining (`Model/train_model.py`, S3-based)
+lives in the private orchestration repo. `Model/Spray_Angle_Model.ipynb` is
+historical (2025, pre-F3) and is kept only for the spray-angle EDA.
 
 ## Future Ideas
 
@@ -180,6 +200,7 @@ baseball_game_simulator/
 │
 ├── Documentation/
 │   ├── readme_image_generator.ipynb  # Generate README images
+│   ├── spray_angle_calibration.md    # Rendering vs model spray-angle vertex
 │   └── Images/                   # README visualization images
 │
 ├── .github/
@@ -210,12 +231,13 @@ baseball_game_simulator/
 ├── tests/                        # pytest suite (physics, features, threading,
 │                                 #   venue mapping, import smoke, assets)
 │
-├── Data/
+├── Data/                         # Notebooks and tests only — the daily run
+│   │                             #   fetches from the MLB Stats API instead
 │   ├── batted_balls/             # Yearly parquet files
 │   ├── games/                    # Games parquet file
 │   ├── teams/                    # Teams parquet file
 │   ├── contour_data.csv          # EV/LA visualization data
-│   └── fences.csv                # Raw fence-dimension source data
+│   └── fences.csv                # raw fence-distance source for Model/data/mlb_park_walls.csv
 │
 └── Research/
     ├── 2024_Season_WP_Model.ipynb # Bayesian hierarchical model research
@@ -265,6 +287,10 @@ Stadium-specific spray charts showing batted ball locations with expected outcom
 - [Who Deserved to Win: Building an MLB Game Outcome Simulator](https://medium.com/@dmgrifka_64770/who-deserved-to-win-building-an-mlb-game-outcome-simulator-b4a8d4bca2a9)
   
 - [Applying Bayesian Hierarchical Methods to MLB Season Win Probabilities with PyStan](https://medium.com/@dmgrifka_64770/applying-bayesian-hierarchical-methods-to-mlb-season-win-probabilties-with-pystan-468572abb932)
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ## Contact
 
