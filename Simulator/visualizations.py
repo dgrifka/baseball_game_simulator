@@ -20,7 +20,7 @@ from Simulator.constants import (
 )
 from Simulator.game_simulator import prepare_batted_ball_features
 from Simulator.style import (
-    PALETTE, apply_base_style, get_team_color, lighten,
+    PALETTE, apply_base_style, get_team_color, lighten, darken,
     stamp_header, title_axes, draw_title_block, finalize, heading_font,
 )
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -248,6 +248,66 @@ def _apply_watermark(filepath, position='top-right', y_pct=None):
         print(f"Warning: could not apply watermark to {filepath}: {e}")
 
 
+def _pcts(away, home, tie=None):
+    """Format deserve-to-win percentages once, for labels and filenames.
+
+    Every chart formatted these with the same ``f"{v:.0f}"`` inline. Keeping
+    it in one place is what guarantees the number in a chart's subtitle and
+    the number in its filename can never drift apart.
+    """
+    out = {'away': f"{away:.0f}", 'home': f"{home:.0f}"}
+    if tie is not None:
+        out['tie'] = f"{tie:.0f}"
+    return out
+
+
+def _relative_luminance(color):
+    """WCAG relative luminance of ``color`` (sRGB, 0..1)."""
+    def _lin(v):
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = (_lin(c) for c in to_rgb(color))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _contrast_text(bg_color):
+    """Pick white or the dark ink color for text drawn on ``bg_color``.
+
+    Returns whichever gives the higher WCAG contrast ratio, rather than
+    comparing luminance to a hand-picked cutoff. Every lightened team color
+    used for walk segments lands in the 0.59-0.77 luminance band, where white
+    scores 1.8:1-2.9:1 (below the 3:1 floor for large text) and the dark ink
+    scores 6:1-10:1, so any single cutoff in that band gets some teams wrong.
+    """
+    bg = _relative_luminance(bg_color)
+
+    def _ratio(fg):
+        hi, lo = sorted((bg, _relative_luminance(fg)), reverse=True)
+        return (hi + 0.05) / (lo + 0.05)
+
+    return 'white' if _ratio('white') > _ratio(PALETTE['text']) else PALETTE['text']
+
+
+def _dtw_subtitle(away_name, away_score, home_name, home_score,
+                  formatted_date, pcts):
+    """The shared 'Actual: ... DTW: ...' subtitle line."""
+    return (f"Actual: {away_name} {away_score} - {home_name} {home_score}   "
+            f"({formatted_date})    DTW: {away_name} {pcts['away']}% • "
+            f"{home_name} {pcts['home']}% • Tie {pcts['tie']}%")
+
+
+def _out_path(images_dir, away_name, home_name, away_score, home_score,
+              pcts, suffix):
+    """Build (and ensure the directory for) a chart's output path.
+
+    Filenames are consumed downstream, so the shape here is deliberately
+    byte-identical to the five inline f-strings it replaces.
+    """
+    os.makedirs(images_dir, exist_ok=True)
+    filename = (f"{away_name}_{home_name}_{away_score}-{home_score}"
+                f"--{pcts['away']}-{pcts['home']}_{suffix}.png")
+    return os.path.join(images_dir, filename)
+
+
 _NAME_SUFFIXES = {'jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv'}
 
 
@@ -355,11 +415,7 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
     # into every chart rendered afterwards. Use the shared cream style instead.
     apply_base_style()
 
-    percentages = {
-        'away': f"{away_win_percentage:.0f}",
-        'home': f"{home_win_percentage:.0f}",
-        'tie': f"{tie_percentage:.0f}"
-    }
+    percentages = _pcts(away_win_percentage, home_win_percentage, tie_percentage)
 
     # Extract data
     outcomes = {
@@ -459,8 +515,8 @@ def la_ev_graph(home_outcomes, away_outcomes, away_estimated_total_bases, home_e
         plt.ylim(-70, 70)
 
         # Save with high quality — same filename as before.
-        filename = f'{away_team}_{home_team}_{str(away_score)}-{str(home_score)}--{percentages["away"]}-{percentages["home"]}_bb.png'
-        filepath = os.path.join(images_dir, filename)
+        filepath = _out_path(images_dir, away_team, home_team,
+                             away_score, home_score, percentages, 'bb')
         finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
     finally:
         plt.close(fig)
@@ -480,11 +536,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     """
     apply_base_style()
 
-    percentages = {
-        'away': f"{away_win_percentage:.0f}",
-        'home': f"{home_win_percentage:.0f}",
-        'tie':  f"{tie_percentage:.0f}",
-    }
+    percentages = _pcts(away_win_percentage, home_win_percentage, tie_percentage)
 
     home_runs_scored = np.asarray(home_runs_scored)
     away_runs_scored = np.asarray(away_runs_scored)
@@ -497,8 +549,10 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
     home_color = get_team_color(team_colors, home_team, idx=0)
     away_color = get_team_color(team_colors, away_team, idx=0)
 
-    # If the two team primaries are too close, lighten the away team's
-    # primary to keep the bars distinguishable. (Some teams' secondary
+    # If the two team primaries are too close, darken the away team's
+    # primary to keep the bars distinguishable. Darkening rather than
+    # lightening: lightening pushes the color toward the cream background,
+    # which washes a pale primary out entirely. (Some teams' secondary
     # entries in team_colors aren't valid hex strings, so we don't rely
     # on them here.)
     def _color_distance(c1, c2):
@@ -507,7 +561,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         return ((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2) ** 0.5
 
     if _color_distance(home_color, away_color) < 0.20:
-        r, g, b = lighten(away_color, 0.45)
+        r, g, b = darken(away_color, 0.45)
         away_color = colors.to_hex((r, g, b))
 
     # Reserve space at the top for a dedicated title strip.
@@ -531,8 +585,12 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         # Bumped headroom so badges sit clearly above the tallest bar.
         # Close-score stagger spans more vertically so the two boxes don't
         # graze each other or the bar tops.
-        y_top = max(home_counts.max(), away_counts.max()) * 1.45
+        # Headroom is only needed when the two badges have to stagger
+        # vertically; otherwise 1.45 leaves a third of the axis empty and
+        # squashes the bars into the bottom half.
         scores_close = abs(home_score - away_score) <= 1
+        peak = max(home_counts.max(), away_counts.max())
+        y_top = peak * (1.45 if scores_close else 1.12)
         if scores_close:
             # Lower-scoring team's badge sits higher to clear the overlap.
             away_badge_y = y_top * 0.97 if away_score > home_score else y_top * 0.78
@@ -567,7 +625,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
                 fontweight='bold')
 
         # Axis formatting
-        ax.set_xlim(-0.5, max_runs + 1.5)
+        ax.set_xlim(-0.5, max_runs + 0.5)
         ax.set_ylim(0, y_top * 1.05)
         ax.set_xticks(range(max_runs + 1))
         ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
@@ -580,7 +638,9 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         for s in ['bottom', 'left']:
             ax.spines[s].set_color(PALETTE['spine'])
 
-        ax.legend(loc='upper right', frameon=False, fontsize=11)
+        # Upper left: run distributions are right-skewed, so the upper right
+        # is where the tail lives and the upper left is reliably empty.
+        ax.legend(loc='upper left', frameon=False, fontsize=11)
 
         # Dedicated title strip at the top of the figure (separate axes
         # from the plot, so it can't collide with bars / legend / score
@@ -588,9 +648,8 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         # thin divider rule.
         tax = title_axes(fig, height_frac=0.13, top_pad=0.02)
         subtitle_lines = [
-            f'Actual: {away_team} {away_score} - {home_team} {home_score}   '
-            f'({formatted_date})    DTW: {away_team} {percentages["away"]}% • '
-            f'{home_team} {percentages["home"]}% • Tie {percentages["tie"]}%',
+            _dtw_subtitle(away_team, away_score, home_team, home_score,
+                          formatted_date, percentages),
             f'Most Likely: {away_team} {away_mode} - {home_team} {home_mode}',
         ]
         draw_title_block(tax,
@@ -598,10 +657,8 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
                          subtitle_lines,
                          title_size=20, subtitle_size=11)
 
-        os.makedirs(images_dir, exist_ok=True)
-        filename = (f'{away_team}_{home_team}_{away_score}-{home_score}'
-                    f'--{percentages["away"]}-{percentages["home"]}_rd.png')
-        filepath = os.path.join(images_dir, filename)
+        filepath = _out_path(images_dir, away_team, home_team,
+                             away_score, home_score, percentages, 'rd')
         finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
     finally:
         plt.close(fig)
@@ -646,8 +703,10 @@ def prepare_table_data(df):
     # Format launch speed
     df['Launch Speed'] = df['Launch Speed'].astype(str) + ' mph'
     
-    # Round estimated bases to 2 decimals
-    df['Estimated Bases'] = df['Estimated Bases'].round(2)
+    # Estimated bases to a fixed 2 decimals. .round(2) leaves ragged strings
+    # in the rendered column ("3.0", "1.9", "2.29"); the column reads as a
+    # number only if every row has the same number of decimals.
+    df['Estimated Bases'] = df['Estimated Bases'].apply(lambda x: f'{x:.2f}')
     
     return df
 
@@ -657,6 +716,8 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
     """Creates enhanced table visualization of estimated bases statistics with team logos."""
 
     apply_base_style()
+
+    percentages = _pcts(away_win_percentage, home_win_percentage)
 
     df = df.copy().head(15)
 
@@ -698,19 +759,20 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
 
         add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df)
 
-        title = "Top 15 Batted Balls by Estimated Total Bases"
-        subtitle = (
-            f"{away_team} {away_score} - {home_team} {home_score}   •   {formatted_date}\n"
-            f"Win Probability: {away_team} {away_win_percentage:.0f}% • "
-            f"{home_team} {home_win_percentage:.0f}%"
-        )
-        stamp_header(fig, title, subtitle,
-                     y_title=0.93, y_subtitle=0.88,
-                     title_size=23, subtitle_size=15)
+        # Dedicated title strip, matching the other three social charts:
+        # left-aligned bold title, divider rule, muted subtitle rows.
+        tax = title_axes(fig, height_frac=0.13, top_pad=0.02)
+        draw_title_block(
+            tax,
+            "Top 15 Batted Balls by Estimated Total Bases",
+            [f"{away_team} {away_score} - {home_team} {home_score}   •   {formatted_date}",
+             f"Win Probability: {away_team} {percentages['away']}% • "
+             f"{home_team} {percentages['home']}%"],
+            title_size=22, subtitle_size=13)
 
-        os.makedirs(images_dir, exist_ok=True)
-        filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{away_win_percentage:.0f}-{home_win_percentage:.0f}_estimated_bases.png'
-        filepath = os.path.join(images_dir, filename)
+        filepath = _out_path(images_dir, away_team, home_team,
+                             away_score, home_score, percentages,
+                             'estimated_bases')
         finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
     finally:
         plt.close(fig)
@@ -774,7 +836,9 @@ def create_enhanced_cell_styles_with_logos(table, df, team_color_map):
         player_cell.get_text().set_color(PALETTE['text'])
 
         # Estimated bases — YlOrRd gradient with luminance-driven text color.
-        bases_value = df.iloc[row - 1]['Estimated Bases']
+        # The column is a formatted string for display; the gradient needs
+        # the number back.
+        bases_value = float(df.iloc[row - 1]['Estimated Bases'])
         bases_cell = table[(row, bases_col)]
         rgba = cmap(norm(bases_value))
         bases_cell.set_facecolor(rgba)
@@ -817,11 +881,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
     """
     apply_base_style()
 
-    percentages = {
-        'away': f"{away_win_percentage:.0f}",
-        'home': f"{home_win_percentage:.0f}",
-        'tie': f"{tie_percentage:.0f}"
-    }
+    percentages = _pcts(away_win_percentage, home_win_percentage, tie_percentage)
 
     # ------- Aggregate outcomes -------
     player_contributions = {}   # (name, team) -> {batted_balls, walks, pa, total}
@@ -1010,16 +1070,28 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                 ax.text(name_x, idx, display_name, ha='right', va='center',
                         fontsize=11, color=PALETTE['text'], transform=trans)
 
+            # x limit is needed before the labels so the total label's offset
+            # can be expressed as a fraction of the axis rather than in data
+            # units (the two panels are on very different scales).
+            max_val = max(bb + w for bb, w in zip(bb_vals, walk_vals)) if bb_vals else 1
+            x_max = max_val * 1.18
+
             # Value labels on bars
             for idx, (bb, w) in enumerate(zip(bb_vals, walk_vals)):
                 if bb > 0.5:
                     ax.text(bb/2, idx, f'{bb:.1f}', ha='center', va='center',
                            fontsize=10, color='white', fontweight='bold')
                 if w > 0.5:
+                    # The walk segment is a lightened team color and can be
+                    # pale enough that white text on it is unreadable.
                     ax.text(bb + w/2, idx, f'{w:.0f}', ha='center', va='center',
-                           fontsize=10, color='white', fontweight='bold')
+                           fontsize=10, fontweight='bold',
+                           color=_contrast_text(wc_list[idx]))
                 total = bb + w
-                ax.text(total + 0.08, idx, f'{total:.1f}', ha='left', va='center',
+                # Blended transform: x as a fraction of the axis, so the gap
+                # between a bar and its total is identical on both panels.
+                ax.text(total / x_max + 0.008, idx, f'{total:.1f}',
+                       ha='left', va='center', transform=trans,
                        fontsize=11, color=PALETTE['text'], fontweight='bold')
 
             # Styling
@@ -1033,8 +1105,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
             ax.grid(axis='x', alpha=0.5, linestyle='--', color=PALETTE['grid'])
             ax.set_axisbelow(True)
 
-            max_val = max(bb + w for bb, w in zip(bb_vals, walk_vals)) if bb_vals else 1
-            ax.set_xlim(0, max_val * 1.18)
+            ax.set_xlim(0, x_max)
 
             # Track per-section colors for the legend (representative pair)
             return tc_list[0] if tc_list else PALETTE['text'], wc_list[0] if wc_list else PALETTE['text_muted']
@@ -1050,11 +1121,8 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         fig_h = fig.get_size_inches()[1]
         strip_height_frac = max(0.10, min(0.16, 1.5 / fig_h))
         tax = title_axes(fig, height_frac=strip_height_frac, top_pad=0.015)
-        subtitle = (
-            f'Actual: {away_team} {away_score} - {home_team} {home_score}   '
-            f'({formatted_date})    DTW: {away_team} {percentages["away"]}% • '
-            f'{home_team} {percentages["home"]}% • Tie {percentages["tie"]}%'
-        )
+        subtitle = _dtw_subtitle(away_team, away_score, home_team, home_score,
+                                 formatted_date, percentages)
         draw_title_block(tax, 'Player Contributions by Estimated Total Bases',
                          [subtitle], title_size=22, subtitle_size=12)
 
@@ -1083,9 +1151,9 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         ax_hit.legend(handles=legend_patches, loc='lower right', fontsize=10,
                      frameon=False)
 
-        os.makedirs(images_dir, exist_ok=True)
-        filename = f'{away_team}_{home_team}_{away_score}-{home_score}--{percentages["away"]}-{percentages["home"]}_player_contributions.png'
-        filepath = os.path.join(images_dir, filename)
+        filepath = _out_path(images_dir, away_team, home_team,
+                             away_score, home_score, percentages,
+                             'player_contributions')
         finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
     finally:
         plt.close(fig)
@@ -1540,11 +1608,7 @@ def spray_chart(home_outcomes, away_outcomes,
     if pipeline is None:
         pipeline = _get_model()
 
-    percentages = {
-        'away': f"{away_win_percentage:.0f}",
-        'home': f"{home_win_percentage:.0f}",
-        'tie': f"{tie_percentage:.0f}"
-    }
+    percentages = _pcts(away_win_percentage, home_win_percentage, tie_percentage)
 
     home_logo_name = get_logo_team_name(home_team)
     away_logo_name = get_logo_team_name(away_team)
@@ -1695,11 +1759,9 @@ def spray_chart(home_outcomes, away_outcomes,
         # everything reads as one cohesive header (no more colliding with
         # the watermark or the field).
         tax = title_axes(fig, height_frac=0.16, top_pad=0.02)
-        subtitle = (
-            f"Actual: {away_display_name} {away_score} - {home_display_name} {home_score}   "
-            f"({formatted_date})    DTW: {away_display_name} {percentages['away']}% • "
-            f"{home_display_name} {percentages['home']}% • Tie {percentages['tie']}%"
-        )
+        subtitle = _dtw_subtitle(away_display_name, away_score,
+                                 home_display_name, home_score,
+                                 formatted_date, percentages)
         draw_title_block(tax, "Batted Ball Spray Chart", [subtitle],
                          title_size=22, subtitle_size=12)
 
@@ -1710,32 +1772,32 @@ def spray_chart(home_outcomes, away_outcomes,
         sm = ScalarMappable(norm=ESTIMATED_BASES_NORM, cmap=ESTIMATED_BASES_CMAP)
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
-        cbar.set_ticks([0, 1, 2, 3, 4])
-        cbar.set_ticklabels(['0', '1', '2', '3', '4'])
-        cbar.ax.tick_params(labelsize=10, length=0, pad=3, colors=PALETTE['text'])
+        # No numerals: "2.0 estimated bases" means nothing to a reader, and the
+        # Out/1B/2B/3B/HR row underneath already says what the scale is.
+        cbar.set_ticks([])
         cbar.outline.set_visible(False)
 
         fig.text(0.5, 0.852, 'Estimated Bases',
                  fontsize=11, fontweight='bold', ha='center', va='bottom',
                  color=PALETTE['text'], fontfamily=heading_font())
 
-        # Outcome subtitle row beneath the numeric ticks (Out / 1B / 2B / 3B / HR).
-        # Five evenly-spaced x positions matching cbar tick centers.
-        for x_frac, outcome_label in zip(
-            [0.35, 0.425, 0.50, 0.575, 0.65],
-            ['Out', '1B', '2B', '3B', 'HR']
-        ):
-            fig.text(x_frac, 0.778, outcome_label,
-                     fontsize=8.5, ha='center', va='top',
+        # Outcome row beneath the bar. x positions are derived from the
+        # colorbar axes' own bounds, so moving/resizing cbar_ax can no longer
+        # leave the labels behind.
+        cb_pos = cbar_ax.get_position()
+        outcome_labels = ['Out', '1B', '2B', '3B', 'HR']
+        for i, outcome_label in enumerate(outcome_labels):
+            x_frac = cb_pos.x0 + cb_pos.width * i / (len(outcome_labels) - 1)
+            fig.text(x_frac, cb_pos.y0 - 0.008, outcome_label,
+                     fontsize=11, ha='center', va='top',
                      color=PALETTE['text_muted'], fontstyle='italic')
 
         fig.text(0.5, 0.015, 'Stadium dimensions are estimated for this visual',
                  fontsize=9, fontstyle='italic', color=PALETTE['text_muted'],
                  ha='center', va='bottom')
 
-        filename = (f"{away_display_name}_{home_display_name}_{away_score}-{home_score}--"
-                    f"{percentages['away']}-{percentages['home']}_spray.png")
-        filepath = os.path.join(images_dir, filename)
+        filepath = _out_path(images_dir, away_display_name, home_display_name,
+                             away_score, home_score, percentages, 'spray')
 
         finalize(fig, filepath, dpi=200, pad_inches=0.1,
                  apply_watermark_fn=_apply_watermark)

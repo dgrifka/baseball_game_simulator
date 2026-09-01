@@ -126,6 +126,17 @@ def lighten(color, amount=0.5):
             b + (1 - b) * amount)
 
 
+def darken(color, amount=0.5):
+    """Blend ``color`` toward black by ``amount`` (0..1).
+
+    The counterpart to ``lighten``. Used where a color has to be pushed away
+    from another one without also pushing it toward the cream background —
+    lightening a pale team primary makes it vanish into the page.
+    """
+    r, g, b = to_rgb(color)
+    return (r * (1 - amount), g * (1 - amount), b * (1 - amount))
+
+
 def stamp_header(fig, title, subtitle=None, *, x=0.5, ha='center',
                  y_title=0.97, y_subtitle=0.935,
                  title_size=16, subtitle_size=11):
