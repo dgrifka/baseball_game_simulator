@@ -8,22 +8,35 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is what the daily bake runs on; 3.12 is what development uses.
+        # Both are tested because the pickled model artifact and the pinned
+        # scikit-learn have to load under either.
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: ${{ matrix.python-version }}
+
+      # Install with uv, matching how the pipeline installs this repo's
+      # requirements in production. Pinned so a uv release cannot change
+      # resolution under us.
+      - uses: astral-sh/setup-uv@v9
+        with:
+          version: "0.12.2"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+        run: uv pip install --system -r requirements.txt pytest==9.0.3
 
       - name: Run tests
         # tests/ covers the venue-id regression, an import-smoke over every
         # module the daily bake depends on, and asset-presence for the model
         # CSVs. This is what would have caught the best_batted_balls import break.
+        # It also pins the feature-frame column order, calls predict_proba on the
+        # shipped pickle, and checks scalar/vector engine parity. Runs once per
+        # interpreter in the matrix above.
         run: pytest tests/ -q
