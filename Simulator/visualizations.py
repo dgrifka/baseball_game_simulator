@@ -225,6 +225,30 @@ def _apply_watermark(filepath, position='top-right', y_pct=None):
         print(f"Warning: could not apply watermark to {filepath}: {e}")
 
 
+_NAME_SUFFIXES = {'jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv'}
+
+
+def surname(full_name):
+    """Return the surname portion of a full player name, for chart labels.
+
+    Drops the first token (the given name) and any trailing generational
+    suffix, keeping multi-token surnames intact:
+
+        "Vladimir Guerrero Jr." -> "Guerrero"
+        "Elly De La Cruz"       -> "De La Cruz"
+        "Cal Raleigh"           -> "Raleigh"
+        "Ichiro"                -> "Ichiro"
+
+    A single-token name is returned unchanged; an empty/None name yields ''.
+    """
+    parts = (full_name or '').split()
+    while len(parts) > 1 and parts[-1].lower() in _NAME_SUFFIXES:
+        parts.pop()
+    if len(parts) > 1:
+        return ' '.join(parts[1:])
+    return parts[0] if parts else ''
+
+
 def get_team_logo(team_name, mlb_team_logos, logo_cache={}):
     """
     Retrieves team logo URL with caching.
@@ -1554,8 +1578,9 @@ def spray_chart(home_outcomes, away_outcomes,
                 plot_x = distance * np.cos(angle_rad)
                 plot_y = distance * np.sin(angle_rad)
 
-                # Extract last name for labeling top batted balls
-                last_name = player_name.split()[-1] if player_name else ''
+                # Surname for labeling top batted balls. Not split()[-1]:
+                # that labels "Vladimir Guerrero Jr." as "Jr.".
+                last_name = surname(player_name)
 
                 batted_balls[team_key].append({
                     'x': plot_x,
