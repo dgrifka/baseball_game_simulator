@@ -27,6 +27,7 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import requests
 from io import BytesIO
 from PIL import Image, ImageEnhance
+import functools
 import os
 
 # Resolve paths relative to the repo root (parent of Simulator/)
@@ -148,6 +149,36 @@ def _load_headshot(player_id, size=80):
         return None
 
 
+@functools.lru_cache(maxsize=8)
+def _watermark_logo(target_h):
+    """Return the watermark logo as RGBA, pre-keyed and scaled to ``target_h``.
+
+    Memoized per target height: a process renders many charts at the same
+    image size, and this used to decode + white-key + alpha-scale the full
+    asset on every single save.
+
+    The shipped asset is already RGBA with its white background keyed out, so
+    the white-mask branch only runs for a legacy RGB asset. The 0.85 alpha
+    multiply stays here rather than baked into the file, so the rendered
+    watermark is identical either way.
+    """
+    logo = Image.open(_LOGO_PATH)
+    if logo.mode != 'RGBA':
+        logo = logo.convert('RGBA')
+        logo_data = np.array(logo)
+        r, g, b = logo_data[:, :, 0], logo_data[:, :, 1], logo_data[:, :, 2]
+        white_mask = (r > 240) & (g > 240) & (b > 240)
+        logo_data[white_mask, 3] = 0
+        logo = Image.fromarray(logo_data)
+
+    logo_data = np.array(logo)
+    logo_data[:, :, 3] = (logo_data[:, :, 3].astype(float) * 0.85).astype(np.uint8)
+    logo = Image.fromarray(logo_data)
+
+    logo_w = int(target_h * logo.width / logo.height)
+    return logo.resize((logo_w, target_h), Image.LANCZOS)
+
+
 def _apply_watermark(filepath, position='top-right', y_pct=None):
     """Add logo + watermark text to a saved image file using PIL.
 
@@ -172,23 +203,15 @@ def _apply_watermark(filepath, position='top-right', y_pct=None):
         img = Image.open(filepath).convert('RGBA')
         w, h = img.size
 
-        logo = Image.open(_LOGO_PATH).convert('RGBA')
-        logo_data = np.array(logo)
-        r, g, b = logo_data[:, :, 0], logo_data[:, :, 1], logo_data[:, :, 2]
-        white_mask = (r > 240) & (g > 240) & (b > 240)
-        logo_data[white_mask, 3] = 0
-        logo_data[:, :, 3] = (logo_data[:, :, 3].astype(float) * 0.85).astype(np.uint8)
-        logo = Image.fromarray(logo_data)
-
         # Scale logo relative to the smaller dimension (avoids overflow on narrow images)
         ref = min(w, h)
-        logo_h = max(20, int(ref * 0.028))
-        logo_w = int(logo_h * logo.width / logo.height)
-        logo = logo.resize((logo_w, logo_h), Image.LANCZOS)
+        logo_h = max(20, int(ref * 0.045))
+        logo = _watermark_logo(logo_h)
+        logo_w = logo.width
 
         # Prepare text — sized so it's slightly wider than the logo
         text = 'Data: MLB  |  @mlb_simulator'
-        font_size = max(10, int(ref * 0.0095))
+        font_size = max(10, int(ref * 0.014))
         try:
             font_path = fm.findfont(fm.FontProperties(family='DejaVu Sans'))
             font = ImageFont.truetype(font_path, font_size)
