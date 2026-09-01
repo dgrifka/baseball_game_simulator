@@ -206,15 +206,18 @@ def draw_title_block(ax, title, subtitle_lines=None, *,
         cursor_y -= 0.30
 
 
-def finalize(fig, filepath, *, dpi=200, apply_watermark_fn=None):
+def finalize(fig, filepath, *, dpi=200, pad_inches=0.1, apply_watermark_fn=None):
     """Standardized save + watermark + close.
 
     ``apply_watermark_fn`` is injected by the caller (avoids a circular
     import between this module and visualizations.py).
+
+    ``pad_inches`` defaults to 0.1, which is matplotlib's own default for
+    ``bbox_inches='tight'`` — so existing callers are byte-unchanged.
     """
     import matplotlib.pyplot as plt
     os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
-    fig.savefig(filepath, dpi=dpi, bbox_inches='tight',
+    fig.savefig(filepath, dpi=dpi, bbox_inches='tight', pad_inches=pad_inches,
                 facecolor=PALETTE['bg'], edgecolor='none')
     if apply_watermark_fn is not None:
         apply_watermark_fn(filepath)
