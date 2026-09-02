@@ -1432,7 +1432,8 @@ def draw_baseball_field(ax, venue_name='default'):
         (0, cf_dist, 'center'),
         (45, rf_dist, 'left')
     ]
-    
+
+    fence_label_anchors = []
     for angle, dist_ft, ha in label_positions:
         angle_rad = np.radians(90 - angle)
         dist_plot = dist_ft * FEET_TO_PLOT
@@ -1441,7 +1442,8 @@ def draw_baseball_field(ax, venue_name='default'):
         label_y = label_dist * np.sin(angle_rad)
         ax.text(label_x, label_y, f"{dist_ft}'", ha=ha, va='bottom',
                 fontsize=11, color='#3F3A33', fontweight='bold', zorder=5)
-    
+        fence_label_anchors.append((label_x, label_y, ha))
+
     # Home plate — real proportions: 17" front, 8.5" sides, 12" back edges
     # Scaled so half-width = 2.5 plot units; back depth = sqrt(12²-8.5²)/8.5 * 2.5
     hp_hw = 2.5   # half-width
@@ -1456,9 +1458,12 @@ def draw_baseball_field(ax, venue_name='default'):
     ], closed=True, facecolor='white', edgecolor='black', linewidth=1, zorder=6)
     ax.add_patch(home_plate)
 
+    return fence_label_anchors
+
 
 def _place_spray_labels(ax, team_bbs, x_extent, axis_limit,
-                        min_xbases=None, max_labels=10, fallback_top=3):
+                        min_xbases=None, max_labels=10, fallback_top=3,
+                        *, extra_obstacles=None):
     """Place batted-ball labels with smart collision-avoiding placement.
 
     Scores 8 candidate offsets per label to avoid overlaps with other labels,
@@ -1487,6 +1492,11 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit,
         Cap on labels when ``min_xbases`` is used.
     fallback_top : int
         Number of top-xbases balls to label if nothing clears ``min_xbases``.
+    extra_obstacles : list[tuple] or None
+        Fixed texts the labels must avoid, as ``(x, y, ha)`` anchors in data
+        coords with ``va='bottom'`` (the shape ``draw_baseball_field`` returns
+        for its fence-distance labels). Seeded into the overlap scoring as
+        already-placed labels.
     """
     sorted_bbs = sorted(team_bbs, key=lambda b: b['xbases'], reverse=True)
 
@@ -1524,6 +1534,16 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit,
     label_half_h = 8
 
     placed = []  # list of (cx, cy) in data coords for placed labels
+
+    # Fence-distance texts join the scoring as pre-placed labels, their
+    # anchors shifted to the text's approximate centre (va='bottom' always;
+    # ha shifts left-aligned text right and right-aligned text left).
+    for ox, oy, ha in (extra_obstacles or []):
+        if ha == 'left':
+            ox += label_half_w * 0.5
+        elif ha == 'right':
+            ox -= label_half_w * 0.5
+        placed.append((ox, oy + label_half_h * 0.5))
 
     for bb in top_bbs:
         bx, by = bb['x'], bb['y']
@@ -1715,7 +1735,7 @@ def spray_chart(home_outcomes, away_outcomes,
             (ax_away, 'away', away_display_name, away_logo_name),
             (ax_home, 'home', home_display_name, home_logo_name)
         ]:
-            draw_baseball_field(ax, venue_name)
+            fence_labels = draw_baseball_field(ax, venue_name)
             ax.grid(False)
 
             logo_url = get_team_logo(logo_name, mlb_team_logos)
@@ -1766,7 +1786,8 @@ def spray_chart(home_outcomes, away_outcomes,
             # and better), capped at 10 to prevent overlap on slug-fests. Quiet
             # games fall back to top 3 by xbases so something still gets named.
             _place_spray_labels(ax, batted_balls[team_key], x_extent, axis_limit,
-                                min_xbases=1.0, max_labels=10, fallback_top=3)
+                                min_xbases=1.0, max_labels=10, fallback_top=3,
+                                extra_obstacles=fence_labels)
 
             ax.set_xlim(-x_extent, x_extent)
             ax.set_ylim(-3, axis_limit)
