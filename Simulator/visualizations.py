@@ -640,7 +640,7 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
 
         # Upper left: run distributions are right-skewed, so the upper right
         # is where the tail lives and the upper left is reliably empty.
-        ax.legend(loc='upper left', frameon=False, fontsize=11)
+        ax.legend(loc='upper right', frameon=False, fontsize=11)
 
         # Dedicated title strip at the top of the figure (separate axes
         # from the plot, so it can't collide with bars / legend / score
@@ -1842,7 +1842,7 @@ def add_team_logos_to_table(ax, table, team_names, mlb_team_logos, df):
             
             if logo_url:
                 # Get the logo image with smaller size for better fit
-                logo_size = (28, 28)  # Further reduced for better cell fit
+                logo_size = (40, 40)  # Matches the size the shipped table rendered at (via the old shared cache)
                 img = getImage(logo_url, zoom=0.75, size=logo_size, alpha=1.0)  # Reduced zoom for smaller appearance
                 
                 if img:
