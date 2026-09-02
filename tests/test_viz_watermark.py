@@ -19,7 +19,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-import pytest  # noqa: E402
 
 from Simulator.style import title_axes, draw_title_block  # noqa: E402
 
@@ -143,7 +142,6 @@ def test_logo_and_handle_are_flush_with_the_strip_right_edge():
         plt.close(fig)
 
 
-@pytest.mark.xfail(strict=True, reason="charts are wired up in Part 2")
 def test_only_the_retired_chart_still_pastes_the_watermark():
     """The four social charts draw the watermark; only la_ev_graph pastes it.
 

@@ -677,11 +677,12 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         draw_title_block(tax,
                          f'Distribution of Runs Scored  —  {num_simulations:,} Simulations',
                          subtitle_lines,
-                         title_size=20, subtitle_size=11)
+                         title_size=20, subtitle_size=11,
+                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
 
         filepath = _out_path(images_dir, away_team, home_team,
                              away_score, home_score, percentages, 'rd')
-        finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
+        finalize(fig, filepath, dpi=200)
     finally:
         plt.close(fig)
 
@@ -790,12 +791,13 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             [f"{away_team} {away_score} - {home_team} {home_score}   •   {formatted_date}",
              f"Win Probability: {away_team} {percentages['away']}% • "
              f"{home_team} {percentages['home']}%"],
-            title_size=22, subtitle_size=13)
+            title_size=22, subtitle_size=13,
+            logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
 
         filepath = _out_path(images_dir, away_team, home_team,
                              away_score, home_score, percentages,
                              'estimated_bases')
-        finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
+        finalize(fig, filepath, dpi=200)
     finally:
         plt.close(fig)
 
@@ -1146,7 +1148,8 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         subtitle = _dtw_subtitle(away_team, away_score, home_team, home_score,
                                  formatted_date, percentages)
         draw_title_block(tax, 'Player Contributions by Estimated Total Bases',
-                         [subtitle], title_size=22, subtitle_size=12)
+                         [subtitle], title_size=22, subtitle_size=12,
+                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
 
         ax_hit.set_title('Hitting  —  Estimated Bases', fontsize=13, fontweight='bold',
                         loc='left', color=PALETTE['text_muted'], pad=8,
@@ -1176,7 +1179,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         filepath = _out_path(images_dir, away_team, home_team,
                              away_score, home_score, percentages,
                              'player_contributions')
-        finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
+        finalize(fig, filepath, dpi=200)
     finally:
         plt.close(fig)
 
@@ -1785,7 +1788,8 @@ def spray_chart(home_outcomes, away_outcomes,
                                  home_display_name, home_score,
                                  formatted_date, percentages)
         draw_title_block(tax, "Batted Ball Spray Chart", [subtitle],
-                         title_size=22, subtitle_size=12)
+                         title_size=22, subtitle_size=12,
+                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
 
         # Continuous Estimated Bases legend — horizontal colorbar inset.
         # Centered at fig x=0.5 in the same vertical band the old discrete
@@ -1821,8 +1825,7 @@ def spray_chart(home_outcomes, away_outcomes,
         filepath = _out_path(images_dir, away_display_name, home_display_name,
                              away_score, home_score, percentages, 'spray')
 
-        finalize(fig, filepath, dpi=200, pad_inches=0.1,
-                 apply_watermark_fn=_apply_watermark)
+        finalize(fig, filepath, dpi=200, pad_inches=0.1)
 
         print(f"Saved spray chart: {filepath}")
         return filepath
