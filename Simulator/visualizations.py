@@ -36,6 +36,10 @@ _MODEL_PATH = os.path.join(_REPO_ROOT, 'Model', 'batted_ball_model.pkl')
 _CONTOUR_PATH = os.path.join(_REPO_ROOT, 'Data', 'contour_data.csv')
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'mlb_simulator_logo.png')
 
+# The watermark's attribution line. One constant so the string drawn in the
+# title strip and the one the retired chart pastes can never drift apart.
+WATERMARK_HANDLE = 'Data: MLB  |  @mlb_simulator'
+
 # Lazy-loaded caches
 _contour_cache = None
 _model_cache = None
@@ -149,13 +153,9 @@ def _load_headshot(player_id, size=80):
         return None
 
 
-@functools.lru_cache(maxsize=8)
-def _watermark_logo(target_h):
-    """Return the watermark logo as RGBA, pre-keyed and scaled to ``target_h``.
-
-    Memoized per target height: a process renders many charts at the same
-    image size, and this used to decode + white-key + alpha-scale the full
-    asset on every single save.
+@functools.lru_cache(maxsize=1)
+def _watermark_logo_native():
+    """The watermark logo as a keyed RGBA PIL image at its native size.
 
     The shipped asset is already RGBA with its white background keyed out, so
     the white-mask branch only runs for a legacy RGB asset. The 0.85 alpha
@@ -173,8 +173,30 @@ def _watermark_logo(target_h):
 
     logo_data = np.array(logo)
     logo_data[:, :, 3] = (logo_data[:, :, 3].astype(float) * 0.85).astype(np.uint8)
-    logo = Image.fromarray(logo_data)
+    return Image.fromarray(logo_data)
 
+
+@functools.lru_cache(maxsize=1)
+def _watermark_logo_rgba():
+    """The keyed watermark logo as an RGBA array at native size.
+
+    For the matplotlib title-strip watermark, which sizes the logo itself via
+    the axes it is drawn into — so this must not resize. Deliberately kept
+    separate from ``_watermark_logo``, whose whole job is to rasterize to a
+    pixel height for the PIL paste.
+    """
+    return np.asarray(_watermark_logo_native())
+
+
+@functools.lru_cache(maxsize=8)
+def _watermark_logo(target_h):
+    """Return the watermark logo as RGBA, pre-keyed and scaled to ``target_h``.
+
+    Memoized per target height: a process renders many charts at the same
+    image size, and this used to decode + white-key + alpha-scale the full
+    asset on every single save.
+    """
+    logo = _watermark_logo_native()
     logo_w = int(target_h * logo.width / logo.height)
     return logo.resize((logo_w, target_h), Image.LANCZOS)
 
@@ -210,7 +232,7 @@ def _apply_watermark(filepath, position='top-right', y_pct=None):
         logo_w = logo.width
 
         # Prepare text — sized so it's slightly wider than the logo
-        text = 'Data: MLB  |  @mlb_simulator'
+        text = WATERMARK_HANDLE
         font_size = max(10, int(ref * 0.014))
         try:
             font_path = fm.findfont(fm.FontProperties(family='DejaVu Sans'))
