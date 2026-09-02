@@ -25,7 +25,7 @@ jobs:
       # Install with uv, matching how the pipeline installs this repo's
       # requirements in production. Pinned so a uv release cannot change
       # resolution under us.
-      - uses: astral-sh/setup-uv@v9
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           version: "0.12.2"
 
