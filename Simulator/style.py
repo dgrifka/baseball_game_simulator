@@ -155,6 +155,12 @@ def stamp_header(fig, title, subtitle=None, *, x=0.5, ha='center',
                  ha=ha, va='top', linespacing=1.5)
 
 
+# Strip-local vertical layout, shared by the rule and the watermark logo so
+# the two can never drift into each other.
+_RULE_Y = 0.55
+_LOGO_BOTTOM = 0.62
+
+
 def title_axes(fig, *, height_frac=0.14, top_pad=0.015, right_reserve=0.12):
     """Reserve a dedicated, axis-less strip across the top of the figure
     for a title block.
@@ -183,17 +189,43 @@ def title_axes(fig, *, height_frac=0.14, top_pad=0.015, right_reserve=0.12):
 
 def draw_title_block(ax, title, subtitle_lines=None, *,
                      title_size=20, subtitle_size=11,
-                     rule=True):
+                     rule=True, logo=None, handle=None, logo_pt=30):
     """Render a 2-row title block inside the strip from ``title_axes()``.
 
     Layout: bold title on row 1, optional thin divider rule, then one or
     more subtitle lines (passed as a list so each line can be its own
     height). Subtitle text is muted; rule is a thin grey line.
+
+    ``logo`` (an RGBA array) and ``handle`` (a string) draw the watermark
+    inside the strip instead of pasting it onto the saved PNG afterwards.
+    The logo is right-aligned on the title row, the handle right-aligned on
+    the first subtitle row, and the rule's band between them is left empty.
+
+    ``logo_pt`` is the logo's height in *points*, so it renders at the same
+    physical size on every chart at a given dpi. Sizing it as a fraction of
+    the image — what the PIL paste did — made the logo twice as tall on a
+    tall chart as on a wide one.
     """
     if subtitle_lines is None:
         subtitle_lines = []
     elif isinstance(subtitle_lines, str):
         subtitle_lines = [subtitle_lines]
+
+    if logo is not None:
+        fig = ax.figure
+        fig_w, fig_h = fig.get_size_inches()
+        pos = ax.get_position()
+        # Height in figure fraction from a physical point size; width follows
+        # from the asset's own aspect ratio, corrected for the figure's.
+        h = logo_pt / 72 / fig_h
+        w = h * (fig_h / fig_w) * (logo.shape[1] / logo.shape[0])
+        y0 = pos.y0 + _LOGO_BOTTOM * pos.height
+        lax = fig.add_axes([pos.x1 - w, y0, w, h], label='watermark_logo')
+        lax.imshow(logo, interpolation='antialiased')
+        lax.axis('off')
+        lax.set_facecolor('none')
+        # Below the strip so a long title overprints the logo, not vice versa.
+        lax.set_zorder(ax.get_zorder() - 1)
 
     ax.text(0.0, 0.92, title,
             fontsize=title_size, fontweight='bold',
@@ -201,12 +233,20 @@ def draw_title_block(ax, title, subtitle_lines=None, *,
             fontfamily=_HEADING_FONTS,
             transform=ax.transAxes)
 
-    cursor_y = 0.55
+    cursor_y = _RULE_Y
     if rule:
         ax.plot([0.0, 1.0], [cursor_y, cursor_y],
                 color=PALETTE['grid'], linewidth=0.8,
                 transform=ax.transAxes, clip_on=False)
         cursor_y -= 0.10
+
+    if handle is not None:
+        # Same size and colour as a subtitle, on the subtitle's own row.
+        ax.text(1.0, cursor_y, handle,
+                fontsize=subtitle_size,
+                color=PALETTE['text_muted'],
+                ha='right', va='top',
+                transform=ax.transAxes)
 
     for line in subtitle_lines:
         ax.text(0.0, cursor_y, line,

@@ -36,6 +36,10 @@ _MODEL_PATH = os.path.join(_REPO_ROOT, 'Model', 'batted_ball_model.pkl')
 _CONTOUR_PATH = os.path.join(_REPO_ROOT, 'Data', 'contour_data.csv')
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'mlb_simulator_logo.png')
 
+# The watermark's attribution line. One constant so the string drawn in the
+# title strip and the one the retired chart pastes can never drift apart.
+WATERMARK_HANDLE = 'Data: MLB  |  @mlb_simulator'
+
 # Lazy-loaded caches
 _contour_cache = None
 _model_cache = None
@@ -149,13 +153,9 @@ def _load_headshot(player_id, size=80):
         return None
 
 
-@functools.lru_cache(maxsize=8)
-def _watermark_logo(target_h):
-    """Return the watermark logo as RGBA, pre-keyed and scaled to ``target_h``.
-
-    Memoized per target height: a process renders many charts at the same
-    image size, and this used to decode + white-key + alpha-scale the full
-    asset on every single save.
+@functools.lru_cache(maxsize=1)
+def _watermark_logo_native():
+    """The watermark logo as a keyed RGBA PIL image at its native size.
 
     The shipped asset is already RGBA with its white background keyed out, so
     the white-mask branch only runs for a legacy RGB asset. The 0.85 alpha
@@ -173,8 +173,30 @@ def _watermark_logo(target_h):
 
     logo_data = np.array(logo)
     logo_data[:, :, 3] = (logo_data[:, :, 3].astype(float) * 0.85).astype(np.uint8)
-    logo = Image.fromarray(logo_data)
+    return Image.fromarray(logo_data)
 
+
+@functools.lru_cache(maxsize=1)
+def _watermark_logo_rgba():
+    """The keyed watermark logo as an RGBA array at native size.
+
+    For the matplotlib title-strip watermark, which sizes the logo itself via
+    the axes it is drawn into — so this must not resize. Deliberately kept
+    separate from ``_watermark_logo``, whose whole job is to rasterize to a
+    pixel height for the PIL paste.
+    """
+    return np.asarray(_watermark_logo_native())
+
+
+@functools.lru_cache(maxsize=8)
+def _watermark_logo(target_h):
+    """Return the watermark logo as RGBA, pre-keyed and scaled to ``target_h``.
+
+    Memoized per target height: a process renders many charts at the same
+    image size, and this used to decode + white-key + alpha-scale the full
+    asset on every single save.
+    """
+    logo = _watermark_logo_native()
     logo_w = int(target_h * logo.width / logo.height)
     return logo.resize((logo_w, target_h), Image.LANCZOS)
 
@@ -210,7 +232,7 @@ def _apply_watermark(filepath, position='top-right', y_pct=None):
         logo_w = logo.width
 
         # Prepare text — sized so it's slightly wider than the logo
-        text = 'Data: MLB  |  @mlb_simulator'
+        text = WATERMARK_HANDLE
         font_size = max(10, int(ref * 0.014))
         try:
             font_path = fm.findfont(fm.FontProperties(family='DejaVu Sans'))
@@ -655,11 +677,12 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
         draw_title_block(tax,
                          f'Distribution of Runs Scored  —  {num_simulations:,} Simulations',
                          subtitle_lines,
-                         title_size=20, subtitle_size=11)
+                         title_size=20, subtitle_size=11,
+                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
 
         filepath = _out_path(images_dir, away_team, home_team,
                              away_score, home_score, percentages, 'rd')
-        finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
+        finalize(fig, filepath, dpi=200)
     finally:
         plt.close(fig)
 
@@ -768,12 +791,13 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
             [f"{away_team} {away_score} - {home_team} {home_score}   •   {formatted_date}",
              f"Win Probability: {away_team} {percentages['away']}% • "
              f"{home_team} {percentages['home']}%"],
-            title_size=22, subtitle_size=13)
+            title_size=22, subtitle_size=13,
+            logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
 
         filepath = _out_path(images_dir, away_team, home_team,
                              away_score, home_score, percentages,
                              'estimated_bases')
-        finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
+        finalize(fig, filepath, dpi=200)
     finally:
         plt.close(fig)
 
@@ -1124,7 +1148,8 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         subtitle = _dtw_subtitle(away_team, away_score, home_team, home_score,
                                  formatted_date, percentages)
         draw_title_block(tax, 'Player Contributions by Estimated Total Bases',
-                         [subtitle], title_size=22, subtitle_size=12)
+                         [subtitle], title_size=22, subtitle_size=12,
+                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
 
         ax_hit.set_title('Hitting  —  Estimated Bases', fontsize=13, fontweight='bold',
                         loc='left', color=PALETTE['text_muted'], pad=8,
@@ -1154,7 +1179,7 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
         filepath = _out_path(images_dir, away_team, home_team,
                              away_score, home_score, percentages,
                              'player_contributions')
-        finalize(fig, filepath, dpi=200, apply_watermark_fn=_apply_watermark)
+        finalize(fig, filepath, dpi=200)
     finally:
         plt.close(fig)
 
@@ -1763,7 +1788,8 @@ def spray_chart(home_outcomes, away_outcomes,
                                  home_display_name, home_score,
                                  formatted_date, percentages)
         draw_title_block(tax, "Batted Ball Spray Chart", [subtitle],
-                         title_size=22, subtitle_size=12)
+                         title_size=22, subtitle_size=12,
+                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
 
         # Continuous Estimated Bases legend — horizontal colorbar inset.
         # Centered at fig x=0.5 in the same vertical band the old discrete
@@ -1799,8 +1825,7 @@ def spray_chart(home_outcomes, away_outcomes,
         filepath = _out_path(images_dir, away_display_name, home_display_name,
                              away_score, home_score, percentages, 'spray')
 
-        finalize(fig, filepath, dpi=200, pad_inches=0.1,
-                 apply_watermark_fn=_apply_watermark)
+        finalize(fig, filepath, dpi=200, pad_inches=0.1)
 
         print(f"Saved spray chart: {filepath}")
         return filepath
