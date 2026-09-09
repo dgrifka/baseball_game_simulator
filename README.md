@@ -78,10 +78,14 @@ pip install pytest
 pytest tests/ -q
 ```
 
-The suite covers the spin/carry physics, F6 feature construction, weather and
-batter-id threading, venue-id mapping, model-asset presence, and an import
-smoke test over every module the daily run depends on. The same command runs
-in CI (`.github/workflows/ci.yml`) on pushes to `main` and every pull request.
+The suite (~135 tests, under ten seconds) covers the spin/carry physics, F6
+feature construction, a golden feature frame and a predict smoke on the
+shipped pickle, scalar/vector engine parity, the HR tail correction, the
+estimated-bases schema, weather and batter-id threading, venue-id mapping,
+chart labels and watermark geometry, model-asset presence, and an import smoke
+test over every module the daily run depends on. CI
+(`.github/workflows/ci.yml`) runs the same command on Python 3.11 and 3.12 for
+pushes to `main` and every pull request.
 
 ## Model
 
@@ -173,16 +177,17 @@ historical (2025, pre-F3) and is kept only for the spray-angle EDA.
 
 ## 2026 Additions
 
-- **Spin + temperature physics (feature set F6)**: `Model/bbe_physics.py` ports Alan Nathan's public spin and trajectory research, adding backspin/sidespin estimates and a temperature-aware carry integration. Seven new features; log loss improved from 0.446 to 0.4388.
-- **HistGradientBoosting estimator**: the classifier moved from `GradientBoostingClassifier` to `HistGradientBoostingClassifier` with native categorical support (ordinal-encoded), trained with early stopping.
-- **Live weather capture**: `parse_weather` pulls `gameData.weather` out of the play-by-play payload already being fetched (zero extra API calls) and threads game-time temperature and roof state into batted-ball scoring, behind a `sanitize_temp` guard for implausible readings.
-- **Vectorized simulation engine**: `Simulator/vector_engine.py` simulates all N games at once as NumPy arrays, iterating over ~80 event positions instead of 10,000 simulations. Baserunning rules are not reimplemented — every transition table is built at import time by calling the scalar functions in `game_simulator.py`, which remain the reference implementation.
-- **Test suite + CI**: `tests/` covers the physics module, F6 feature construction, weather/batter-id threading, venue-id mapping, model-asset presence, and an import smoke test over every module the daily run depends on. GitHub Actions runs it on every push and pull request.
-- **Park-geometry features (feature set F3)**: `venue_id` replaced by `altitude_ft`, `wall_distance_ft`, `carry_ft`, and `over_fence_margin`, computed from real stadium wall polygons and altitudes (`Model/data/`). Log loss improved from 0.450 to 0.446, with better calibration at the extremes.
-- **Sigmoid calibration + season-forward split**: the classifier is wrapped in `CalibratedClassifierCV(method="sigmoid")`, calibrated on a season held forward from training.
-- **HR tail correction (simulation only)**: a small bump to home-run probability at 100+ mph exit velocities during resampling; exported per-ball probabilities stay raw by design.
-- **Per-inning simulation primitives**: `outcomes_by_inning` / `simulator_by_inning` preserve inning structure (including steals/pickoffs) for the per-inning deserved-run-differential charts.
-- **Alternate/minor-league venue support**: wall geometry and altitude for tracked non-MLB parks (e.g. Sutter Health Park, Las Vegas Ballpark), plus a generalized polygon generator.
+The model items are described in full under [Model](#model).
+
+- **Spin + temperature physics (feature set F6)** — seven Nathan-derived spin and carry features; log loss 0.446 → 0.4388.
+- **Park-geometry features (feature set F3)** — `venue_id` replaced by altitude, wall distance and carry computed from real stadium polygons; log loss 0.450 → 0.446.
+- **HistGradientBoosting estimator** with native categoricals and early stopping, sigmoid-calibrated on a season held forward from training.
+- **Live weather capture** — game-time temperature and roof state from the feed already being fetched, behind the `sanitize_temp` guard.
+- **HR tail correction (simulation only)** — small bump at 100+ mph during resampling; exported per-ball probabilities stay raw.
+- **Vectorized simulation engine** — `Simulator/vector_engine.py` simulates all games at once; the baserunning rules stay in `game_simulator.py`, which builds the transition tables.
+- **Per-inning simulation primitives** — `outcomes_by_inning` / `simulator_by_inning` for the per-inning deserved-run-differential charts.
+- **Alternate/minor-league venue support** — Sutter Health Park, Las Vegas Ballpark, and a generalized polygon generator.
+- **Test suite + CI** — see [Development](#development).
 
 ## 2025 Additions
 
@@ -195,19 +200,22 @@ historical (2025, pre-F3) and is kept only for the spray-angle EDA.
 ```
 baseball_game_simulator/
 ├── .gitignore
+├── LICENSE
 ├── README.md
 ├── requirements.txt
+├── pyproject.toml                # pytest config
 │
 ├── Documentation/
-│   ├── readme_image_generator.ipynb  # Generate README images
+│   ├── make_readme_images.py         # Render the four example game charts
+│   ├── readme_image_generator.ipynb  # The two model-validation plots
 │   ├── spray_angle_calibration.md    # Rendering vs model spray-angle vertex
-│   └── Images/                   # README visualization images
+│   └── Images/                       # README visualization images
 │
 ├── .github/
 │   └── workflows/ci.yml          # CI: pytest on push + pull request
 │
 ├── Model/
-│   ├── Spray_Angle_Model.ipynb   # Model training/EDA notebook
+│   ├── Spray_Angle_Model.ipynb   # Historical (2025) spray-angle EDA
 │   ├── batted_ball_model.pkl     # Trained model pipeline (sklearn)
 │   ├── bbe_physics.py            # Nathan spin + temp-aware carry physics (F6)
 │   ├── feature_engineering.py    # Spray angle, geometry & feature calculations
@@ -228,8 +236,7 @@ baseball_game_simulator/
 │   ├── visualizations.py         # Plotting functions
 │   └── assets/                   # Watermark/logo assets
 │
-├── tests/                        # pytest suite (physics, features, threading,
-│                                 #   venue mapping, import smoke, assets)
+├── tests/                        # pytest suite — see Development
 │
 ├── Data/                         # Notebooks and tests only — the daily run
 │   │                             #   fetches from the MLB Stats API instead
@@ -248,7 +255,11 @@ baseball_game_simulator/
 
 This section demonstrates the model's key features and outputs.
 
-> 📓 **How these images were created:** [Documentation/readme_image_generator.ipynb](Documentation/readme_image_generator.ipynb)
+> 📓 The two validation plots below come from
+> [Documentation/readme_image_generator.ipynb](Documentation/readme_image_generator.ipynb).
+> The four game charts under [Outputs](#outputs) are rendered by
+> `python Documentation/make_readme_images.py` (2025 World Series Game 7,
+> seeded so the run is reproducible).
 
 ### Spray Angle Adjustment Validation
 
@@ -268,19 +279,19 @@ The classic "sweet spot" visualization showing how exit velocity and launch angl
 
 Stadium-specific spray charts showing batted ball locations with expected outcome indicators.
 
-![Spray Chart Example](Documentation/Images/Dodgers_Blue%20Jays_5-4--60-30_spray.png)
+![Spray Chart Example](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_spray.png)
 
 ### Run Distribution
 
-![Run Distribution](Documentation/Images/Dodgers_Blue%20Jays_5-4--60-30_rd.png)
+![Run Distribution](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_rd.png)
 
 ### Estimated Bases Table
 
-![Run Distribution](Documentation/Images/Dodgers_Blue%20Jays_5-4--60-30_estimated_bases.png)
+![Run Distribution](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_estimated_bases.png)
 
 ### Player Contributions
 
-![Run Distribution](Documentation/Images/Dodgers_Blue%20Jays_5-4--60-30_player_contributions.png)
+![Run Distribution](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_player_contributions.png)
 
 ## Research
 

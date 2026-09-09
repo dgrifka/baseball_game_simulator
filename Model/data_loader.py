@@ -63,7 +63,7 @@ def load_teams():
 def load_batted_balls_with_venue(seasons=None):
     """
     Load batted balls joined with venue info from games table.
-    This is what Base_Model needs.
+    This is what the training/EDA notebooks need.
     
     Returns:
         DataFrame with batted balls + venue_name column.
@@ -77,7 +77,7 @@ def load_batted_balls_with_venue(seasons=None):
         how='left'
     )
     
-    # Handle stadium name changes (same as Base_Model.ipynb)
+    # Handle stadium name changes in the historical parquet snapshots
     stadium_mapping = {
         'George M. Steinbrenner Field': 'Yankee Stadium',
         'Sutter Health Park': 'Oakland Coliseum',

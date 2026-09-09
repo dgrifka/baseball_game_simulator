@@ -1,6 +1,7 @@
 """
 Feature engineering functions for MLB batted ball outcome prediction.
-Used by both model training (Base_Model.ipynb) and inference (game_simulator.py).
+Used by both model training (train_model.py in the private orchestration repo) and
+inference (Simulator/game_simulator.py); the two must never diverge.
 """
 
 import functools
