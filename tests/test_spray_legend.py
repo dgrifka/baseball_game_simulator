@@ -154,3 +154,96 @@ def test_legend_sits_below_the_strip_on_the_default_palette(spray_boxes):
 
 def test_legend_sits_below_the_strip_with_a_filled_band(spray_boxes, banded_palette):
     _assert_legend_below_strip(spray_boxes())
+
+
+# --- Player-name labels vs the fence distance texts -------------------------
+
+def _fence_anchor_plot_xy(angle_deg, dist_ft):
+    """Plot coords of a fence distance label, mirroring draw_baseball_field."""
+    angle_rad = np.radians(90 - angle_deg)
+    label_dist = dist_ft * viz.FEET_TO_PLOT + 6
+    return label_dist * np.cos(angle_rad), label_dist * np.sin(angle_rad)
+
+
+def _ball_at_right_field_fence_label(name, extra_ft=0.0):
+    """A batted ball that lands on the right-field distance text.
+
+    Spray angle 45 degrees (the right-field line) by construction: the
+    calibrated rendering vertex is (127.4, 215.0), so equal x and y deltas
+    give a 45-degree angle. The distance is the fence distance plus the same
+    6 plot units draw_baseball_field pushes its label past the fence.
+    """
+    rf_dist_ft = viz.DEFAULT_STADIUM_DIMENSIONS[-1][1]
+    total_distance = rf_dist_ft + 6 / viz.FEET_TO_PLOT + extra_ft
+    data = {
+        'launch_speed': 104.0,
+        'launch_angle': 28.0,
+        'total_distance': total_distance,
+        'coord_x': viz.VERTEX_CALIBRATED_X + 50.0,
+        'coord_y': viz.VERTEX_CALIBRATED_Y - 50.0,
+        'bat_side': 'R',
+        'temp_f': 72.0,
+        'roof_closed': False,
+    }
+    return (data, 'home_run', name)
+
+
+def _label_boxes(fig):
+    """(name-label boxes, fence-text boxes) in display pixels, per field axes."""
+    renderer = fig.canvas.get_renderer()
+    field_axes = [a for a in fig.axes if a.get_title()]
+    per_axes = []
+    for ax in field_axes:
+        names, fences = [], []
+        for text in ax.texts:
+            box = text.get_window_extent(renderer=renderer)
+            if isinstance(text, matplotlib.text.Annotation):
+                names.append((text.get_text(), box))
+            elif text.get_text().endswith("'"):
+                fences.append((text.get_text(), box))
+        per_axes.append((names, fences))
+    return per_axes
+
+
+@pytest.fixture
+def fence_collision_boxes(monkeypatch, tmp_path):
+    """Render a chart whose notable balls all land on the right-field text."""
+    captured = {}
+
+    def fake_finalize(fig, filepath, **kwargs):
+        fig.canvas.draw()
+        captured['per_axes'] = _label_boxes(fig)
+        return filepath
+
+    monkeypatch.setattr(viz, 'finalize', fake_finalize)
+
+    home = [_ball_at_right_field_fence_label('Dingler'),
+            _ball_at_right_field_fence_label('Greene', extra_ft=6.0),
+            _ball_at_right_field_fence_label('Torkelson', extra_ft=12.0)]
+    away = [_ball_at_right_field_fence_label('Vargas'),
+            _ball_at_right_field_fence_label('Montgomery', extra_ft=6.0)]
+    viz.spray_chart(home, away, 'Tigers', 'White Sox', 3, 1,
+                    55.0, 40.0, 5.0, [], '09/19/2026',
+                    images_dir=str(tmp_path), pipeline=_FixedPipeline())
+    return captured['per_axes']
+
+
+def test_name_labels_never_sit_on_a_fence_distance_text(fence_collision_boxes):
+    """A wall-scraper's name must not be drawn over the 335' text."""
+    for names, fences in fence_collision_boxes:
+        assert fences, "expected the fence distance texts to be drawn"
+        for name, name_box in names:
+            for fence, fence_box in fences:
+                assert not name_box.overlaps(fence_box), (
+                    f"label {name!r} overlaps the {fence} fence text"
+                )
+
+
+def test_name_labels_never_sit_on_each_other(fence_collision_boxes):
+    """Stacked wall-scrapers get separated, or dropped — never overprinted."""
+    for names, _ in fence_collision_boxes:
+        for i, (name_a, box_a) in enumerate(names):
+            for name_b, box_b in names[i + 1:]:
+                assert not box_a.overlaps(box_b), (
+                    f"labels {name_a!r} and {name_b!r} overlap"
+                )
