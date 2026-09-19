@@ -160,3 +160,26 @@ def test_only_the_retired_chart_still_pastes_the_watermark():
     assert "_apply_watermark" in inspect.getsource(viz.la_ev_graph), (
         "la_ev_graph should keep the PIL watermark paste"
     )
+
+
+def test_site_line_sits_one_subtitle_row_under_the_handle():
+    """``site=`` draws a second right-aligned line directly under the handle.
+
+    Same size and colour as the handle, flush with the strip's right edge,
+    exactly one subtitle row (0.30 of the strip) lower.
+    """
+    handle, site = "Data: MLB  |  @mlb_simulator", "dtwbaseball.com"
+    fig = plt.figure(figsize=(12, 8.5))
+    tax = title_axes(fig, height_frac=0.13, top_pad=0.02)
+    draw_title_block(tax, "Distribution of Runs Scored", ["Subtitle line one"],
+                     title_size=20, subtitle_size=11,
+                     logo=_fake_logo(), handle=handle, site=site, logo_pt=LOGO_PT)
+    try:
+        h = _handle_text(tax, handle)
+        s = _handle_text(tax, site)
+        assert s.get_position() == (1.0, h.get_position()[1] - 0.30)
+        assert s.get_ha() == "right" and s.get_va() == "top"
+        assert s.get_fontsize() == h.get_fontsize()
+        assert s.get_color() == h.get_color()
+    finally:
+        plt.close(fig)

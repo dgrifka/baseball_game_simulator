@@ -39,6 +39,8 @@ _LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 
 # The watermark's attribution line. One constant so the string drawn in the
 # title strip and the one the retired chart pastes can never drift apart.
 WATERMARK_HANDLE = 'Data: MLB  |  @mlb_simulator'
+# The site line drawn under the handle on the four social charts.
+WATERMARK_SITE = 'dtwbaseball.com'
 
 # Lazy-loaded caches
 _contour_cache = None
@@ -678,7 +680,8 @@ def run_dist(num_simulations, home_runs_scored, away_runs_scored, home_team, awa
                          f'Distribution of Runs Scored  —  {num_simulations:,} Simulations',
                          subtitle_lines,
                          title_size=20, subtitle_size=11,
-                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
+                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE,
+                         site=WATERMARK_SITE)
 
         filepath = _out_path(images_dir, away_team, home_team,
                              away_score, home_score, percentages, 'rd')
@@ -792,7 +795,8 @@ def create_estimated_bases_table(df, away_team, home_team, away_score, home_scor
              f"Win Probability: {away_team} {percentages['away']}% • "
              f"{home_team} {percentages['home']}%"],
             title_size=22, subtitle_size=13,
-            logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
+            logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE,
+            site=WATERMARK_SITE)
 
         filepath = _out_path(images_dir, away_team, home_team,
                              away_score, home_score, percentages,
@@ -1149,7 +1153,8 @@ def player_contribution_chart(home_outcomes, away_outcomes, home_team, away_team
                                  formatted_date, percentages)
         draw_title_block(tax, 'Player Contributions by Estimated Total Bases',
                          [subtitle], title_size=22, subtitle_size=12,
-                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
+                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE,
+                         site=WATERMARK_SITE)
 
         ax_hit.set_title('Hitting  —  Estimated Bases', fontsize=13, fontweight='bold',
                         loc='left', color=PALETTE['text_muted'], pad=8,
@@ -1810,7 +1815,8 @@ def spray_chart(home_outcomes, away_outcomes,
                                  formatted_date, percentages)
         draw_title_block(tax, "Batted Ball Spray Chart", [subtitle],
                          title_size=22, subtitle_size=12,
-                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE)
+                         logo=_watermark_logo_rgba(), handle=WATERMARK_HANDLE,
+                         site=WATERMARK_SITE)
 
         # Continuous Estimated Bases legend — horizontal colorbar inset.
         # Centered at fig x=0.5 in the same vertical band the old discrete

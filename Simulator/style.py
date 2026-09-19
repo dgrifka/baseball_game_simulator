@@ -189,7 +189,7 @@ def title_axes(fig, *, height_frac=0.14, top_pad=0.015, right_reserve=0.12):
 
 def draw_title_block(ax, title, subtitle_lines=None, *,
                      title_size=20, subtitle_size=11,
-                     rule=True, logo=None, handle=None, logo_pt=30):
+                     rule=True, logo=None, handle=None, site=None, logo_pt=30):
     """Render a 2-row title block inside the strip from ``title_axes()``.
 
     Layout: bold title on row 1, optional thin divider rule, then one or
@@ -200,6 +200,7 @@ def draw_title_block(ax, title, subtitle_lines=None, *,
     inside the strip instead of pasting it onto the saved PNG afterwards.
     The logo is right-aligned on the title row, the handle right-aligned on
     the first subtitle row, and the rule's band between them is left empty.
+    ``site`` (a string) goes right-aligned one subtitle row under the handle.
 
     ``logo_pt`` is the logo's height in *points*, so it renders at the same
     physical size on every chart at a given dpi. Sizing it as a fraction of
@@ -247,6 +248,12 @@ def draw_title_block(ax, title, subtitle_lines=None, *,
                 color=PALETTE['text_muted'],
                 ha='right', va='top',
                 transform=ax.transAxes)
+        if site is not None:
+            ax.text(1.0, cursor_y - 0.30, site,
+                    fontsize=subtitle_size,
+                    color=PALETTE['text_muted'],
+                    ha='right', va='top',
+                    transform=ax.transAxes)
 
     for line in subtitle_lines:
         ax.text(0.0, cursor_y, line,
