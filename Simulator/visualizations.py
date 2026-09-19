@@ -7,6 +7,7 @@ from matplotlib.patches import Polygon
 from scipy.interpolate import griddata
 from matplotlib.colors import LinearSegmentedColormap, Normalize, to_rgb
 from matplotlib.cm import ScalarMappable
+from matplotlib.transforms import Bbox
 import matplotlib.colors as colors
 import pandas as pd
 import numpy as np
@@ -1416,6 +1417,10 @@ def draw_baseball_field(ax, venue_name='default'):
     """
     Draw baseball field with stadium-specific fence dimensions.
     Grass fills only to the fence line.
+
+    Returns:
+        list[matplotlib.text.Text]: the three fence distance labels (LF, CF,
+        RF), so callers placing their own labels can measure and avoid them.
     """
     fence_x, fence_y, dims, smooth_angles, smooth_distances = get_stadium_fence_curve(venue_name)
 
@@ -1478,16 +1483,17 @@ def draw_baseball_field(ax, venue_name='default'):
         (45, rf_dist, 'left')
     ]
 
-    fence_label_anchors = []
+    fence_label_texts = []
     for angle, dist_ft, ha in label_positions:
         angle_rad = np.radians(90 - angle)
         dist_plot = dist_ft * FEET_TO_PLOT
         label_dist = dist_plot + 6
         label_x = label_dist * np.cos(angle_rad)
         label_y = label_dist * np.sin(angle_rad)
-        ax.text(label_x, label_y, f"{dist_ft}'", ha=ha, va='bottom',
-                fontsize=11, color='#3F3A33', fontweight='bold', zorder=5)
-        fence_label_anchors.append((label_x, label_y, ha))
+        fence_label_texts.append(
+            ax.text(label_x, label_y, f"{dist_ft}'", ha=ha, va='bottom',
+                    fontsize=11, color='#3F3A33', fontweight='bold', zorder=5)
+        )
 
     # Home plate — real proportions: 17" front, 8.5" sides, 12" back edges
     # Scaled so half-width = 2.5 plot units; back depth = sqrt(12²-8.5²)/8.5 * 2.5
@@ -1503,7 +1509,36 @@ def draw_baseball_field(ax, venue_name='default'):
     ], closed=True, facecolor='white', edgecolor='black', linewidth=1, zorder=6)
     ax.add_patch(home_plate)
 
-    return fence_label_anchors
+    return fence_label_texts
+
+
+# The rounded bbox drawn around a name label extends past the text itself
+# (boxstyle pad=0.2 at 9pt), and a label that merely touches a fence text still
+# reads as a collision. Both are covered by padding every measured box.
+_LABEL_BOX_PAD_PX = 4
+
+
+def _padded_box(box):
+    """A display-space bbox grown by the label's own chrome."""
+    return Bbox.from_extents(box.x0 - _LABEL_BOX_PAD_PX,
+                             box.y0 - _LABEL_BOX_PAD_PX,
+                             box.x1 + _LABEL_BOX_PAD_PX,
+                             box.y1 + _LABEL_BOX_PAD_PX)
+
+
+def _measuring_renderer(fig):
+    """A renderer whose transforms match what will be saved, or None.
+
+    The draw settles the equal-aspect axes box, without which every pixel
+    measurement is taken against a stale axes position. A canvas that cannot
+    produce a renderer (a non-Agg backend) leaves the caller on its
+    approximate data-coordinate scoring rather than failing the chart.
+    """
+    try:
+        fig.canvas.draw()
+        return fig.canvas.get_renderer()
+    except (AttributeError, ValueError):
+        return None
 
 
 def _place_spray_labels(ax, team_bbs, x_extent, axis_limit,
@@ -1537,11 +1572,12 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit,
         Cap on labels when ``min_xbases`` is used.
     fallback_top : int
         Number of top-xbases balls to label if nothing clears ``min_xbases``.
-    extra_obstacles : list[tuple] or None
-        Fixed texts the labels must avoid, as ``(x, y, ha)`` anchors in data
-        coords with ``va='bottom'`` (the shape ``draw_baseball_field`` returns
-        for its fence-distance labels). Seeded into the overlap scoring as
-        already-placed labels.
+    extra_obstacles : list or None
+        Fixed texts the labels must avoid: either the ``Text`` artists
+        ``draw_baseball_field`` returns, or ``(x, y, ha)`` anchors in data
+        coords with ``va='bottom'``. Anchors seed the overlap scoring as
+        already-placed labels; artists additionally join the pixel check
+        below, which is the one that can actually see where a text landed.
     """
     sorted_bbs = sorted(team_bbs, key=lambda b: b['xbases'], reverse=True)
 
@@ -1583,17 +1619,34 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit,
     # Fence-distance texts join the scoring as pre-placed labels, their
     # anchors shifted to the text's approximate centre (va='bottom' always;
     # ha shifts left-aligned text right and right-aligned text left).
-    for ox, oy, ha in (extra_obstacles or []):
+    obstacle_texts = []
+    for obstacle in (extra_obstacles or []):
+        if hasattr(obstacle, 'get_position'):
+            obstacle_texts.append(obstacle)
+            (ox, oy), ha = obstacle.get_position(), obstacle.get_ha()
+        else:
+            ox, oy, ha = obstacle
         if ha == 'left':
             ox += label_half_w * 0.5
         elif ha == 'right':
             ox -= label_half_w * 0.5
         placed.append((ox, oy + label_half_h * 0.5))
 
+    # Pixel pass. The scoring above works in approximate data units, which is
+    # enough to steer a label but cannot tell whether the drawn text actually
+    # lands on something: the same offset is a clean gap at one zoom and an
+    # overprint at another. So rank the candidates by score, then walk them in
+    # that order measuring the real bbox, and take the first that touches
+    # nothing. A name with no clean spot is dropped — a missing name beats an
+    # unreadable one.
+    renderer = _measuring_renderer(ax.figure)
+    obstacle_boxes = [_padded_box(t.get_window_extent(renderer=renderer))
+                      for t in obstacle_texts] if renderer else []
+    placed_boxes = []
+
     for bb in top_bbs:
         bx, by = bb['x'], bb['y']
-        best_score = -1e9
-        best_pos = _CANDIDATES[0]
+        scores = {}
 
         for dx_pt, dy_pt, ha, va in _CANDIDATES:
             # Convert point offset to approximate data-coord offset.
@@ -1640,24 +1693,45 @@ def _place_spray_labels(ax, team_bbs, x_extent, axis_limit,
             if dy_pt < 0:
                 score += 10
 
-            if score > best_score:
-                best_score = score
-                best_pos = (dx_pt, dy_pt, ha, va)
+            scores[(dx_pt, dy_pt, ha, va)] = score
 
-        dx_pt, dy_pt, ha, va = best_pos
-        scale = x_extent / 400.0
-        placed.append((bx + dx_pt * scale, by + dy_pt * scale))
+        # Stable sort: equal scores keep _CANDIDATES order, so a label with
+        # nothing near it lands on the first candidate, as it always has.
+        ranked = sorted(_CANDIDATES, key=lambda c: -scores[c])
 
-        ax.annotate(
+        annotation = ax.annotate(
             bb['last_name'], (bx, by),
-            textcoords='offset points', xytext=(dx_pt, dy_pt),
-            fontsize=9, fontweight='bold', ha=ha, va=va,
+            textcoords='offset points', xytext=ranked[0][:2],
+            fontsize=9, fontweight='bold',
+            ha=ranked[0][2], va=ranked[0][3],
             color='#1A1A1A', zorder=11,
             bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
                       edgecolor='#999999', alpha=0.92, linewidth=0.6),
             arrowprops=dict(arrowstyle='-', color='#888888',
                             linewidth=0.8, shrinkA=0, shrinkB=6),
         )
+
+        chosen = None
+        for dx_pt, dy_pt, ha, va in ranked:
+            annotation.set_position((dx_pt, dy_pt))
+            annotation.set_ha(ha)
+            annotation.set_va(va)
+            if renderer is None:          # no canvas to measure against
+                chosen = (dx_pt, dy_pt)
+                break
+            box = _padded_box(annotation.get_window_extent(renderer=renderer))
+            if not any(box.overlaps(other)
+                       for other in obstacle_boxes + placed_boxes):
+                chosen = (dx_pt, dy_pt)
+                placed_boxes.append(box)
+                break
+
+        if chosen is None:
+            annotation.remove()
+            continue
+
+        scale = x_extent / 400.0
+        placed.append((bx + chosen[0] * scale, by + chosen[1] * scale))
 
 
 def spray_chart(home_outcomes, away_outcomes,
@@ -1705,12 +1779,20 @@ def spray_chart(home_outcomes, away_outcomes,
     home_display_name = get_display_team_name(home_team)
     away_display_name = get_display_team_name(away_team)
 
+    # Title-strip geometry, named once: the legend below the strip is placed
+    # from the strip's own bottom edge, so the two can never drift apart.
+    strip_height_frac = 0.16
+    strip_top_pad = 0.02
+    strip_bottom = 1.0 - strip_height_frac - strip_top_pad
+
     fig, (ax_away, ax_home) = plt.subplots(1, 2, figsize=(16, 9.5), dpi=150)
     try:
         fig.patch.set_facecolor(PALETTE['bg'])
         for ax in (ax_away, ax_home):
             ax.set_facecolor(PALETTE['bg'])
-        plt.subplots_adjust(left=0.015, right=0.985, top=0.78, bottom=0.05, wspace=0.0)
+        # top=0.74 (not 0.78) leaves the legend its own lane: an equal-aspect
+        # field at a deep stadium pushes the team heading up toward the strip.
+        plt.subplots_adjust(left=0.015, right=0.985, top=0.74, bottom=0.05, wspace=0.0)
     
         # Process outcomes
         batted_balls = {'home': [], 'away': []}
@@ -1827,17 +1909,19 @@ def spray_chart(home_outcomes, away_outcomes,
                     )
                     ax.add_patch(ring)
 
-            # Label every hit-quality ball (xbases >= 1.0 — well-struck singles
-            # and better), capped at 10 to prevent overlap on slug-fests. Quiet
-            # games fall back to top 3 by xbases so something still gets named.
-            _place_spray_labels(ax, batted_balls[team_key], x_extent, axis_limit,
-                                min_xbases=1.0, max_labels=10, fallback_top=3,
-                                extra_obstacles=fence_labels)
-
             ax.set_xlim(-x_extent, x_extent)
             ax.set_ylim(-3, axis_limit)
             ax.set_aspect('equal')
             ax.axis('off')
+
+            # Label every hit-quality ball (xbases >= 1.0 — well-struck singles
+            # and better), capped at 10 to prevent overlap on slug-fests. Quiet
+            # games fall back to top 3 by xbases so something still gets named.
+            # After the limits, never before: the labels are checked in pixels,
+            # and pixels only mean anything once the axes knows its own scale.
+            _place_spray_labels(ax, batted_balls[team_key], x_extent, axis_limit,
+                                min_xbases=1.0, max_labels=10, fallback_top=3,
+                                extra_obstacles=fence_labels)
 
             bip_count = len(batted_balls[team_key])
             walk_count = walk_counts[team_key]
@@ -1849,7 +1933,7 @@ def spray_chart(home_outcomes, away_outcomes,
         # Outcome legend is mounted to the right edge of the same strip so
         # everything reads as one cohesive header (no more colliding with
         # the watermark or the field).
-        tax = title_axes(fig, height_frac=0.16, top_pad=0.02)
+        tax = title_axes(fig, height_frac=strip_height_frac, top_pad=strip_top_pad)
         subtitle = _dtw_subtitle(away_display_name, away_score,
                                  home_display_name, home_score,
                                  formatted_date, percentages)
@@ -1859,9 +1943,10 @@ def spray_chart(home_outcomes, away_outcomes,
                          site=WATERMARK_SITE)
 
         # Continuous Estimated Bases legend — horizontal colorbar inset.
-        # Centered at fig x=0.5 in the same vertical band the old discrete
-        # legend lived in (below the title strip, above the subplots).
-        cbar_ax = fig.add_axes([0.35, 0.808, 0.30, 0.018])
+        # Centered at fig x=0.5 and hung off the strip's bottom edge, so the
+        # whole legend (label, bar, outcome row) sits in clear air below the
+        # band rather than straddling it.
+        cbar_ax = fig.add_axes([0.35, strip_bottom - 0.075, 0.30, 0.018])
         sm = ScalarMappable(norm=ESTIMATED_BASES_NORM, cmap=ESTIMATED_BASES_CMAP)
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
@@ -1870,8 +1955,8 @@ def spray_chart(home_outcomes, away_outcomes,
         cbar.set_ticks([])
         cbar.outline.set_visible(False)
 
-        fig.text(0.5, 0.852, 'Estimated Bases',
-                 fontsize=11, fontweight='bold', ha='center', va='bottom',
+        fig.text(0.5, strip_bottom - 0.030, 'Estimated Bases',
+                 fontsize=11, fontweight='bold', ha='center', va='top',
                  color=PALETTE['text'], fontfamily=heading_font())
 
         # Outcome row beneath the bar. x positions are derived from the
