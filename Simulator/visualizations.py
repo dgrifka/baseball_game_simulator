@@ -155,14 +155,42 @@ def _load_headshot(player_id, size=80):
         return None
 
 
-@functools.lru_cache(maxsize=1)
+def _disc(logo, pad=0.10):
+    """Composite ``logo`` (RGBA PIL image) centred on an opaque white disc.
+
+    The disc's side is ``max(w, h) * (1 + 2 * pad)``. Drawn at 4x and
+    downsampled so its edge is antialiased.
+    """
+    w, h = logo.size
+    side = int(round(max(w, h) * (1 + 2 * pad)))
+    big = Image.new('L', (side * 4, side * 4), 0)
+    from PIL import ImageDraw as _ImageDraw
+    _ImageDraw.Draw(big).ellipse((0, 0, side * 4 - 1, side * 4 - 1), fill=255)
+    out = Image.new('RGBA', (side, side), (255, 255, 255, 0))
+    out.putalpha(big.resize((side, side), Image.LANCZOS))
+    out.alpha_composite(logo, ((side - w) // 2, (side - h) // 2))
+    return out
+
+
+def _stamp_disc():
+    """Whether the stamp logo goes on a white disc — read at call time."""
+    return bool(PALETTE.get('stamp_disc'))
+
+
 def _watermark_logo_native():
-    """The watermark logo as a keyed RGBA PIL image at its native size.
+    """The watermark logo as a keyed RGBA PIL image at its native size."""
+    return _watermark_logo_native_for(_stamp_disc())
+
+
+@functools.lru_cache(maxsize=2)
+def _watermark_logo_native_for(disc):
+    """Cached body of ``_watermark_logo_native``, keyed on the disc flag.
 
     The shipped asset is already RGBA with its white background keyed out, so
     the white-mask branch only runs for a legacy RGB asset. The 0.85 alpha
     multiply stays here rather than baked into the file, so the rendered
-    watermark is identical either way.
+    watermark is identical either way. The disc, when on, goes under the logo
+    BEFORE that multiply so disc and logo fade together.
     """
     logo = Image.open(_LOGO_PATH)
     if logo.mode != 'RGBA':
@@ -173,12 +201,14 @@ def _watermark_logo_native():
         logo_data[white_mask, 3] = 0
         logo = Image.fromarray(logo_data)
 
+    if disc:
+        logo = _disc(logo)
+
     logo_data = np.array(logo)
     logo_data[:, :, 3] = (logo_data[:, :, 3].astype(float) * 0.85).astype(np.uint8)
     return Image.fromarray(logo_data)
 
 
-@functools.lru_cache(maxsize=1)
 def _watermark_logo_rgba():
     """The keyed watermark logo as an RGBA array at native size.
 
@@ -187,18 +217,26 @@ def _watermark_logo_rgba():
     separate from ``_watermark_logo``, whose whole job is to rasterize to a
     pixel height for the PIL paste.
     """
-    return np.asarray(_watermark_logo_native())
+    return _watermark_logo_rgba_for(_stamp_disc())
 
 
-@functools.lru_cache(maxsize=8)
+@functools.lru_cache(maxsize=2)
+def _watermark_logo_rgba_for(disc):
+    return np.asarray(_watermark_logo_native_for(disc))
+
+
 def _watermark_logo(target_h):
-    """Return the watermark logo as RGBA, pre-keyed and scaled to ``target_h``.
+    """Return the watermark logo as RGBA, pre-keyed and scaled to ``target_h``."""
+    return _watermark_logo_for(target_h, _stamp_disc())
 
-    Memoized per target height: a process renders many charts at the same
-    image size, and this used to decode + white-key + alpha-scale the full
-    asset on every single save.
+
+@functools.lru_cache(maxsize=16)
+def _watermark_logo_for(target_h, disc):
+    """Memoized per (target height, disc): a process renders many charts at
+    the same image size, and this used to decode + white-key + alpha-scale the
+    full asset on every single save.
     """
-    logo = _watermark_logo_native()
+    logo = _watermark_logo_native_for(disc)
     logo_w = int(target_h * logo.width / logo.height)
     return logo.resize((logo_w, target_h), Image.LANCZOS)
 
@@ -265,7 +303,9 @@ def _apply_watermark(filepath, position='top-right', y_pct=None):
 
         img.paste(logo, (logo_x, logo_y), logo)
         draw = ImageDraw.Draw(img)
-        draw.text((text_x, text_y), text, fill=(140, 140, 140), font=font)
+        ink = PALETTE.get('stamp_ink')
+        fill = tuple(int(round(c * 255)) for c in to_rgb(ink)) if ink else (140, 140, 140)
+        draw.text((text_x, text_y), text, fill=fill, font=font)
 
         img.convert('RGB').save(filepath)
     except Exception as e:

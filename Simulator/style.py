@@ -18,6 +18,8 @@ contributions). Provides:
 import os
 from matplotlib import rcParams, font_manager
 from matplotlib.colors import to_rgb
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
+from matplotlib.patches import Rectangle
 
 
 PALETTE = {
@@ -36,6 +38,15 @@ PALETTE = {
     'bad':        '#C03A2B',
     # Row stripes (table)
     'row_alt':    '#F4EFE6',
+    # Optional hooks. A caller may set these before drawing; None / False
+    # means "behave exactly as before", so the defaults render as above.
+    'band':       None,    # title-strip fill (a full-width figure patch)
+    'title_ink':  None,    # title + subtitle ink inside a filled band
+    'stamp_ink':  None,    # watermark text ink
+    'stamp_disc': False,   # paste the watermark logo on a white disc
+    'mark_disc':  False,   # white disc behind marks drawn by place_mark()
+    'accent':     None,    # non-team mark colour
+    'accent_2':   None,    # secondary non-team mark colour
 }
 
 
@@ -175,6 +186,14 @@ def title_axes(fig, *, height_frac=0.14, top_pad=0.015, right_reserve=0.12):
     left blank for the watermark (logo + handle text). Set to 0 for
     charts where the watermark sits elsewhere.
     """
+    band = PALETTE.get('band')
+    if band:
+        # A figure patch, so bbox_inches='tight' keeps it; zorder puts it
+        # behind every axes.
+        fig.patches.append(Rectangle((0, 1 - height_frac - top_pad), 1,
+                                     height_frac + top_pad,
+                                     transform=fig.transFigure, facecolor=band,
+                                     edgecolor='none', zorder=-10))
     width = max(0.50, 1.0 - 0.04 - right_reserve)
     ax = fig.add_axes([0.04, 1.0 - height_frac - top_pad, width, height_frac])
     ax.set_xlim(0, 1)
@@ -212,6 +231,11 @@ def draw_title_block(ax, title, subtitle_lines=None, *,
     elif isinstance(subtitle_lines, str):
         subtitle_lines = [subtitle_lines]
 
+    title_ink = PALETTE.get('title_ink')
+    title_color = title_ink or PALETTE['text']
+    subtitle_color = title_ink or PALETTE['text_muted']
+    stamp_color = PALETTE.get('stamp_ink') or PALETTE['text_muted']
+
     if logo is not None:
         fig = ax.figure
         fig_w, fig_h = fig.get_size_inches()
@@ -230,14 +254,15 @@ def draw_title_block(ax, title, subtitle_lines=None, *,
 
     ax.text(0.0, 0.92, title,
             fontsize=title_size, fontweight='bold',
-            color=PALETTE['text'], ha='left', va='top',
+            color=title_color, ha='left', va='top',
             fontfamily=_HEADING_FONTS,
             transform=ax.transAxes)
 
     cursor_y = _RULE_Y
     if rule:
         ax.plot([0.0, 1.0], [cursor_y, cursor_y],
-                color=PALETTE['grid'], linewidth=0.8,
+                color=title_ink or PALETTE['grid'],
+                alpha=0.5 if title_ink else None, linewidth=0.8,
                 transform=ax.transAxes, clip_on=False)
         cursor_y -= 0.10
 
@@ -245,23 +270,44 @@ def draw_title_block(ax, title, subtitle_lines=None, *,
         # Same size and colour as a subtitle, on the subtitle's own row.
         ax.text(1.0, cursor_y, handle,
                 fontsize=subtitle_size,
-                color=PALETTE['text_muted'],
+                color=stamp_color,
                 ha='right', va='top',
                 transform=ax.transAxes)
         if site is not None:
             ax.text(1.0, cursor_y - 0.30, site,
                     fontsize=subtitle_size,
-                    color=PALETTE['text_muted'],
+                    color=stamp_color,
                     ha='right', va='top',
                     transform=ax.transAxes)
 
     for line in subtitle_lines:
         ax.text(0.0, cursor_y, line,
                 fontsize=subtitle_size,
-                color=PALETTE['text_muted'],
+                color=subtitle_color,
                 ha='left', va='top',
                 transform=ax.transAxes)
         cursor_y -= 0.30
+
+
+def place_mark(ax, rgba, xy, height_px, *, disc=None, zorder=5, xycoords='data'):
+    """Place an RGBA mark (team logo, headshot) ``height_px`` pixels tall.
+
+    ``OffsetImage`` zoom is in points-per-pixel, so a bare ``zoom`` renders a
+    different size at every dpi; dividing by ``dpi / 72`` makes ``height_px``
+    mean saved pixels. With ``disc`` (default ``PALETTE['mark_disc']``) a
+    white circle 1.35x the mark's height is drawn one zorder below it.
+    """
+    dpi = ax.figure.dpi
+    if disc if disc is not None else PALETTE.get('mark_disc'):
+        diameter_pt = 1.35 * height_px * 72.0 / dpi
+        ax.scatter([xy[0]], [xy[1]], s=diameter_pt ** 2, color='white',
+                   edgecolors='none', zorder=zorder - 1, clip_on=False,
+                   transform=ax.transAxes if xycoords == 'axes fraction' else ax.transData)
+    zoom = height_px / rgba.shape[0] * 72.0 / dpi
+    ab = AnnotationBbox(OffsetImage(rgba, zoom=zoom), xy, frameon=False, pad=0,
+                        xycoords=xycoords, zorder=zorder)
+    ax.add_artist(ab)
+    return ab
 
 
 def finalize(fig, filepath, *, dpi=200, pad_inches=0.1, apply_watermark_fn=None):
