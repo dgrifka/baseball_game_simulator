@@ -1705,12 +1705,20 @@ def spray_chart(home_outcomes, away_outcomes,
     home_display_name = get_display_team_name(home_team)
     away_display_name = get_display_team_name(away_team)
 
+    # Title-strip geometry, named once: the legend below the strip is placed
+    # from the strip's own bottom edge, so the two can never drift apart.
+    strip_height_frac = 0.16
+    strip_top_pad = 0.02
+    strip_bottom = 1.0 - strip_height_frac - strip_top_pad
+
     fig, (ax_away, ax_home) = plt.subplots(1, 2, figsize=(16, 9.5), dpi=150)
     try:
         fig.patch.set_facecolor(PALETTE['bg'])
         for ax in (ax_away, ax_home):
             ax.set_facecolor(PALETTE['bg'])
-        plt.subplots_adjust(left=0.015, right=0.985, top=0.78, bottom=0.05, wspace=0.0)
+        # top=0.74 (not 0.78) leaves the legend its own lane: an equal-aspect
+        # field at a deep stadium pushes the team heading up toward the strip.
+        plt.subplots_adjust(left=0.015, right=0.985, top=0.74, bottom=0.05, wspace=0.0)
     
         # Process outcomes
         batted_balls = {'home': [], 'away': []}
@@ -1849,7 +1857,7 @@ def spray_chart(home_outcomes, away_outcomes,
         # Outcome legend is mounted to the right edge of the same strip so
         # everything reads as one cohesive header (no more colliding with
         # the watermark or the field).
-        tax = title_axes(fig, height_frac=0.16, top_pad=0.02)
+        tax = title_axes(fig, height_frac=strip_height_frac, top_pad=strip_top_pad)
         subtitle = _dtw_subtitle(away_display_name, away_score,
                                  home_display_name, home_score,
                                  formatted_date, percentages)
@@ -1859,9 +1867,10 @@ def spray_chart(home_outcomes, away_outcomes,
                          site=WATERMARK_SITE)
 
         # Continuous Estimated Bases legend — horizontal colorbar inset.
-        # Centered at fig x=0.5 in the same vertical band the old discrete
-        # legend lived in (below the title strip, above the subplots).
-        cbar_ax = fig.add_axes([0.35, 0.808, 0.30, 0.018])
+        # Centered at fig x=0.5 and hung off the strip's bottom edge, so the
+        # whole legend (label, bar, outcome row) sits in clear air below the
+        # band rather than straddling it.
+        cbar_ax = fig.add_axes([0.35, strip_bottom - 0.075, 0.30, 0.018])
         sm = ScalarMappable(norm=ESTIMATED_BASES_NORM, cmap=ESTIMATED_BASES_CMAP)
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
@@ -1870,8 +1879,8 @@ def spray_chart(home_outcomes, away_outcomes,
         cbar.set_ticks([])
         cbar.outline.set_visible(False)
 
-        fig.text(0.5, 0.852, 'Estimated Bases',
-                 fontsize=11, fontweight='bold', ha='center', va='bottom',
+        fig.text(0.5, strip_bottom - 0.030, 'Estimated Bases',
+                 fontsize=11, fontweight='bold', ha='center', va='top',
                  color=PALETTE['text'], fontfamily=heading_font())
 
         # Outcome row beneath the bar. x positions are derived from the
