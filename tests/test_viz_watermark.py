@@ -19,11 +19,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+import pytest  # noqa: E402
 
-from Simulator.style import title_axes, draw_title_block  # noqa: E402
+from Simulator.style import (  # noqa: E402
+    PALETTE, title_axes, draw_title_block, fit_band_to_content, BAND_INSET,
+)
 
-# Strip-local y of the divider rule, as drawn by draw_title_block.
-RULE_Y = 0.55
 LOGO_PT = 30
 
 
@@ -98,7 +99,9 @@ def test_logo_sits_above_the_rule_and_handle_below_it():
     fig, tax, logo_axes = _build((12, 8.5), handle=handle)
     try:
         pos = tax.get_position()
-        rule_y_fig = pos.y0 + RULE_Y * pos.height
+        # The rule's strip-local y is computed per strip (points-based, centred
+        # block) and recorded on the strip by draw_title_block.
+        rule_y_fig = pos.y0 + tax._dtw_layout['rule_y'] * pos.height
 
         logo_bottom = logo_axes[0].get_position().y0
         assert logo_bottom > rule_y_fig, (
@@ -166,7 +169,7 @@ def test_site_line_sits_one_subtitle_row_under_the_handle():
     """``site=`` draws a second right-aligned line directly under the handle.
 
     Same size and colour as the handle, flush with the strip's right edge,
-    exactly one subtitle row (0.30 of the strip) lower.
+    exactly one subtitle row (the strip's computed row pitch) lower.
     """
     handle, site = "Data: MLB  |  @mlb_simulator", "dtwbaseball.com"
     fig = plt.figure(figsize=(12, 8.5))
@@ -177,9 +180,100 @@ def test_site_line_sits_one_subtitle_row_under_the_handle():
     try:
         h = _handle_text(tax, handle)
         s = _handle_text(tax, site)
-        assert s.get_position() == (1.0, h.get_position()[1] - 0.30)
+        pitch = tax._dtw_layout['pitch']
+        assert s.get_position()[0] == 1.0
+        assert s.get_position()[1] == pytest.approx(h.get_position()[1] - pitch)
         assert s.get_ha() == "right" and s.get_va() == "top"
         assert s.get_fontsize() == h.get_fontsize()
         assert s.get_color() == h.get_color()
     finally:
         plt.close(fig)
+
+
+def test_subtitle_rows_stay_inside_the_strip():
+    """Two subtitle rows plus the title fit inside a 0.13 strip on an 8.5in
+    figure — the run-distribution geometry — with band above and below.
+
+    The old fixed fractions (rows at 0.45 and 0.15 of the strip) put the second
+    row's descenders on the band's bottom edge.
+    """
+    fig = plt.figure(figsize=(12, 8.5))
+    tax = title_axes(fig, height_frac=0.13, top_pad=0.02)
+    draw_title_block(tax, "Distribution of Runs Scored", ["Line one", "Line two"],
+                     title_size=20, subtitle_size=11)
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        pos = tax.get_position()
+        fig_h_px = fig.get_size_inches()[1] * fig.dpi
+        strip_bottom = pos.y0 * fig_h_px
+        strip_top = (pos.y0 + pos.height) * fig_h_px
+        for t in tax.texts:
+            ext = t.get_window_extent(renderer)
+            assert ext.y0 > strip_bottom + 2, f"{t.get_text()!r} touches the band's bottom edge"
+            assert ext.y1 < strip_top - 2, f"{t.get_text()!r} touches the band's top edge"
+    finally:
+        plt.close(fig)
+
+
+def test_band_fits_the_plot_beneath_it():
+    """After fit_band_to_content the band's x-extent equals the plot's.
+
+    The band starts full-width; the plot here is an axes with tick labels that
+    stop well short of the figure's right edge. The strip re-seats inside the
+    band with BAND_INSET on each side, and the logo stays flush with the strip.
+    """
+    saved = dict(PALETTE)
+    PALETTE.update(band='#123456', title_ink='#FFFFFF')
+    fig = plt.figure(figsize=(12, 8))
+    try:
+        ax = fig.add_axes([0.15, 0.10, 0.55, 0.65])
+        ax.plot([0, 1], [0, 1])
+        tax = title_axes(fig, height_frac=0.13, top_pad=0.02)
+        draw_title_block(tax, "Title", ["Subtitle"], logo=_fake_logo(),
+                         handle="Data: MLB", site="site.com")
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        inv = fig.transFigure.inverted()
+        bb = ax.get_tightbbox(renderer)
+        want_x0 = inv.transform((bb.x0, 0))[0]
+        want_x1 = inv.transform((bb.x1, 0))[0]
+
+        got = fit_band_to_content(fig)
+        band = fig._dtw_band
+        assert got == pytest.approx((want_x0, want_x1), abs=1e-6)
+        assert band.get_x() == pytest.approx(want_x0, abs=1e-6)
+        assert band.get_x() + band.get_width() == pytest.approx(want_x1, abs=1e-6)
+        sp = tax.get_position()
+        assert sp.x0 == pytest.approx(want_x0 + BAND_INSET, abs=1e-6)
+        assert sp.x1 == pytest.approx(want_x1 - BAND_INSET, abs=1e-6)
+        lax = [a for a in fig.axes if a.get_label() == "watermark_logo"][0]
+        assert lax.get_position().x1 == pytest.approx(sp.x1, abs=1e-6)
+    finally:
+        plt.close(fig)
+        PALETTE.clear()
+        PALETTE.update(saved)
+
+
+def test_band_widens_for_a_title_wider_than_the_plot():
+    """A narrow plot under a long title: the band grows to cover the title."""
+    saved = dict(PALETTE)
+    PALETTE.update(band='#123456', title_ink='#FFFFFF')
+    fig = plt.figure(figsize=(12, 8))
+    try:
+        ax = fig.add_axes([0.45, 0.10, 0.10, 0.65])
+        ax.plot([0, 1], [0, 1])
+        tax = title_axes(fig, height_frac=0.13, top_pad=0.02)
+        draw_title_block(tax, "A Very Long Title That Is Wider Than The Plot", ["Subtitle"])
+        fig.canvas.draw()
+        x0, x1 = fit_band_to_content(fig)
+        renderer = fig.canvas.get_renderer()
+        inv = fig.transFigure.inverted()
+        for t in tax.texts:
+            ext = t.get_window_extent(renderer)
+            assert inv.transform((ext.x0, 0))[0] >= x0 - 1e-6
+            assert inv.transform((ext.x1, 0))[0] <= x1 + 1e-6
+    finally:
+        plt.close(fig)
+        PALETTE.clear()
+        PALETTE.update(saved)
