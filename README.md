@@ -78,14 +78,19 @@ pip install pytest
 pytest tests/ -q
 ```
 
-The suite (~135 tests, under ten seconds) covers the spin/carry physics, F6
+The suite (~150 tests, about ten seconds) covers the spin/carry physics, F6
 feature construction, a golden feature frame and a predict smoke on the
 shipped pickle, scalar/vector engine parity, the HR tail correction, the
 estimated-bases schema, weather and batter-id threading, venue-id mapping,
-chart labels and watermark geometry, model-asset presence, and an import smoke
-test over every module the daily run depends on. CI
+chart labels, title-strip styling hooks and watermark geometry, model-asset
+presence, the README image script, and an import smoke test over every module
+the daily run depends on. CI
 (`.github/workflows/ci.yml`) runs the same command on Python 3.11 and 3.12 for
 pushes to `main` and every pull request.
+
+The simulator runs the vectorized engine by default. Set `DTW_SCALAR_SIM=1` to
+force the scalar reference path in `game_simulator.py` instead; the two must
+agree, and the parity tests check that they do.
 
 ## Model
 
@@ -238,12 +243,12 @@ baseball_game_simulator/
 │
 ├── tests/                        # pytest suite — see Development
 │
-├── Data/                         # Notebooks and tests only — the daily run
-│   │                             #   fetches from the MLB Stats API instead
+├── Data/                         # Historical data for notebooks and tests —
+│   │                             #   the daily run fetches from the MLB Stats API
 │   ├── batted_balls/             # Yearly parquet files
 │   ├── games/                    # Games parquet file
 │   ├── teams/                    # Teams parquet file
-│   ├── contour_data.csv          # EV/LA visualization data
+│   ├── contour_data.csv          # EV/LA outcome contour drawn by la_ev_graph (production)
 │   └── fences.csv                # raw fence-distance source for Model/data/mlb_park_walls.csv
 │
 └── Research/
