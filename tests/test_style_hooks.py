@@ -63,7 +63,7 @@ def test_defaults_render_cream_with_no_band(palette, tmp_path):
 
 
 def test_band_adds_one_full_width_patch_and_title_uses_title_ink(palette):
-    palette.update(band='#2F6B33', title_ink='#FFFFFF', stamp_ink='#EEEEEE')
+    palette.update(band='#123456', title_ink='#FFFFFF', stamp_ink='#EEEEEE')
     fig, tax = _strip()
     try:
         assert len(fig.patches) == 1, f"expected one band patch, got {len(fig.patches)}"
