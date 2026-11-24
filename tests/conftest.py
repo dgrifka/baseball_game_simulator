@@ -1,7 +1,7 @@
 """
-Ensures the repo root is importable as `Simulator.*` regardless of how
-pytest's import mode resolves test-file paths (there's no top-level
-conftest.py/pyproject.toml pinning rootdir insertion in this repo).
+Ensures the repo root is importable as `Simulator.*` however pytest is invoked.
+`pyproject.toml` sets `pythonpath = ["."]` for the same purpose; this insertion
+stays as a second guard for runs that do not read that config.
 """
 import os
 import sys
@@ -13,11 +13,10 @@ if _REPO_ROOT not in sys.path:
 import pytest  # noqa: E402  (must follow the sys.path insertion above)
 
 # Everything shared between test modules lives here as a fixture on purpose.
-# A test module must never do `from tests.conftest import ...`: this repo has no
-# pytest ini file, so pytest picks its rootdir by walking up to the enclosing
-# .git, which resolves `tests.` against the MAIN checkout even when the suite is
-# running inside a worktree. Fixtures are discovered by pytest itself and are
-# immune to that.
+# A test module must never do `from tests.conftest import ...`: `tests/` is not
+# a package, so that import loads a second copy of this file under another
+# module name, separate from the one pytest registered. Fixtures are discovered
+# by pytest itself and are immune to that.
 
 
 def _synthetic_ball(launch_speed, launch_angle, coord_x, coord_y, bat_side):

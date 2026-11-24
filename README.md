@@ -78,14 +78,15 @@ pip install pytest
 pytest tests/ -q
 ```
 
-The suite (~150 tests, about ten seconds) covers the spin/carry physics, F6
+The suite (~155 tests, about ten seconds) covers the spin/carry physics, F6
 feature construction, a golden feature frame and a predict smoke on the
 shipped pickle, scalar/vector engine parity, the HR tail correction, the
 estimated-bases schema, per-inning event ordering, weather and batter-id
 threading, venue-id mapping, the two spray-angle vertices, timeout and retry
 handling in the MLB Stats API client, chart labels, title-strip styling hooks
-and watermark geometry, model-asset presence, the README image script, and an
-import smoke test over every module the daily run depends on. CI
+and watermark geometry, model-asset presence, the README image script, the
+names the downstream pipeline imports, and an import smoke test over every
+module the daily run depends on. CI
 (`.github/workflows/ci.yml`) runs the same command on Python 3.11 and 3.12 for
 pushes to `main` and every pull request.
 
@@ -206,6 +207,7 @@ The model items are described in full under [Model](#model).
 ```
 baseball_game_simulator/
 ├── .github/
+│   ├── dependabot.yml            # Monthly grouped updates for the pinned actions
 │   └── workflows/ci.yml          # CI: pytest on push + pull request
 │
 ├── Data/                         # Historical data for notebooks and tests —
