@@ -81,10 +81,11 @@ pytest tests/ -q
 The suite (~150 tests, about ten seconds) covers the spin/carry physics, F6
 feature construction, a golden feature frame and a predict smoke on the
 shipped pickle, scalar/vector engine parity, the HR tail correction, the
-estimated-bases schema, weather and batter-id threading, venue-id mapping,
-chart labels, title-strip styling hooks and watermark geometry, model-asset
-presence, the README image script, and an import smoke test over every module
-the daily run depends on. CI
+estimated-bases schema, per-inning event ordering, weather and batter-id
+threading, venue-id mapping, the two spray-angle vertices, timeout and retry
+handling in the MLB Stats API client, chart labels, title-strip styling hooks
+and watermark geometry, model-asset presence, the README image script, and an
+import smoke test over every module the daily run depends on. CI
 (`.github/workflows/ci.yml`) runs the same command on Python 3.11 and 3.12 for
 pushes to `main` and every pull request.
 
@@ -191,7 +192,7 @@ The model items are described in full under [Model](#model).
 - **HR tail correction (simulation only)** — small bump at 100+ mph during resampling; exported per-ball probabilities stay raw.
 - **Vectorized simulation engine** — `Simulator/vector_engine.py` simulates all games at once; the baserunning rules stay in `game_simulator.py`, which builds the transition tables.
 - **Per-inning simulation primitives** — `outcomes_by_inning` / `simulator_by_inning` for the per-inning deserved-run-differential charts.
-- **Alternate/minor-league venue support** — Sutter Health Park, Las Vegas Ballpark, and a generalized polygon generator.
+- **Alternate/minor-league venue support** — wall polygons, altitudes and chart outlines for Sutter Health Park and Las Vegas Ballpark (the script that generates a new park's polygon lives in the private orchestration repo).
 - **Test suite + CI** — see [Development](#development).
 
 ## 2025 Additions
@@ -204,56 +205,56 @@ The model items are described in full under [Model](#model).
 ## Project Structure
 ```
 baseball_game_simulator/
-├── .gitignore
-├── LICENSE
-├── README.md
-├── requirements.txt
-├── pyproject.toml                # pytest config
-│
-├── Documentation/
-│   ├── make_readme_images.py         # Render the four example game charts
-│   ├── readme_image_generator.ipynb  # The two model-validation plots
-│   ├── spray_angle_calibration.md    # Rendering vs model spray-angle vertex
-│   └── Images/                       # README visualization images
-│
 ├── .github/
 │   └── workflows/ci.yml          # CI: pytest on push + pull request
 │
+├── Data/                         # Historical data for notebooks and tests —
+│   │                             #   the daily run fetches from the MLB Stats API
+│   ├── batted_balls/             # Yearly parquet files (2024, 2025)
+│   ├── games/                    # Games parquet file
+│   ├── teams/                    # Teams parquet file
+│   ├── contour_data.csv          # EV/LA outcome contour drawn by la_ev_graph (production)
+│   └── fences.csv                # Raw fence-distance source for Model/data/mlb_park_walls.csv
+│
+├── Documentation/
+│   ├── Images/                       # README visualization images
+│   ├── make_readme_images.py         # Render the four example game charts
+│   ├── readme_image_generator.ipynb  # The two model-validation plots
+│   └── spray_angle_calibration.md    # Rendering vs model spray-angle vertex
+│
 ├── Model/
+│   ├── data/
+│   │   ├── mlb_park_walls.csv    # Stadium wall polygons (park-geometry features)
+│   │   └── park_altitudes.csv    # Stadium altitudes
 │   ├── Spray_Angle_Model.ipynb   # Historical (2025) spray-angle EDA
 │   ├── batted_ball_model.pkl     # Trained model pipeline (sklearn)
 │   ├── bbe_physics.py            # Nathan spin + temp-aware carry physics (F6)
-│   ├── feature_engineering.py    # Spray angle, geometry & feature calculations
-│   ├── model_metadata.json       # Model documentation (features, metrics)
 │   ├── data_loader.py            # Parquet data loading utilities
-│   └── data/
-│       ├── mlb_park_walls.csv    # Stadium wall polygons (park-geometry features)
-│       └── park_altitudes.csv    # Stadium altitudes
+│   ├── feature_engineering.py    # Spray angle, geometry & feature calculations
+│   └── model_metadata.json       # Model documentation (features, metrics)
+│
+├── Research/
+│   ├── 2024_Season_WP_Model.ipynb # Bayesian hierarchical model research
+│   └── venue_effects_eda.ipynb    # Venue-effects EDA (led to F3 geometry features)
 │
 ├── Simulator/
+│   ├── assets/                   # Watermark/logo assets
 │   ├── constants.py              # Configuration and venue mappings
 │   ├── game_simulator.py         # Core simulation engine (incl. per-inning sim)
-│   ├── vector_engine.py          # Vectorized NumPy simulation engine
 │   ├── get_game_information.py   # MLB Stats API data retrieval
 │   ├── style.py                  # Shared chart styling
 │   ├── team_mapping.py           # Team name format mappings
 │   ├── utils.py                  # Helper functions
-│   ├── visualizations.py         # Plotting functions
-│   └── assets/                   # Watermark/logo assets
+│   ├── vector_engine.py          # Vectorized NumPy simulation engine
+│   └── visualizations.py         # Plotting functions
 │
 ├── tests/                        # pytest suite — see Development
 │
-├── Data/                         # Historical data for notebooks and tests —
-│   │                             #   the daily run fetches from the MLB Stats API
-│   ├── batted_balls/             # Yearly parquet files
-│   ├── games/                    # Games parquet file
-│   ├── teams/                    # Teams parquet file
-│   ├── contour_data.csv          # EV/LA outcome contour drawn by la_ev_graph (production)
-│   └── fences.csv                # raw fence-distance source for Model/data/mlb_park_walls.csv
-│
-└── Research/
-    ├── 2024_Season_WP_Model.ipynb # Bayesian hierarchical model research
-    └── venue_effects_eda.ipynb    # Venue-effects EDA (led to F3 geometry features)
+├── .gitignore
+├── LICENSE
+├── README.md
+├── pyproject.toml                # pytest config
+└── requirements.txt
 ```
 
 ## Model Validation
@@ -292,11 +293,11 @@ Stadium-specific spray charts showing batted ball locations with expected outcom
 
 ### Estimated Bases Table
 
-![Run Distribution](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_estimated_bases.png)
+![Estimated Bases Table](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_estimated_bases.png)
 
 ### Player Contributions
 
-![Run Distribution](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_player_contributions.png)
+![Player Contributions](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_player_contributions.png)
 
 ## Research
 
