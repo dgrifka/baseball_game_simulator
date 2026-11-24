@@ -1,0 +1,15 @@
+# Keeps the SHA-pinned actions in .github/workflows/ current. Actions only:
+# requirements.txt is pinned on purpose (see the comment there).
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      # Held at the version the production pipeline installs with; bumped by
+      # hand together with it.
+      - dependency-name: "astral-sh/setup-uv"

@@ -206,6 +206,7 @@ The model items are described in full under [Model](#model).
 ```
 baseball_game_simulator/
 ├── .github/
+│   ├── dependabot.yml            # Monthly grouped updates for the pinned actions
 │   └── workflows/ci.yml          # CI: pytest on push + pull request
 │
 ├── Data/                         # Historical data for notebooks and tests —
