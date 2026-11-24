@@ -77,8 +77,8 @@ def test_bucket_table_covers_100_mph_and_up_without_gaps():
         "lookup is `lo <= launch_speed < hi`, so at exactly 200 mph and above the "
         "correction silently stops applying and HR probability drops back to raw -- "
         "non-monotonic in EV. Not reachable in production (the Statcast record is "
-        "~122 mph), and fixing it means editing Simulator/, which wave A3 forbids. "
-        "Documented here so wave B can close the top bucket."
+        "~122 mph). Closing the top bucket means editing Simulator/game_simulator.py, "
+        "a scoring-path file, so it waits for the next scoring-path change."
     ),
 )
 def test_hr_correction_still_applies_at_and_above_200_mph():
