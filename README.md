@@ -3,27 +3,69 @@
 ### https://x.com/mlb_simulator
 ### [@mlb-simulator.bsky.social](https://bsky.app/profile/mlb-simulator.bsky.social)
 
-## Table of Contents
-- [Description](#description)
-- [Architecture](#architecture)
-- [Installation](#installation)
-- [Development](#development)
-- [Model](#model)
-- [Future Ideas](#future-ideas)
-- [Assumptions](#assumptions)
-- [Reasons Actual vs Simulation Can Vary](#reasons-actual-vs-simulation-can-vary)
-- [2026 Additions](#2026-additions)
-- [2025 Additions](#2025-additions)
-- [Project Structure](#project-structure)
-- [Model Validation](#model-validation)
-- [Outputs](#outputs)
-- [Research](#research)
-- [License](#license)
-- [Contact](#contact)
+> **Analysts:** the model, its scores and its formulas are in [For analysts](#for-analysts).
+>
+> **Developers:** install, tests and the file tree are in [For developers](#for-developers).
 
-## Description
+## Who deserved to win Game 7?
 
-This project simulates alternative outcomes of MLB games by resampling batted ball events, walks, strikeouts, steals, and pickoffs to determine who "should have won" a game. The simulator uses advanced metrics including launch angle, exit velocity, spray angle, and ballpark-specific factors to provide a more nuanced analysis of team performance and game outcomes.
+The Dodgers won Game 7 of the 2025 World Series 5 to 4, in 11 innings at Rogers
+Centre. That is how the night went once, and once is all a box score can show.
+
+I built this simulator to ask how the same night would go if it were dealt out
+again. It keeps every batted ball, walk, strikeout, steal and pickoff each team
+had, lets a model decide fresh what each batted ball becomes, and plays the game
+10,000 times. With that many replays, no single bounce decides the answer.
+
+Replayed that way, Game 7 goes to the Dodgers 61 times in 100 and to the Blue
+Jays 29 times. The team that won was also the team that deserved to, by about
+two to one.
+
+![How often each team scored each run total across 10,000 replays of Game 7](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_rd.png)
+
+The other 10 replays in 100 are ties, since each team's replay is scored on its
+own and the simulator plays no extra innings when the two totals match.
+
+## What does "deserve" mean?
+
+Start with one ball. In the top of the 2nd inning, Tommy Edman hit a fly ball
+that left the bat at 101.3 mph and rose at 42 degrees, which is hard and high.
+Edman pulled it toward right field, and right fielder Addison Barger caught it.
+Before you read on, decide what that ball should have been.
+
+The box score has already decided. It is an out, worth exactly what a pop-up to
+the catcher is worth. The simulator answers a different question. It asks how
+often a ball hit this hard, this high, in this direction and in this park
+becomes each result, and it uses those chances in place of what happened.
+
+![Five bars: the model's chance that Edman's fly ball becomes an out, a single, a double, a triple or a home run](Documentation/Images/article_one_ball.png)
+
+The model calls Edman's fly ball a coin flip. It gives the ball a 49 percent
+chance of being an out and a 50 percent chance of being a home run, with almost
+nothing left for anything in between. The Blue Jays got the better half of that
+flip.
+
+On this page, a ball deserves what it was worth across every result it could
+have had, not the one result it got. To put that worth in one number, I weight
+each result by the bases it is worth, add them up, and call the total estimated
+bases.
+
+```math
+\text{estimated bases} = p_{1B} + 2\,p_{2B} + 3\,p_{3B} + 4\,p_{HR}
+```
+
+Read aloud: the chance of a single, plus twice the chance of a double, plus three
+times the chance of a triple, plus four times the chance of a home run.
+
+Symbols: $p_{1B}$, $p_{2B}$, $p_{3B}$ and $p_{HR}$ are the model's chances that
+the ball becomes a single, a double, a triple or a home run. An out is worth no
+bases, so it has no term.
+
+Edman's fly ball comes to 2.01 estimated bases, about the value of a double, for
+a ball the box score counts as nothing. The replays above draw every batted
+ball's result from chances like these.
+
+<!-- old README below; replaced in stage 2 -->
 
 This account was inspired by @MoneyPuckdotcom. The model and account are derived from data gathered from MLB Stats API.
 
