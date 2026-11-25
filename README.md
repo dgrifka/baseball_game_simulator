@@ -70,6 +70,220 @@ Edman's fly ball comes to 2.01 estimated bases, about the value of a double, for
 a ball the box score counts as nothing. The replays above draw every batted
 ball's result from chances like these.
 
+## Where does the data come from?
+
+Everything the simulator knows about a game comes from the MLB Stats API, the
+league's public feed of every play. For each ball put in play it reads how hard
+the ball left the bat, the angle it left at, where on the field it ended up,
+which side of the plate the batter hit from, and the park. For the game as a
+whole it reads the temperature the feed reports and whether the roof was
+closed. Every strikeout, walk, hit batter, stolen base and pickoff comes along
+too, since the replays use them.
+
+For Game 7 that is 37 batted balls for the Dodgers and 33 for the Blue Jays.
+Those 70 balls are what every replay decides again.
+
+The model learned what a batted ball is worth from three seasons, each with its
+own job. It learned its patterns from about 126K batted balls in 2024, was
+calibrated on about 127K from 2025, and was tested on about 79K from 2026.
+Calibrating means checking the model's chances against a season it did not
+learn from and adjusting them, so that across many balls its chances match how
+often things really happened.
+
+Testing on 2026 asks the question the simulator faces every night, which is how
+the model does on games it has never seen. The scores from that test are in
+[For analysts](#for-analysts).
+
+## How does the model read a ball?
+
+The model turns a batted ball into five chances from four kinds of information,
+and I added each one to answer a problem the one before it left open. Edman's
+fly ball goes through every step with its own numbers.
+
+### How hard and how high
+
+Speed and angle come first, since they say most of what happens to a ball. A
+soft ground ball and a scorched line drive need nothing else to be told apart.
+
+They leave the hardest balls unsettled, though. A ball hit as hard and as high
+as Edman's can clear the wall in one direction and land in a glove in another,
+so speed and angle alone cannot decide it.
+
+### Which way it went
+
+Direction answers part of that. The wall is closer down the lines than in
+center field, so a fly ball pulled down a line has less wall to clear than the
+same ball hit to center. A left-handed batter pulls the ball to right field and
+a right-handed batter pulls it to left, so I measure the angle from the
+batter's side of the plate, where a pulled ball points the same way for both.
+
+Edman batted left-handed and pulled the ball toward the right-field line, about
+39 degrees off center.
+
+### The park
+
+A fly ball that clears the wall in one park is a long out in another. Earlier
+versions of the model handled that with one learned adjustment per stadium. I
+dropped it, since one number for a whole park cannot tell a short corner from a
+deep center field.
+
+In its place the model gets two facts about the park. The first is the distance
+to the wall along the line this ball was hit, read from an outline of each
+park's wall. The second is the park's altitude, since thinner air carries a ball
+farther. On the model's outline of Rogers Centre, the wall along Edman's line
+stood about 343 feet away, and the park sits 266 feet above sea level.
+
+From those, the model makes a first estimate of how far the ball would fly
+through that park's air, with drag and gravity and nothing else. By that
+estimate Edman's ball carries about 393 feet and clears the wall by about 49. I
+tried adding lift to this first estimate, and it did not make the model better,
+so it stays drag only.
+
+### Spin and air
+
+Drag alone flies a ball as if it had no spin, and a batted ball always spins.
+Spin lifts a ball, bends it and adds drag. So the model estimates each ball's
+spin from its launch angle, its direction and the batter's side, using formulas
+from Alan Nathan's research on the physics of baseball, and flies the ball again
+with the lift and the drag that spin creates.
+
+The estimate gives Edman's ball about 4,400 revolutions a minute, much of it
+sideways. With that spin the ball comes down about 346 feet out, only about 3
+feet past the wall.
+
+Temperature is the last piece. Warm air is thinner than cold air and lets a ball
+carry farther, so the model reads the game-time temperature from the feed. Game
+7 was played under a closed roof at 68 degrees, and at that temperature Edman's
+ball comes down about 345 feet out, 2 feet past the wall.
+
+By the physics, then, Edman's ball reached the wall with almost nothing to
+spare, which is a fair place for a coin flip.
+
+## How is the game replayed?
+
+Each replay deals one team's night back out in a new order and lets the model
+decide every batted ball again. Here is one replay for one team.
+
+The simulator shuffles the team's events, every batted ball, strikeout, walk,
+hit batter, steal and pickoff, into a random order and plays them one at a time.
+A strikeout is an out. A walk or a hit batter puts the batter on first and moves
+runners up only when they are forced. A steal moves the lead runner up a base,
+and a pickoff removes the lead runner for an out.
+
+A batted ball gets a random draw against its five chances, like a roll of a die
+weighted by the model, and becomes an out, a single, a double, a triple or a
+home run.
+
+Runners move up as many bases as the hit, with three exceptions where real
+runners often take more. A runner on second scores on a single 56 times in 100
+and otherwise stops at third. A runner on first reaches third on a single 26.5
+times in 100 when second base is empty, and otherwise stops at second. A runner
+on first scores on a double 67.5 times in 100 and otherwise stops at third. I
+set each of those halfway between the simulator's original rules and the major
+league averages.
+
+Every three outs the bases clear and a new inning starts. When the team's events
+run out, the replay is over, and its runs are the team's score. The other team
+is replayed the same way, the higher score wins, and the simulator does all of
+it 10,000 times. The win shares in the first section are the share of those
+replays each team won.
+
+One adjustment happens only in the replays. For a ball hit 100 mph or harder,
+the home run chance goes up slightly and the out chance gives up the same
+amount, as [For analysts](#for-analysts) shows. It moves Edman's ball from a 50
+percent home run to 51 percent.
+
+The whole path, from the feed to the charts, is below. A separate private repo
+runs the daily job and posts the charts.
+
+```mermaid
+flowchart TD
+    A["MLB Stats API<br/>every play of the game"] --> B["Each batted ball<br/>speed, angle, direction, park, weather"]
+    P["Park walls and altitudes"] --> B
+    Q["Physics<br/>carry, spin, air"] --> B
+    B --> M["Batted-ball model<br/>five chances per ball"]
+    M --> S["10,000 replays<br/>shuffle, draw, run the bases"]
+    S --> C["Charts"]
+    C --> X["a separate private repo posts the charts"]
+```
+
+The night's batted balls also get three charts of their own. The spray chart
+puts each team's batted balls where they went, ringed in the color of what the
+model thought each one was worth.
+
+![Spray chart of Game 7: each team's batted balls on the field, each ringed in a color for its estimated bases](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_spray.png)
+
+The estimated bases table ranks the night's 15 most valuable batted balls by
+that worth, and Edman's caught fly ball is sixth.
+
+![Table of Game 7's 15 batted balls with the most estimated bases, with speed, angle, direction, result and home run chance for each](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_estimated_bases.png)
+
+The player chart adds up each hitter's estimated bases, with one base for each
+walk, and each pitcher's estimated bases allowed.
+
+![Bars of estimated bases for each Game 7 hitter and estimated bases allowed for each pitcher](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_player_contributions.png)
+
+## What does the simulator miss?
+
+The replays judge contact, and they leave out most of what happens after the
+ball leaves the bat. Some of those gaps give a team runs in a replay and some
+take runs away.
+
+Defense is the biggest. The model knows how a ball was hit, not who was standing
+where, so a diving catch in the real game is a hit in many replays. A ball a
+fielder misplayed is judged only by how it was hit, and errors do not exist in a
+replay. A ball in play that the feed has no measurements for counts as an out in
+every replay.
+
+Lineup order does not exist either. The shuffle hands out a team's events in a
+random order, so a lineup that strings its hits together gets no credit for it,
+and one that scatters them gets no blame.
+
+Strikeouts and walks are fixed. Every replay has the same strikeouts, walks and
+hit batters as the real game, and only the balls in play are decided again. An
+out in a replay is always one out, so a double play takes one out and not two. A
+runner never moves up on an out, so a sacrifice fly is just an out. The first
+rule gives a replay runs the real game did not have, and the second takes some
+away.
+
+A replay can also run longer or shorter than the real game, since it ends when
+a team's events run out and not after nine innings. A home team that wins
+without batting in the bottom of the ninth brings fewer events to its replays
+than the visitors bring to theirs, which tilts the replays toward the visitors.
+
+The replays also score more than the real night did. The Dodgers' most common
+replay total is 9 runs and the Blue Jays' is 7, beside a real 5 to 4.
+
+Part of that is the contact. By the model's count, the Dodgers' batted balls
+were worth about 29 bases and got 21, while the Blue Jays' were worth about 22
+and got 20. The Dodgers lost far more to the night's catches and bounces than
+the Blue Jays did. The rest comes from the replay itself, since the Blue Jays'
+contact was worth close to what it got and their replays still score about
+twice their real 4 runs.
+
+Both teams play by the same rules, which is why I read the replays for which
+team hit the ball better and not for how many runs either one should have
+scored. The rules do not cost both teams the same, though, since a team that hit
+into more double plays on the night gets more of them back.
+
+The strongest objection is Edman's ball itself. It fell short of the wall, as
+the second section says, so a fan could fairly argue that the Blue Jays earned
+that out and the physics simply missed. The out was real, and the box score
+keeps it. The simulator asks a narrower question, what a ball that leaves the
+bat this way is usually worth, and its answer is a home run about half the time.
+A ball that dies short is the other half of that answer, not a sign the answer
+is wrong.
+
+Some of this I would like to change. Player speed, from sprint speed or steals
+per plate appearance, would let fast runners take the extra base more often.
+Double plays drawn from each ground ball's chances would take away runs the
+replays now give for free. A layered model could predict each result with the
+other results' chances in hand, and each team's usual run totals could shape how
+likely each replay is. Each would move the answer for some games, and none would
+change what the answer means.
+
+The box score says who won, and the replays say whose contact deserved to.
+
 <!-- old README below; replaced in stage 2 -->
 
 This account was inspired by @MoneyPuckdotcom. The model and account are derived from data gathered from MLB Stats API.
