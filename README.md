@@ -284,294 +284,332 @@ change what the answer means.
 
 The box score says who won, and the replays say whose contact deserved to.
 
-<!-- old README below; replaced in stage 2 -->
+## For analysts
 
-This account was inspired by @MoneyPuckdotcom. The model and account are derived from data gathered from MLB Stats API.
+This section is for readers who want to check or rebuild the model. Nothing
+above depends on it.
 
-Feel free to submit a pull request with modifications/improvements!
+### The model
 
-## Architecture
+The batted-ball model is scikit-learn's histogram gradient boosting
+classifier, a long chain of small decision trees in which each tree corrects
+the ones before it, wrapped in sigmoid calibration. It takes 28 inputs, 26
+numbers and 2 categories, known in the code as feature set F6. It returns five
+chances that add to one, for an out, a single, a double, a triple and a home
+run.
 
-This project uses a **two-repository structure** for security:
+It was fit on 125,778 batted balls from 2024, calibrated on 126,774 from 2025
+and tested on 78,602 from 2026, so every test ball comes from a season the
+model never saw while it was built. Sigmoid calibration fits an S-shaped curve
+from the trees' raw scores to chances on the 2025 season, and scikit-learn's
+[calibration guide](https://scikit-learn.org/stable/modules/calibration.html)
+explains it.
 
-| Repository | Visibility | Purpose |
-|------------|------------|---------|
-| [baseball_game_simulator](https://github.com/dgrifka/baseball_game_simulator) | Public | Core simulation engine, model, visualizations |
-| private orchestration repo | Private | Orchestration, social media posting, credentials, GitHub Actions |
+### How good is it?
 
-```mermaid
-flowchart TD
-    A[MLB Stats API] --> B[get_game_information.py]
-    B --> C[feature_engineering.py]
-    D[bbe_physics.py] --> C
-    E[(Model/data park walls + altitudes)] --> C
-    C --> F[batted_ball_model.pkl<br/>calibrated HistGBC, F6]
-    F --> G{{per-ball outcome probabilities}}
-    G --> H[game_simulator.py<br/>scalar reference]
-    G --> I[vector_engine.py<br/>vectorized NumPy]
-    H -. builds transition tables at import .-> I
-    I --> J[visualizations.py]
-    H --> J
-    J --> K[private orchestration repo<br/>posts to Twitter / Bluesky]
-```
+All three scores are on the 78,602 test balls from 2026.
 
-The private orchestration repo imports functions from this public repo and handles posting to Twitter/Bluesky. This keeps API credentials secure while allowing the core simulation logic to be open source.
+Accuracy is 0.826, which means the model's most likely result was the real
+result for 82.6 percent of test balls. That sounds better than it is, since
+most batted balls are outs. In this repo's 2025 batted balls 67.8 percent were
+outs, so a model that always said "out" would be right about two times in
+three. Accuracy also checks only the top choice, and the replays use all five
+chances.
 
-## Installation
+Log loss is 0.4388, and lower is better. It scores the chance the model gave to
+what really happened, and it punishes a confident miss far more than a cautious
+one, which matters because the replays draw from the chances themselves. The
+model before this one, with the park inputs but without spin and temperature
+(feature set F3), scored 0.4469 on the same test set, according to the deploy
+record in commit `691dec4`.
 
-```bash
-git clone https://github.com/dgrifka/baseball_game_simulator.git
-cd baseball_game_simulator
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-```
+CRPS, the continuous ranked probability score, is 0.174 on total bases. It
+compares the whole spread of bases the model expected with the bases the ball
+really got, and lower is better. A model that put all of every ball's chance on
+its real result would score 0.
 
-Note: `scikit-learn` is pinned in `requirements.txt` because
-`Model/batted_ball_model.pkl` is a pickled sklearn pipeline — unpickling
-across sklearn versions is not guaranteed.
+![Paired bars for each band of exit velocity from 85 to 115 mph, the model's home run rate beside the real one](Documentation/Images/article_hr_check.png)
 
-## Development
+The chart puts the model's home run rate beside the real one for each band of
+exit velocity. From 95 to 115 mph the model reads slightly low, by about one and
+a half to two and a half percentage points. The model's metadata does not say
+which batted balls this check covers, so read it as the model's own check and
+not as a test on unseen games.
 
-Run the test suite from the repo root:
+### The inputs
 
-```bash
-pip install pytest
-pytest tests/ -q
-```
+The 28 inputs, grouped by what they describe:
 
-The suite (~155 tests, about ten seconds) covers the spin/carry physics, F6
-feature construction, a golden feature frame and a predict smoke on the
-shipped pickle, scalar/vector engine parity, the HR tail correction, the
-estimated-bases schema, per-inning event ordering, weather and batter-id
-threading, venue-id mapping, the two spray-angle vertices, timeout and retry
-handling in the MLB Stats API client, chart labels, title-strip styling hooks
-and watermark geometry, model-asset presence, the README image script, the
-names the downstream pipeline imports, and an import smoke test over every
-module the daily run depends on. CI
-(`.github/workflows/ci.yml`) runs the same command on Python 3.11 and 3.12 for
-pushes to `main` and every pull request.
-
-The simulator runs the vectorized engine by default. Set `DTW_SCALAR_SIM=1` to
-force the scalar reference path in `game_simulator.py` instead; the two must
-agree, and the parity tests check that they do.
-
-## Model
-
-The batted ball outcome model is a **calibrated Histogram Gradient Boosting
-Classifier** (`CalibratedClassifierCV(HistGradientBoostingClassifier)`, sigmoid
-calibration, season-forward train/calibration split) trained on ~331K Statcast
-batted ball events from the 2024-2026 seasons. It predicts a 5-class
-probability vector [out, single, double, triple, home run] for each batted
-ball, which the simulator resamples from.
-
-**Performance** (held-out test set of 78,602 events, see `Model/model_metadata.json`):
-- Accuracy: 0.826
-- Log loss: 0.4388
-- CRPS (total bases): 0.174
-
-**Features (28 = 26 numeric + 2 categorical, feature set "F6"):**
 | Group | Features |
 |-------|----------|
 | Contact quality | `hitData_launchSpeed`, `hitData_launchAngle`, `launch_speed_squared`, `is_barrel`, `launch_angle_category` |
 | Distance | `distance_proxy`, `hr_distance_proxy` |
-| Spray | `spray_angle_adj` (handedness-adjusted; negative = pull side), `spray_angle_abs`, `spray_direction`, `is_pulled`, `is_opposite` |
+| Spray | `spray_angle_adj` (handedness-adjusted, negative = pull side), `spray_angle_abs`, `spray_direction`, `is_pulled`, `is_opposite` |
 | Interactions | `pulled_hard`, `oppo_hard`, `spray_ev_interaction`, `pulled_ground_ball`, `oppo_line_drive` |
 | Park geometry | `altitude_ft`, `wall_distance_ft`, `carry_ft`, `over_fence_margin` |
 | Spin | `total_spin_rpm`, `sidespin_abs_rpm`, `carry_ft_spin`, `over_fence_margin_spin` |
 | Temperature | `temp_f`, `carry_ft_spin_temp`, `over_fence_margin_spin_temp` |
 
-Every feature is derivable at inference time from
-`{exit velocity, launch angle, hit coordinates, batter handedness, venue_id,
-game-time temperature}`, and training and inference call the *same*
-`create_features_for_prediction`, so there is no train/serve skew.
+Every input comes from what the live feed gives for one ball, which is exit
+velocity, launch angle, hit coordinates, batter side, the park, and the
+game-time temperature with the roof state. The park inputs replaced a
+per-stadium `venue_id` category in 2026, after the study in
+`Research/venue_effects_eda.ipynb`.
 
-### Park geometry (F3)
+Temperature passes through `sanitize_temp` in `Model/feature_engineering.py`
+before it is used. A missing reading becomes 70°F. A closed-roof reading outside
+50 to 95°F becomes 72°F, since the feed sometimes reports the outdoor
+temperature for a closed roof. Every other reading is clipped to 35 to 105°F.
 
-The park-geometry features are computed from each stadium's wall polygon in
-`Model/data/mlb_park_walls.csv` plus altitude in `Model/data/park_altitudes.csv`.
-They **replaced the old `venue_id` categorical** in 2026: instead of learning a
-per-stadium fudge factor, the model sees the physics-relevant quantities —
-how far the wall is along the ball's spray line (`wall_distance_ft`, by
-ray-casting the spray angle against the wall polygon), and how much carry the
-air gives the ball (`carry_ft`, from a drag-only numerical trajectory
-integration with an exponential-atmosphere density model).
+The first carry estimate, `carry_ft`, is drag only. Magnus lift is written into
+it behind `_USE_LIFT` and switched off, since it did not improve log loss,
+calibration error or the home run tail. The spin-aware carries,
+`carry_ft_spin` and `carry_ft_spin_temp`, come from `Model/bbe_physics.py`,
+which follows Nathan's spreadsheet and does include lift. The two flights differ
+on purpose, and changing either one means a retrain.
 
-### Spin and temperature (F6)
+### The formulas
 
-`Model/bbe_physics.py` adds a physics-informed spin and trajectory layer seeded
-from Alan Nathan's public research (Trajectory Calculator; "Analysis of
-Baseball Trajectories", 2017). Backspin and sidespin are estimated from launch
-angle, handedness-adjusted spray angle, and bat side, then fed into a
-spin-aware carry integration that also takes game-time air temperature into
-account — warm, thin air carries the ball measurably farther.
+The formulas run in the order a ball's numbers flow, from the air to the win
+share, and each is transcribed from the function named under it. The step from
+five chances to estimated bases is the formula in
+[What does "deserve" mean?](#what-does-deserve-mean) and is not repeated here.
 
-Temperature comes from the live feed's `gameData.weather` (no extra API calls)
-and passes through a `sanitize_temp` guard: missing readings default to 70°F,
-and closed-roof games with implausible outdoor readings are pinned to 72°F —
-the MLB API has reported everything from 0°F to 109°F for climate-controlled
-games. Magnus lift was evaluated and left **off**: it did not improve log loss,
-calibration error, or the HR tail, so the shipped carry is drag-only.
+The first carry estimate flies the ball in steps of 0.005 seconds from 1 metre
+off the ground, at its measured speed and angle, through still air whose
+density falls with the park's altitude, until it lands.
 
-The simulator additionally applies a small **HR tail correction** at extreme
-exit velocities (100+ mph) during resampling only — the exported per-ball
-probabilities are always the raw calibrated model output. See the scope note
-in `Simulator/game_simulator.py`.
+```math
+\rho = 1.225\, e^{-h/8500}, \qquad \frac{d\vec{v}}{dt} = -\frac{\rho\, C_D\, A}{2m}\, \lvert \vec{v} \rvert\, \vec{v} - g\, \hat{z}
+```
 
-For more details, see `Model/bbe_physics.py` (the spin and carry physics),
-`Model/model_metadata.json` (the shipped model's exact features and metrics),
-and `Documentation/spray_angle_calibration.md` (the two spray-angle vertices
-and why the model's is frozen). Retraining (`Model/train_model.py`, S3-based)
-lives in the private orchestration repo. `Model/Spray_Angle_Model.ipynb` is
-historical (2025, pre-F3) and is kept only for the spray-angle EDA.
+Read aloud: the air's density is its sea-level density, shrunk the higher the
+park sits. At each step the ball slows by an amount that grows with the air's
+density and with the square of its speed, and gravity pulls it down.
 
-## Future Ideas
+Symbols: $\rho$ is the air density in kg/m³, $h$ the park's altitude in metres,
+$\vec{v}$ the ball's velocity, $C_D = 0.30$ the drag coefficient, $A = 0.00426$
+m² the ball's cross-section, $m = 0.145$ kg its mass, $g = 9.81$ m/s² gravity and
+$\hat{z}$ the upward direction. The carry is where the ball comes back to the
+ground, in feet. From `_drag_carry_scalar` in `Model/feature_engineering.py`.
 
-- Layer the expected outcome model by predicting outcomes conditional on other outcome probabilities
-- Add sprint speed or stolen bases per PA to account for player speed
-- Incorporate double plays into the simulations, depending on ground ball probabilities
-- Incorporate prior run distribution into likelihood of the simulations
+Spin is estimated from the launch angle, the direction and the batter's side
+with the regressions in Nathan's Trajectory Calculator.
 
-## Assumptions
+```math
+\omega_b = -763 + 120\,\theta + 21\,s, \qquad \omega_s = -\sigma\,(849 + 94\,s), \qquad \omega = \sqrt{\omega_b^2 + \omega_s^2}
+```
 
-- The number of strikeouts and walks/HBP remain the same in each simulation
-- The simulation can have fewer/more innings than the real game, since the outcomes will be distributed differently
+Read aloud: backspin rises with the launch angle and with how far the ball went
+toward the opposite field, and a low ball comes out with topspin. Sidespin is a
+base amount plus a share of the direction angle, and the batter's side sets
+which way it turns. Total spin combines the two the way the two short sides of a
+right triangle make the long one.
 
-## Reasons Actual vs Simulation Can Vary
+Symbols: $\theta$ is the launch angle in degrees, $s$ the spray angle in degrees
+measured from the batter's side (negative when pulled, positive toward the
+opposite field), $\sigma$ is 1 for a right-handed batter and -1 for a
+left-handed one, and $\omega_b$, $\omega_s$ and $\omega$ are backspin, sidespin
+and total spin in revolutions a minute. From `nathan_spin` in
+`Model/bbe_physics.py`. Edman's ball, at 42 degrees and -38.6 batting
+left-handed, gets 3,467 of backspin, -2,776 of sidespin and 4,442 in total.
 
-- **Lineup sequencing**: This simulation assigns outcomes randomly throughout the lineup, so different outcomes can be assigned to each player. A team can outperform the simulation if the roster is constructed better than the simulation assumes.
-- **Defense**: This model uses launch angle, exit velocity, and spray angle to predict outcomes, so a great defensive play in the game can be a hit in the simulation.
-- **9th inning effects**: If the away team put the ball in play in the 9th inning while the home team did not, the away team could be favored more in the simulation.
-- **Errors**: Fielding errors are not accounted for, so a team can outperform or underperform in the simulation depending on errors.
+The spin-aware flight measures the air with Nathan's formula, which also uses
+the game temperature, at standard pressure and 50 percent humidity.
 
-## 2026 Additions
+```math
+\begin{aligned}
+T &= 21.1 + \tfrac{5}{9}\,(t - 70) \\
+e_s &= 4.5841\, \exp\!\left(\frac{(18.687 - T/234.5)\,T}{257.14 + T}\right) \\
+\rho &= 1.2929 \cdot \frac{273}{T + 273} \cdot \frac{760\, e^{-1.217\times 10^{-4}\, h} - 0.3783 \cdot 50 \cdot e_s/100}{760}
+\end{aligned}
+```
 
-The model items are described in full under [Model](#model).
+Read aloud: the temperature in Celsius is counted from 21.1 degrees at 70
+Fahrenheit. The pressure of the water vapor the air can hold rises with the
+temperature. The air's density falls as the temperature rises and as the park
+sits higher, and falls a little more for the water vapor in it.
 
-- **Spin + temperature physics (feature set F6)** — seven Nathan-derived spin and carry features; log loss 0.446 → 0.4388.
-- **Park-geometry features (feature set F3)** — `venue_id` replaced by altitude, wall distance and carry computed from real stadium polygons; log loss 0.450 → 0.446.
-- **HistGradientBoosting estimator** with native categoricals and early stopping, sigmoid-calibrated on a season held forward from training.
-- **Live weather capture** — game-time temperature and roof state from the feed already being fetched, behind the `sanitize_temp` guard.
-- **HR tail correction (simulation only)** — small bump at 100+ mph during resampling; exported per-ball probabilities stay raw.
-- **Vectorized simulation engine** — `Simulator/vector_engine.py` simulates all games at once; the baserunning rules stay in `game_simulator.py`, which builds the transition tables.
-- **Per-inning simulation primitives** — `outcomes_by_inning` / `simulator_by_inning` for the per-inning deserved-run-differential charts.
-- **Alternate/minor-league venue support** — wall polygons, altitudes and chart outlines for Sutter Health Park and Las Vegas Ballpark (the script that generates a new park's polygon lives in the private orchestration repo).
-- **Test suite + CI** — see [Development](#development).
+Symbols: $t$ is the game temperature in °F after the guard above, $T$ the same
+in °C, $e_s$ the saturation vapor pressure in mmHg, $h$ the park's altitude in
+metres and $\rho$ the air density in kg/m³. The flight's drag and lift both
+scale with $K = 0.07182\,\rho'$, where $\rho'$ is $\rho$ in lb/ft³. From
+`air_density_K` in `Model/bbe_physics.py`.
 
-## 2025 Additions
+`spin_aware_carry` then flies the ball in steps of 0.01 seconds from 3 feet up,
+with a drag coefficient that rises with total spin and a Magnus lift coefficient
+that rises with the ratio of spin to speed, as Nathan's spreadsheet does. It
+flies once at 70°F and once at the game temperature.
 
-- **Spray angle model**: Added batter handedness-adjusted spray angle as a feature, improving accuracy from 77% to 82%
-- **Feature engineering module**: Centralized spray angle and feature calculations in `Model/feature_engineering.py`
-- **Improved code docstrings and documentation**
-- **Cleaner and improved visuals**
+Each carry becomes a margin by subtracting the distance to the wall along the
+ball's line.
 
-## Project Structure
+```math
+m = c - w(\phi)
+```
+
+Read aloud: how far past the wall the ball would come down, below zero when it
+falls short.
+
+Symbols: $m$ is the margin in feet, $c$ one of the three carries (drag only,
+spin-aware, spin-aware at the game temperature), and $w(\phi)$ the wall distance
+at spray angle $\phi$ measured from the plate (negative toward left field,
+positive toward right). The wall distance comes from casting a ray along
+$\phi$ to the park's wall outline in `Model/data/mlb_park_walls.csv`, or is 374
+feet when the park or the ray is missing. From `create_features_for_prediction`
+in `Model/feature_engineering.py`. Edman's three margins are 49.3, 2.8 and 2.1
+feet.
+
+In the replays only, a ball hit 100 mph or harder has its home run chance scaled
+up, and its out chance gives up the difference.
+
+```math
+p'_{HR} = f(v)\,p_{HR}, \qquad p'_{out} = \max\bigl(0,\ p_{out} - (f(v) - 1)\,p_{HR}\bigr), \qquad f(v) = \begin{cases} 1.02 & 100 \le v < 105 \\ 1.05 & 105 \le v < 200 \\ 1 & \text{otherwise} \end{cases}
+```
+
+Read aloud: the new home run chance is the old one times a factor, and the out
+chance drops by what the home run chance gained, never below zero. The factor is
+1.02 from 100 to 105 mph, 1.05 from 105 mph up, and 1 below 100 mph.
+
+Symbols: $p_{HR}$ and $p_{out}$ are the model's raw home run and out chances,
+$p'$ the chances the replays draw from, $v$ the exit velocity in mph and $f(v)$
+the factor. The single, double and triple chances do not change. From
+`_apply_hr_tail_correction` and `HR_TAIL_CORRECTIONS` in
+`Simulator/game_simulator.py`. Edman's home run chance goes from 0.4953 to
+0.5052.
+
+A team's win share is the share of replays in which it outscored the other
+team.
+
+```math
+W = \frac{1}{N} \sum_{i=1}^{N} \mathbf{1}\left[R_i > R_i'\right]
+```
+
+Read aloud: the number of replays the team won, divided by the number of
+replays.
+
+Symbols: $N$ is the number of replays (10,000 on this page), $R_i$ and $R_i'$
+the team's and the other team's runs in replay $i$, and $\mathbf{1}[\cdot]$ is 1
+when the bracket is true and 0 when it is not. Equal totals count as ties. From
+`simulator` in `Simulator/game_simulator.py`.
+
+### Three things to know
+
+**The home run bump is in the replays only.** The chances on the one-ball chart,
+in the estimated bases table and in every row the simulator exports are the
+model's raw output. Adding the bump there would change the scoring scale partway
+through a season, so it stays out.
+
+**The model and the charts use two spray-angle vertices, on purpose.** The model
+measures spray angles from the hit-coordinate origin (125.42, 199.02), which was
+fitted for distance and not for angle. Measured from it, about 4.9 percent of
+2024 home runs and 4.7 percent of 2025 home runs land beyond the foul lines. The
+spray chart and the Pull, Center and Oppo labels measure from a calibrated
+vertex, (127.4, 215.0), where those shares fall to 0.23 and 0.12 percent. Every
+shipped model learned from angles measured the first way, so moving the model's
+vertex means new wall outlines and a retrain.
+[Documentation/spray_angle_calibration.md](Documentation/spray_angle_calibration.md)
+has the evidence.
+
+**Two engines run the replays.** A vectorized NumPy engine in
+`Simulator/vector_engine.py` runs by default. Its tables are built at import from
+the scalar reference functions in `Simulator/game_simulator.py`, so the
+baserunning rules live in one place. Set `DTW_SCALAR_SIM=1` to run the scalar
+path instead. The two draw random numbers in different orders, so a seed
+reproduces each engine on its own but not one from the other, and
+`tests/test_engine_parity.py` checks that their run distributions agree.
+
+### Two checks on the inputs
+
+The two plots below come from
+[Documentation/readme_image_generator.ipynb](Documentation/readme_image_generator.ipynb).
+The first checks the handedness adjustment, so that the pull side means the same
+thing for right- and left-handed batters. Blue is the pull side and red the
+opposite field.
+
+![Hit locations colored by handedness-adjusted spray angle, blue for the pull side and red for the opposite field](Documentation/Images/spray_angle_validation.png)
+
+The second shows how exit velocity and launch angle combine into results, with
+color for spray angle (blue pulled, red opposite field) and marker size for how
+good the result was.
+
+![Exit velocity against launch angle for batted balls, colored by spray angle, with marker size for the result](Documentation/Images/ev_la_spray_angle.png)
+
+## For developers
+
+### Install and test
+
+```bash
+git clone https://github.com/dgrifka/baseball_game_simulator.git
+cd baseball_game_simulator
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt pytest
+pytest tests/ -q
+```
+
+`scikit-learn` is pinned in `requirements.txt` because
+`Model/batted_ball_model.pkl` is a pickled scikit-learn pipeline, and unpickling
+across versions is not guaranteed.
+
+The suite has about 175 tests and runs in about ten seconds from the repo root.
+CI (`.github/workflows/ci.yml`) runs the same command on Python 3.11 and 3.12
+for every push to `main` and every pull request.
+
+### Images
+
+- `python Documentation/make_readme_images.py` redraws the four Game 7 charts.
+  It fetches the game (gamePk 813024) and replays it 10,000 times with seed
+  20251101, so the win shares come out the same on every run.
+- `python Documentation/make_article_figures.py` redraws the one-ball chart,
+  which fetches the same game, and the home run check. Add `--only hr_check` to
+  redraw the home run check alone, with no network.
+- The two input checks come from `Documentation/readme_image_generator.ipynb`.
+
+### Files
+
 ```
 baseball_game_simulator/
-├── .github/
-│   ├── dependabot.yml            # Monthly grouped updates for the pinned actions
-│   └── workflows/ci.yml          # CI: pytest on push + pull request
-│
-├── Data/                         # Historical data for notebooks and tests —
-│   │                             #   the daily run fetches from the MLB Stats API
-│   ├── batted_balls/             # Yearly parquet files (2024, 2025)
-│   ├── games/                    # Games parquet file
-│   ├── teams/                    # Teams parquet file
-│   ├── contour_data.csv          # EV/LA outcome contour drawn by la_ev_graph (production)
-│   └── fences.csv                # Raw fence-distance source for Model/data/mlb_park_walls.csv
-│
+├── .github/                        # CI workflow and Dependabot
+├── Data/                           # Historical parquet and CSVs for notebooks and tests
 ├── Documentation/
-│   ├── Images/                       # README visualization images
-│   ├── make_readme_images.py         # Render the four example game charts
-│   ├── readme_image_generator.ipynb  # The two model-validation plots
-│   └── spray_angle_calibration.md    # Rendering vs model spray-angle vertex
-│
+│   ├── Images/                     # Every image on this page
+│   ├── make_readme_images.py       # The four Game 7 charts
+│   ├── make_article_figures.py     # The one-ball chart and the home run check
+│   └── readme_image_generator.ipynb, spray_angle_calibration.md
 ├── Model/
-│   ├── data/
-│   │   ├── mlb_park_walls.csv    # Stadium wall polygons (park-geometry features)
-│   │   └── park_altitudes.csv    # Stadium altitudes
-│   ├── Spray_Angle_Model.ipynb   # Historical (2025) spray-angle EDA
-│   ├── batted_ball_model.pkl     # Trained model pipeline (sklearn)
-│   ├── bbe_physics.py            # Nathan spin + temp-aware carry physics (F6)
-│   ├── data_loader.py            # Parquet data loading utilities
-│   ├── feature_engineering.py    # Spray angle, geometry & feature calculations
-│   └── model_metadata.json       # Model documentation (features, metrics)
-│
-├── Research/
-│   ├── 2024_Season_WP_Model.ipynb # Bayesian hierarchical model research
-│   └── venue_effects_eda.ipynb    # Venue-effects EDA (led to F3 geometry features)
-│
+│   ├── data/                       # Park wall outlines and altitudes
+│   ├── batted_ball_model.pkl       # The shipped model (scikit-learn pipeline)
+│   ├── bbe_physics.py              # Spin, air density and spin-aware carry
+│   ├── feature_engineering.py      # Spray angle, park geometry and the 28 inputs
+│   └── model_metadata.json         # Inputs, split sizes and scores
+├── Research/                       # Season win-probability and venue-effects notebooks
 ├── Simulator/
-│   ├── assets/                   # Watermark/logo assets
-│   ├── constants.py              # Configuration and venue mappings
-│   ├── game_simulator.py         # Core simulation engine (incl. per-inning sim)
-│   ├── get_game_information.py   # MLB Stats API data retrieval
-│   ├── style.py                  # Shared chart styling
-│   ├── team_mapping.py           # Team name format mappings
-│   ├── utils.py                  # Helper functions
-│   ├── vector_engine.py          # Vectorized NumPy simulation engine
-│   └── visualizations.py         # Plotting functions
-│
-├── tests/                        # pytest suite — see Development
-│
-├── .gitignore
-├── LICENSE
-├── README.md
-├── pyproject.toml                # pytest config
-└── requirements.txt
+│   ├── game_simulator.py           # Outcomes, baserunning, scalar replays
+│   ├── vector_engine.py            # Vectorized replays (the default)
+│   ├── get_game_information.py     # MLB Stats API client
+│   └── visualizations.py, style.py # The game charts and their shared style
+├── tests/                          # pytest suite, incl. test_article_figures_script.py
+└── requirements.txt, pyproject.toml
 ```
-
-## Model Validation
-
-This section demonstrates the model's key features and outputs.
-
-> 📓 The two validation plots below come from
-> [Documentation/readme_image_generator.ipynb](Documentation/readme_image_generator.ipynb).
-> The four game charts under [Outputs](#outputs) are rendered by
-> `python Documentation/make_readme_images.py` (2025 World Series Game 7,
-> seeded so the run is reproducible).
-
-### Spray Angle Adjustment Validation
-
-The model adjusts spray angle based on batter handedness so that "pull side" is consistently represented for both right-handed and left-handed batters. Blue indicates pull side, red indicates opposite field.
-
-![Spray Angle Validation](Documentation/Images/spray_angle_validation.png)
-
-### Exit Velocity vs Launch Angle with Spray Angle
-
-The classic "sweet spot" visualization showing how exit velocity and launch angle combine to determine outcomes. Color indicates spray angle (blue = pull, red = oppo), marker size indicates outcome quality.
-
-![EV vs LA with Spray Angle](Documentation/Images/ev_la_spray_angle.png)
-
-## Outputs
-
-### Spray Chart
-
-Stadium-specific spray charts showing batted ball locations with expected outcome indicators.
-
-![Spray Chart Example](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_spray.png)
-
-### Run Distribution
-
-![Run Distribution](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_rd.png)
-
-### Estimated Bases Table
-
-![Estimated Bases Table](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_estimated_bases.png)
-
-### Player Contributions
-
-![Player Contributions](Documentation/Images/Dodgers_Blue%20Jays_5-4--61-29_player_contributions.png)
 
 ## Research
 
 - [Who Deserved to Win: Building an MLB Game Outcome Simulator](https://medium.com/@dmgrifka_64770/who-deserved-to-win-building-an-mlb-game-outcome-simulator-b4a8d4bca2a9)
-  
 - [Applying Bayesian Hierarchical Methods to MLB Season Win Probabilities with PyStan](https://medium.com/@dmgrifka_64770/applying-bayesian-hierarchical-methods-to-mlb-season-win-probabilties-with-pystan-468572abb932)
+
+## Credits
+
+This account was inspired by @MoneyPuckdotcom. The model and the account are
+built on data from the MLB Stats API, and the spin and carry physics are seeded
+from Alan Nathan's public research (the Trajectory Calculator and "Analysis of
+Baseball Trajectories", 2017).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
 
 ## Contact
 
-Derek Grifka - https://dgrifka.github.io/
+Derek Grifka, https://dgrifka.github.io/
+
+Feel free to open a pull request with fixes or improvements.
