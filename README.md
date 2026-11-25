@@ -232,15 +232,18 @@ take runs away.
 Defense is the biggest. The model knows how a ball was hit, not who was standing
 where, so a diving catch in the real game is a hit in many replays. A ball a
 fielder misplayed is judged only by how it was hit, and errors do not exist in a
-replay. A ball in play that the feed has no measurements for counts as an out in
-every replay.
+replay. When the feed has no measurements for a ball in play, the replays count
+it as an out if the real play was not a hit, and drop it if it was.
 
 Lineup order does not exist either. The shuffle hands out a team's events in a
 random order, so a lineup that strings its hits together gets no credit for it,
 and one that scatters them gets no blame.
 
-Strikeouts and walks are fixed. Every replay has the same strikeouts, walks and
-hit batters as the real game, and only the balls in play are decided again.
+Strikeouts and walks are fixed. A replay keeps the real game's strikeouts, walks
+and hit batters as they were, and only the balls in play are decided again. Any
+other plate appearance that ends without a ball in play is left out, which in
+Game 7 drops one of the Blue Jays' 12 strikeouts, the one that ended in a double
+play.
 
 Outs are simpler than in a real game. An out in a replay is always one out, so a
 double play takes one out and not two. A runner never moves up on an out, so a
