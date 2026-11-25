@@ -144,8 +144,8 @@ so it stays drag only.
 Drag alone flies a ball as if it had no spin, and a batted ball always spins.
 Spin lifts a ball, bends it and adds drag. So the model estimates each ball's
 spin from its launch angle, its direction and the batter's side, using formulas
-from Alan Nathan's research on the physics of baseball, and flies the ball again
-with the lift and the drag that spin creates.
+from Alan Nathan's research on the physics of baseball. Then it flies the ball
+again with the lift and the drag that spin creates.
 
 The estimate gives Edman's ball about 4,400 revolutions a minute, much of it
 sideways. With that spin the ball comes down about 346 feet out, only about 3
@@ -164,9 +164,9 @@ spare, which is a fair place for a coin flip.
 Each replay deals one team's night back out in a new order and lets the model
 decide every batted ball again. Here is one replay for one team.
 
-The simulator shuffles the team's events, every batted ball, strikeout, walk,
-hit batter, steal and pickoff, into a random order and plays them one at a time.
-A strikeout is an out. A walk or a hit batter puts the batter on first and moves
+The simulator takes every batted ball, strikeout, walk, hit batter, steal and
+pickoff the team had, shuffles them into a random order, and plays them one at a
+time. A strikeout is an out. A walk or a hit batter puts the batter on first and moves
 runners up only when they are forced. A steal moves the lead runner up a base,
 and a pickoff removes the lead runner for an out.
 
@@ -240,11 +240,12 @@ random order, so a lineup that strings its hits together gets no credit for it,
 and one that scatters them gets no blame.
 
 Strikeouts and walks are fixed. Every replay has the same strikeouts, walks and
-hit batters as the real game, and only the balls in play are decided again. An
-out in a replay is always one out, so a double play takes one out and not two. A
-runner never moves up on an out, so a sacrifice fly is just an out. The first
-rule gives a replay runs the real game did not have, and the second takes some
-away.
+hit batters as the real game, and only the balls in play are decided again.
+
+Outs are simpler than in a real game. An out in a replay is always one out, so a
+double play takes one out and not two. A runner never moves up on an out, so a
+sacrifice fly is just an out. The first rule gives a replay runs the real game
+did not have, and the second takes some away.
 
 A replay can also run longer or shorter than the real game, since it ends when
 a team's events run out and not after nine innings. A home team that wins
@@ -354,7 +355,8 @@ Every input comes from what the live feed gives for one ball, which is exit
 velocity, launch angle, hit coordinates, batter side, the park, and the
 game-time temperature with the roof state. The park inputs replaced a
 per-stadium `venue_id` category in 2026, after the study in
-`Research/venue_effects_eda.ipynb`.
+`Research/venue_effects_eda.ipynb`. The wall outlines and altitudes also cover
+two parks the Athletics use, Sutter Health Park and Las Vegas Ballpark.
 
 Temperature passes through `sanitize_temp` in `Model/feature_engineering.py`
 before it is used. A missing reading becomes 70°F. A closed-roof reading outside
@@ -380,7 +382,10 @@ off the ground, at its measured speed and angle, through still air whose
 density falls with the park's altitude, until it lands.
 
 ```math
-\rho = 1.225\, e^{-h/8500}, \qquad \frac{d\vec{v}}{dt} = -\frac{\rho\, C_D\, A}{2m}\, \lvert \vec{v} \rvert\, \vec{v} - g\, \hat{z}
+\begin{aligned}
+\rho &= 1.225\, e^{-h/8500} \\
+\frac{d\vec{v}}{dt} &= -\frac{\rho\, C_D\, A}{2m}\, \lvert \vec{v} \rvert\, \vec{v} - g\, \hat{z}
+\end{aligned}
 ```
 
 Read aloud: the air's density is its sea-level density, shrunk the higher the
@@ -397,7 +402,11 @@ Spin is estimated from the launch angle, the direction and the batter's side
 with the regressions in Nathan's Trajectory Calculator.
 
 ```math
-\omega_b = -763 + 120\,\theta + 21\,s, \qquad \omega_s = -\sigma\,(849 + 94\,s), \qquad \omega = \sqrt{\omega_b^2 + \omega_s^2}
+\begin{aligned}
+\omega_b &= -763 + 120\,\theta + 21\,s \\
+\omega_s &= -\sigma\,(849 + 94\,s) \\
+\omega &= \sqrt{\omega_b^2 + \omega_s^2}
+\end{aligned}
 ```
 
 Read aloud: backspin rises with the launch angle and with how far the ball went
@@ -421,7 +430,8 @@ the game temperature, at standard pressure and 50 percent humidity.
 \begin{aligned}
 T &= 21.1 + \tfrac{5}{9}\,(t - 70) \\
 e_s &= 4.5841\, \exp\!\left(\frac{(18.687 - T/234.5)\,T}{257.14 + T}\right) \\
-\rho &= 1.2929 \cdot \frac{273}{T + 273} \cdot \frac{760\, e^{-1.217\times 10^{-4}\, h} - 0.3783 \cdot 50 \cdot e_s/100}{760}
+\rho &= 1.2929 \cdot \frac{273}{T + 273} \\
+&\quad \cdot \frac{760\, e^{-1.217\times 10^{-4}\, h} - 0.3783 \cdot 50 \cdot e_s/100}{760}
 \end{aligned}
 ```
 
@@ -464,7 +474,11 @@ In the replays only, a ball hit 100 mph or harder has its home run chance scaled
 up, and its out chance gives up the difference.
 
 ```math
-p'_{HR} = f(v)\,p_{HR}, \qquad p'_{out} = \max\bigl(0,\ p_{out} - (f(v) - 1)\,p_{HR}\bigr), \qquad f(v) = \begin{cases} 1.02 & 100 \le v < 105 \\ 1.05 & 105 \le v < 200 \\ 1 & \text{otherwise} \end{cases}
+\begin{aligned}
+p'_{HR} &= f(v)\,p_{HR} \\
+p'_{out} &= \max\bigl(0,\ p_{out} - (f(v) - 1)\,p_{HR}\bigr) \\
+f(v) &= \begin{cases} 1.02 & 100 \le v < 105 \\ 1.05 & 105 \le v < 200 \\ 1 & \text{otherwise} \end{cases}
+\end{aligned}
 ```
 
 Read aloud: the new home run chance is the old one times a factor, and the out
@@ -517,7 +531,9 @@ the scalar reference functions in `Simulator/game_simulator.py`, so the
 baserunning rules live in one place. Set `DTW_SCALAR_SIM=1` to run the scalar
 path instead. The two draw random numbers in different orders, so a seed
 reproduces each engine on its own but not one from the other, and
-`tests/test_engine_parity.py` checks that their run distributions agree.
+`tests/test_engine_parity.py` checks that their run distributions agree. Both
+engines can also replay a game inning by inning (`outcomes_by_inning` and
+`simulator_by_inning`), which feeds the per-inning run charts.
 
 ### Two checks on the inputs
 
