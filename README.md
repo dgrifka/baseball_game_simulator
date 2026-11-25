@@ -45,6 +45,11 @@ chance of being an out and a 50 percent chance of being a home run, with almost
 nothing left for anything in between. The Blue Jays got the better half of that
 flip.
 
+The ball itself came down 319 feet from the plate, about 24 feet short of the
+wall on that line. The model never sees where a ball lands. It sees only how the
+ball left the bat, and by its count a ball that leaves the bat this way is a
+home run about half the time.
+
 On this page, a ball deserves what it was worth across every result it could
 have had, not the one result it got. To put that worth in one number, I weight
 each result by the bases it is worth, add them up, and call the total estimated
